@@ -33,44 +33,68 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _signIn() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  Future<void> _signIn() async {
+  if (!_formKey.currentState!.validate()) return;
+
+  setState(() {
+    _isLoading = true;
+    _errorMessage = null;
+  });
+
+  try {
+    final response = await Supabase.instance.client.auth.signInWithPassword(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
+
+    if (response.user == null) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Sign in failed. Please check your details.';
+      });
+      return;
+    }
 
     try {
-      await Supabase.instance.client.auth.signInWithPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
       await SessionService.saveSession(staySignedIn: _staySignedIn);
-      // Restore profile from Supabase so it persists across sign-outs
-      await ProfileService.restoreProfileFromSupabase();
-      if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/main-screen',
-          (route) => false,
-        );
-      }
-    } on AuthException catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = e.message;
-        });
-      }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'An unexpected error occurred. Please try again.';
-        });
-      }
+      debugPrint('LoginScreen: saveSession failed: $e');
     }
+
+    try {
+      await ProfileService.restoreProfileFromSupabase();
+    } catch (e) {
+      debugPrint('LoginScreen: restoreProfileFromSupabase failed: $e');
+    }
+
+    if (!mounted) return;
+
+    setState(() => _isLoading = false);
+
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      '/main-screen',
+      (route) => false,
+    );
+  } on AuthException catch (e) {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = false;
+      _errorMessage = e.message;
+    });
+  } catch (e) {
+    debugPrint('LoginScreen: unexpected sign in error: $e');
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = false;
+      _errorMessage = e.toString();
+    });
   }
+}
 
   void _showForgotPassword() {
     showModalBottomSheet(
