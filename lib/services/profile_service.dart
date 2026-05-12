@@ -1,0 +1,365 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+
+class ProfileService {
+  static String? _lastUploadError;
+  static String? get lastUploadError => _lastUploadError;
+
+  static const String _keyIsProfileComplete = 'is_profile_complete';
+
+  static const String _keyRidingSpeed = 'profile_riding_speed';
+  static const String _keySkillLevels = 'profile_skill_levels';
+  static const String _keyBikeTypes = 'profile_bike_types';
+  static const String _keyPreferredRoads = 'profile_preferred_roads';
+  static const String _keyRideTimes = 'profile_ride_times';
+  static const String _keyRiderPhotoPath = 'profile_rider_photo_path';
+  static const String _keyBikePhotoPaths = 'profile_bike_photo_paths';
+  static const String _keyRiderName = 'profile_rider_name';
+  static const String _keyRiderBio = 'profile_rider_bio';
+  static const String _keySpeedUnit =
+      'profile_speed_unit'; // 'metric' or 'imperial'
+  static const String _keyGender = 'profile_gender';
+
+  static Future<bool> isProfileComplete() async {
+    final prefs = await SharedPreferences.getInstance();
+    _lastUploadError = null;
+    return prefs.getBool(_keyIsProfileComplete) ?? false;
+  }
+
+  /// Upload an XFile image to Supabase Storage and return the public URL.
+  /// Returns null if upload fails.
+  static Future<String?> uploadPhoto(XFile photo, String folder) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser == null) {
+        debugPrint('❌ uploadPhoto: No authenticated user');
+        return null;
+      }
+
+      final ext = photo.name.split('.').last.toLowerCase();
+      final safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].contains(ext)
+          ? ext
+          : 'jpg';
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$safeExt';
+      final filePath = '${currentUser.id}/$folder/$fileName';
+
+      // Read bytes from the XFile — works on both web and mobile
+      final bytes = await photo.readAsBytes();
+
+      // Check we actually got data
+      if (bytes.isEmpty) {
+        debugPrint('❌ uploadPhoto: Empty bytes for ${photo.name}');
+        return null;
+      }
+
+      debugPrint(
+        '📤 uploadPhoto: Uploading ${bytes.length} bytes to user-photos/$filePath',
+      );
+
+      final String contentType;
+      if (safeExt == 'png') {
+        contentType = 'image/png';
+      } else if (safeExt == 'gif') {
+        contentType = 'image/gif';
+      } else if (safeExt == 'webp') {
+        contentType = 'image/webp';
+      } else {
+        contentType = 'image/jpeg';
+      }
+
+      await supabase.storage
+          .from('user-photos')
+          .uploadBinary(
+            filePath,
+            bytes,
+            fileOptions: FileOptions(contentType: contentType, upsert: true),
+          );
+
+      final publicUrl = supabase.storage
+          .from('user-photos')
+          .getPublicUrl(filePath);
+
+      debugPrint('✅ uploadPhoto: Public URL = $publicUrl');
+      return publicUrl;
+    } catch (e) {
+      debugPrint('❌ uploadPhoto failed: $e');
+      _lastUploadError = e.toString();
+      return null;
+    }
+  }
+
+  static Future<void> saveProfile({
+    required double ridingSpeed,
+    required List<String> skillLevels,
+    required List<String> bikeTypes,
+    required List<String> preferredRoads,
+    required Map<String, List<String>> rideTimes,
+    String? riderPhotoPath,
+    String? existingRiderPhotoUrl,
+    List<String> bikePhotoPaths = const [],
+    String riderName = '',
+    String riderBio = '',
+    bool isMetric = false,
+    String? gender,
+    XFile? riderPhotoFile,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    _lastUploadError = null;
+
+    await prefs.setDouble(_keyRidingSpeed, ridingSpeed);
+    await prefs.setStringList(_keySkillLevels, skillLevels);
+    await prefs.setStringList(_keyBikeTypes, bikeTypes);
+    await prefs.setStringList(_keyPreferredRoads, preferredRoads);
+    await prefs.setString(_keyRideTimes, jsonEncode(rideTimes));
+
+    // Check auth BEFORE attempting upload
+    final supabase = Supabase.instance.client;
+    var currentUser = supabase.auth.currentUser;
+
+    // If no session, wait briefly for it to restore
+    if (currentUser == null) {
+      debugPrint('⚠️ No auth session in saveProfile — waiting...');
+      for (int i = 0; i < 10; i++) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        currentUser = supabase.auth.currentUser;
+        if (currentUser != null) {
+          debugPrint('✅ Session recovered after ${(i + 1) * 500}ms');
+          break;
+        }
+      }
+    }
+
+    // Upload rider photo to Supabase Storage if a new file was provided
+    // Keep the existing photo unless a new one is uploaded or the user removed it
+    String? resolvedPhotoUrl = existingRiderPhotoUrl;
+
+    if (riderPhotoFile != null) {
+      debugPrint('📸 saveProfile: Uploading rider photo...');
+      final uploadedUrl = await uploadPhoto(riderPhotoFile, 'profile');
+
+      if (uploadedUrl == null ||
+          uploadedUrl.isEmpty ||
+          uploadedUrl.startsWith('blob:')) {
+        throw Exception(
+          'Photo upload failed${_lastUploadError != null ? ': $_lastUploadError' : ''}',
+        );
+      }
+
+      resolvedPhotoUrl = uploadedUrl;
+      debugPrint('✅ saveProfile: Photo uploaded → $resolvedPhotoUrl');
+    }
+
+    // Extra safety: never save blob: URLs — they are temporary browser references
+    if (resolvedPhotoUrl != null && resolvedPhotoUrl.startsWith('blob:')) {
+      debugPrint('❌ saveProfile: Discarding blob URL: $resolvedPhotoUrl');
+      resolvedPhotoUrl = null;
+    }
+
+    if (resolvedPhotoUrl != null && resolvedPhotoUrl.isNotEmpty) {
+      await prefs.setString(_keyRiderPhotoPath, resolvedPhotoUrl);
+    } else {
+      await prefs.remove(_keyRiderPhotoPath);
+    }
+    await prefs.setStringList(_keyBikePhotoPaths, bikePhotoPaths);
+    await prefs.setString(_keyRiderName, riderName);
+    await prefs.setString(_keyRiderBio, riderBio);
+    await prefs.setString(_keySpeedUnit, isMetric ? 'metric' : 'imperial');
+    if (gender != null) {
+      await prefs.setString(_keyGender, gender);
+    }
+    await prefs.setBool(_keyIsProfileComplete, true);
+
+    // Sync to Supabase (only if authenticated)
+    if (currentUser != null) {
+      await _syncToSupabase(
+        ridingSpeed: ridingSpeed,
+        skillLevels: skillLevels,
+        bikeTypes: bikeTypes,
+        preferredRoads: preferredRoads,
+        riderName: riderName,
+        riderBio: riderBio,
+        gender: gender,
+        avatarUrl: resolvedPhotoUrl,
+      );
+    } else {
+      debugPrint('⚠️ Skipping Supabase sync — no auth. Profile saved locally.');
+      // Mark that we need to sync later
+      await prefs.setBool('_pending_supabase_sync', true);
+    }
+  }
+
+  /// Sync rider profile data to Supabase user_profiles table
+  static Future<void> _syncToSupabase({
+    required double ridingSpeed,
+    required List<String> skillLevels,
+    required List<String> bikeTypes,
+    required List<String> preferredRoads,
+    String riderName = '',
+    String riderBio = '',
+    String? gender,
+    String? avatarUrl,
+  }) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser == null) {
+        debugPrint('❌ SYNC FAILED: No authenticated user');
+        return;
+      }
+
+      debugPrint('🔄 Syncing profile to Supabase...');
+      debugPrint('   avatarUrl: $avatarUrl');
+
+      final updates = <String, dynamic>{
+        'id': currentUser.id,
+        'email': currentUser.email,
+        'skill_levels': skillLevels,
+        'bike_types': bikeTypes,
+        'preferred_roads': preferredRoads,
+        'riding_speed': ridingSpeed,
+        'bio': riderBio,
+        'is_profile_complete': true,
+        'avatar_url': avatarUrl,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      if (riderName.isNotEmpty) {
+        updates['full_name'] = riderName;
+      }
+      if (gender != null) {
+        updates['gender'] = gender;
+      }
+
+      await supabase.from('user_profiles').upsert(updates, onConflict: 'id');
+      debugPrint('✅ Profile synced successfully');
+    } catch (e) {
+      debugPrint('❌ SYNC FAILED: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> loadProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rideTimesJson = prefs.getString(_keyRideTimes);
+    Map<String, List<String>> rideTimes = {};
+    if (rideTimesJson != null) {
+      final decoded = jsonDecode(rideTimesJson) as Map<String, dynamic>;
+      rideTimes = decoded.map(
+        (k, v) => MapEntry(k, List<String>.from(v as List)),
+      );
+    }
+    return {
+      'ridingSpeed': prefs.getDouble(_keyRidingSpeed) ?? 60.0,
+      'skillLevels': prefs.getStringList(_keySkillLevels) ?? [],
+      'bikeTypes': prefs.getStringList(_keyBikeTypes) ?? [],
+      'preferredRoads': prefs.getStringList(_keyPreferredRoads) ?? [],
+      'rideTimes': rideTimes,
+      'riderPhotoPath': prefs.getString(_keyRiderPhotoPath),
+      'bikePhotoPaths': prefs.getStringList(_keyBikePhotoPaths) ?? [],
+      'riderName': prefs.getString(_keyRiderName) ?? '',
+      'riderBio': prefs.getString(_keyRiderBio) ?? '',
+      'isMetric': (prefs.getString(_keySpeedUnit) ?? 'imperial') == 'metric',
+      'gender': prefs.getString(_keyGender),
+    };
+  }
+
+  static Future<void> clearProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyIsProfileComplete);
+    await prefs.remove(_keyRidingSpeed);
+    await prefs.remove(_keySkillLevels);
+    await prefs.remove(_keyBikeTypes);
+    await prefs.remove(_keyPreferredRoads);
+    await prefs.remove(_keyRideTimes);
+    await prefs.remove(_keyRiderPhotoPath);
+    await prefs.remove(_keyBikePhotoPaths);
+    await prefs.remove(_keyRiderName);
+    await prefs.remove(_keyRiderBio);
+  }
+
+  /// Fetches the profile from Supabase and restores it to SharedPreferences.
+  /// Call this after login to ensure profile data persists across sign-outs.
+  static Future<void> restoreProfileFromSupabase() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser == null) return;
+
+      final response = await supabase
+          .from('user_profiles')
+          .select()
+          .eq('id', currentUser.id)
+          .maybeSingle();
+
+      if (response == null) return;
+
+      final isComplete = response['is_profile_complete'] as bool? ?? false;
+      if (!isComplete) return;
+
+      final prefs = await SharedPreferences.getInstance();
+
+      // Restore riding speed
+      final ridingSpeed = (response['riding_speed'] as num?)?.toDouble();
+      if (ridingSpeed != null) {
+        await prefs.setDouble(_keyRidingSpeed, ridingSpeed);
+      }
+
+      // Restore skill levels
+      final skillLevels = response['skill_levels'];
+      if (skillLevels != null) {
+        await prefs.setStringList(
+          _keySkillLevels,
+          List<String>.from(skillLevels as List),
+        );
+      }
+
+      // Restore bike types
+      final bikeTypes = response['bike_types'];
+      if (bikeTypes != null) {
+        await prefs.setStringList(
+          _keyBikeTypes,
+          List<String>.from(bikeTypes as List),
+        );
+      }
+
+      // Restore preferred roads
+      final preferredRoads = response['preferred_roads'];
+      if (preferredRoads != null) {
+        await prefs.setStringList(
+          _keyPreferredRoads,
+          List<String>.from(preferredRoads as List),
+        );
+      }
+
+      // Restore name and bio
+      final fullName = response['full_name'] as String?;
+      if (fullName != null) {
+        await prefs.setString(_keyRiderName, fullName);
+      }
+      final bio = response['bio'] as String?;
+      if (bio != null) {
+        await prefs.setString(_keyRiderBio, bio);
+      }
+
+      // Restore gender
+      final gender = response['gender'] as String?;
+      if (gender != null) {
+        await prefs.setString(_keyGender, gender);
+      }
+
+      // Restore avatar/photo URL
+      final avatarUrl = response['avatar_url'] as String?;
+      if (avatarUrl != null) {
+        await prefs.setString(_keyRiderPhotoPath, avatarUrl);
+      }
+
+      // Mark profile as complete locally
+      await prefs.setBool(_keyIsProfileComplete, true);
+    } catch (_) {
+      // Non-critical — local state remains unchanged
+    }
+  }
+}

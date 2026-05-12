@@ -1,0 +1,806 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:sizer/sizer.dart';
+import 'package:share_plus/share_plus.dart';
+import '../../services/premium_service.dart';
+import '../../services/analytics_service.dart';
+import '../../services/profile_service.dart';
+import './widgets/feature_card_widget.dart';
+import './widgets/payment_option_widget.dart';
+import '../../widgets/app_icons.dart';
+
+class PremiumSubscriptionScreen extends StatefulWidget {
+  const PremiumSubscriptionScreen({super.key});
+
+  @override
+  State<PremiumSubscriptionScreen> createState() =>
+      _PremiumSubscriptionScreenState();
+}
+
+class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
+    with SingleTickerProviderStateMixin {
+  bool _isProcessing = false;
+  bool _showSuccess = false;
+  bool _priorityListings = false;
+  late AnimationController _successController;
+  late Animation<double> _scaleAnimation;
+  String? _referralCode;
+  bool _loadingReferral = true;
+  String _userName = '';
+
+  static const Color _orange = Color(0xFFE85A4F);
+  static const Color _gold = Color(0xFFFFB347);
+  static const Color _deepBlue = Color(0xFF0D1B3E);
+
+  @override
+  void initState() {
+    super.initState();
+    _successController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _scaleAnimation = CurvedAnimation(
+      parent: _successController,
+      curve: Curves.elasticOut,
+    );
+    _priorityListings = PremiumService().priorityListingsEnabled;
+    _loadReferralCode();
+  }
+
+  Future<void> _loadReferralCode() async {
+    final profile = await ProfileService.loadProfile();
+    final name = (profile['riderName'] as String? ?? '').trim();
+    if (mounted) {
+      setState(() {
+        _userName = name;
+        _referralCode =
+            '1N23456${name.isNotEmpty ? name.replaceAll(' ', '') : ''}';
+        _loadingReferral = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _successController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleSubscribe() async {
+    setState(() => _isProcessing = true);
+    await Future.delayed(const Duration(seconds: 2));
+    await PremiumService().activatePremium();
+    if (_priorityListings) {
+      await PremiumService().setPriorityListings(true);
+    }
+    // Log premium conversion analytics
+    await AnalyticsService.instance.logPremiumConverted(plan: 'premium');
+    if (mounted) {
+      setState(() {
+        _isProcessing = false;
+        _showSuccess = true;
+      });
+      _successController.forward();
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) Navigator.of(context).pop(true);
+    }
+  }
+
+  Future<void> _handleRestorePurchase() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'No previous purchases found.',
+          style: GoogleFonts.dmSans(fontSize: 13.sp),
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10.0),
+        ),
+        margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          _buildBackground(),
+          SafeArea(
+            child: _showSuccess ? _buildSuccessState() : _buildContent(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBackground() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0D1B3E), Color(0xFF1B365D), Color(0xFF2A1A0E)],
+          stops: [0.0, 0.55, 1.0],
+        ),
+      ),
+      child: Opacity(
+        opacity: 0.06,
+        child: Image.network(
+          'https://images.pexels.com/photos/2611686/pexels-photo-2611686.jpeg',
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          semanticLabel: 'Motorcycle on open road at sunset with dramatic sky',
+          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSuccessState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          ScaleTransition(
+            scale: _scaleAnimation,
+            child: Container(
+              width: 22.w,
+              height: 22.w,
+              decoration: BoxDecoration(
+                color: _gold.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+                border: Border.all(color: _gold, width: 2),
+              ),
+              child: Icon(AppIcons.help, color: _gold, size: 32),
+            ),
+          ),
+          SizedBox(height: 3.h),
+          Text(
+            'Welcome to Premium!',
+            style: GoogleFonts.dmSans(
+              fontSize: 18.sp,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+          SizedBox(height: 1.h),
+          Text(
+            'All premium features are now unlocked.',
+            style: GoogleFonts.dmSans(
+              fontSize: 13.sp,
+              color: Colors.white.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    return Column(
+      children: [
+        _buildHeader(),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: 5.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: 2.h),
+                _buildHeroSection(),
+                SizedBox(height: 3.h),
+                _buildFeaturesSection(),
+                SizedBox(height: 2.5.h),
+                _buildPriorityToggle(),
+                SizedBox(height: 3.h),
+                _buildPricingSection(),
+                SizedBox(height: 2.h),
+                _buildPaymentOptions(),
+                SizedBox(height: 2.h),
+                _buildSubscribeButton(),
+                SizedBox(height: 1.5.h),
+                _buildRestoreLink(),
+                SizedBox(height: 2.h),
+                _buildReferralSection(),
+                SizedBox(height: 1.5.h),
+                _buildLegalLinks(),
+                SizedBox(height: 3.h),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
+      child: Row(
+        children: [
+          const Spacer(),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(),
+              SizedBox(width: 2.w),
+              Text(
+                'RydMatch Premium',
+                style: GoogleFonts.dmSans(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(AppIcons.close, color: Colors.white, size: 18),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeroSection() {
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.all(4.w),
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              colors: [_gold.withValues(alpha: 0.25), Colors.transparent],
+            ),
+            shape: BoxShape.circle,
+          ),
+          child: SizedBox(),
+        ),
+        SizedBox(height: 1.5.h),
+        Text(
+          'Ride Further Together',
+          style: GoogleFonts.dmSans(
+            fontSize: 20.sp,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        SizedBox(height: 0.8.h),
+        Text(
+          'Unlock group rides, deep analytics, and\nboosted visibility in the RydMatch community.',
+          style: GoogleFonts.dmSans(
+            fontSize: 12.sp,
+            color: Colors.white.withValues(alpha: 0.65),
+            height: 1.5,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeaturesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'WHAT YOU GET',
+          style: GoogleFonts.dmSans(
+            fontSize: 10.sp,
+            fontWeight: FontWeight.w700,
+            color: _gold,
+            letterSpacing: 1.4,
+          ),
+        ),
+        SizedBox(height: 1.5.h),
+        FeatureCardWidget(
+          icon: AppIcons.group,
+          title: 'Ride Groups',
+          description:
+              'Create group rides with up to 6 riders, plan routes, and coordinate with matched riders.',
+          accentColor: const Color(0xFF4FC3F7),
+        ),
+        SizedBox(height: 1.2.h),
+        FeatureCardWidget(
+          icon: AppIcons.help,
+          title: 'Ride Analytics',
+          description:
+              'Track total distance, riding streaks, favourite routes, and weekly activity insights.',
+          accentColor: const Color(0xFF81C784),
+        ),
+        SizedBox(height: 1.2.h),
+        FeatureCardWidget(
+          icon: AppIcons.analytics,
+          title: 'Ride Analytics',
+          description:
+              'Track total distance, riding streaks, favourite routes, and weekly activity insights.',
+          accentColor: const Color(0xFF81C784),
+        ),
+        SizedBox(height: 1.2.h),
+        FeatureCardWidget(
+          icon: AppIcons.help,
+          title: 'Priority Listings',
+          description:
+              'Boost your profile to appear higher in other riders\' discovery feeds.',
+          accentColor: _gold,
+        ),
+        SizedBox(height: 1.2.h),
+        FeatureCardWidget(
+          icon: AppIcons.help,
+          title: 'Priority Listings',
+          description:
+              'Boost your profile to appear higher in other riders\' discovery feeds.',
+          accentColor: _gold,
+        ),
+        SizedBox(height: 1.2.h),
+        FeatureCardWidget(
+          icon: Icons.photo_library_rounded,
+          title: 'Ride Feed',
+          description:
+              'Share ride photos, routes, and distances with matched riders. Like and comment on their adventures.',
+          accentColor: const Color(0xFFE85A4F),
+        ),
+        SizedBox(height: 1.2.h),
+        FeatureCardWidget(
+          icon: Icons.cloud_outlined,
+          title: 'Weather Conditions',
+          description:
+              'Live weather data for your route — temperature warnings, wind speed, rain alerts, and ride condition rating.',
+          accentColor: const Color(0xFF4FC3F7),
+        ),
+        SizedBox(height: 1.2.h),
+        FeatureCardWidget(
+          icon: Icons.emoji_events_rounded,
+          title: 'Leaderboard',
+          description:
+              'See weekly rankings among your matched riders — distance covered, rides completed, and badges earned.',
+          accentColor: _gold,
+        ),
+        SizedBox(height: 1.2.h),
+        FeatureCardWidget(
+          icon: Icons.rocket_launch_rounded,
+          title: 'Boost Profile',
+          description:
+              'Put your card at the front of Discovery for 30 minutes with a one-tap boost. Stand out and get more matches.',
+          accentColor: const Color(0xFF7B2FBE),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPriorityToggle() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
+      decoration: BoxDecoration(
+        color: _gold.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14.0),
+        border: Border.all(color: _gold.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(AppIcons.rocket, color: _gold, size: 22),
+          SizedBox(width: 3.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Enable Priority Listings',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  'Boost your profile in discovery feeds',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 11.sp,
+                    color: Colors.white.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: _priorityListings,
+            onChanged: (v) => setState(() => _priorityListings = v),
+            activeThumbColor: _gold,
+            activeTrackColor: _gold.withValues(alpha: 0.3),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPricingSection() {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(vertical: 2.5.h, horizontal: 4.w),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [_orange.withValues(alpha: 0.9), const Color(0xFFB03A31)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16.0),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '30 AED',
+                style: GoogleFonts.dmSans(
+                  fontSize: 28.sp,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  height: 1.0,
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.only(top: 1.5.h),
+                child: Text(
+                  '/month',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 12.sp,
+                    color: Colors.white.withValues(alpha: 0.8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 0.8.h),
+          Text(
+            'Billed monthly · Cancel anytime',
+            style: GoogleFonts.dmSans(
+              fontSize: 11.sp,
+              color: Colors.white.withValues(alpha: 0.75),
+            ),
+          ),
+          SizedBox(height: 0.5.h),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 0.5.h),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(20.0),
+            ),
+            child: Text(
+              '7-day free trial included',
+              style: GoogleFonts.dmSans(
+                fontSize: 11.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentOptions() {
+    return Row(
+      children: [
+        PaymentOptionWidget(
+          label: 'Apple Pay',
+          icon: AppIcons.apple,
+          onTap: _handleSubscribe,
+        ),
+        SizedBox(width: 3.w),
+        PaymentOptionWidget(
+          label: 'Google Pay',
+          icon: Icons.g_mobiledata_rounded,
+          onTap: _handleSubscribe,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubscribeButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: _isProcessing ? null : _handleSubscribe,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _orange,
+          foregroundColor: Colors.white,
+          padding: EdgeInsets.symmetric(vertical: 1.8.h),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14.0),
+          ),
+          elevation: 0,
+        ),
+        child: _isProcessing
+            ? SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(AppIcons.lock, size: 16),
+                  SizedBox(width: 2.w),
+                  Text(
+                    'Subscribe Now',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildRestoreLink() {
+    return Center(
+      child: TextButton(
+        onPressed: _handleRestorePurchase,
+        child: Text(
+          'Restore Purchase',
+          style: GoogleFonts.dmSans(
+            fontSize: 12.sp,
+            color: Colors.white.withValues(alpha: 0.6),
+            decoration: TextDecoration.underline,
+            decorationColor: Colors.white.withValues(alpha: 0.4),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegalLinks() {
+    return Center(
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        children: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pushNamed(context, '/terms-of-service-screen'),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.symmetric(horizontal: 2.w),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'Terms of Service',
+              style: GoogleFonts.dmSans(
+                fontSize: 10.sp,
+                color: Colors.white.withValues(alpha: 0.45),
+              ),
+            ),
+          ),
+          Text(
+            '·',
+            style: GoogleFonts.dmSans(
+              fontSize: 10.sp,
+              color: Colors.white.withValues(alpha: 0.3),
+            ),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.pushNamed(context, '/privacy-policy-screen'),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.symmetric(horizontal: 2.w),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'Privacy Policy',
+              style: GoogleFonts.dmSans(
+                fontSize: 10.sp,
+                color: Colors.white.withValues(alpha: 0.45),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReferralSection() {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16.0),
+        border: Border.all(color: _gold.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.card_giftcard_rounded, color: _gold, size: 20),
+              SizedBox(width: 2.w),
+              Text(
+                'YOUR REFERRAL CODE',
+                style: GoogleFonts.dmSans(
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.w700,
+                  color: _gold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 1.h),
+          Text(
+            'Share with friends — you both get a 7-day free Premium trial!',
+            style: GoogleFonts.dmSans(
+              fontSize: 11.sp,
+              color: Colors.white.withValues(alpha: 0.65),
+              height: 1.4,
+            ),
+          ),
+          SizedBox(height: 1.5.h),
+          _loadingReferral
+              ? Center(
+                  child: SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(
+                      color: _gold,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                )
+              : _referralCode == null
+              ? Text(
+                  'Could not load referral code. Please try again.',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 11.sp,
+                    color: Colors.white.withValues(alpha: 0.5),
+                  ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 4.w,
+                              vertical: 1.4.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _deepBlue.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(10.0),
+                              border: Border.all(
+                                color: _gold.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: Text(
+                              _referralCode!,
+                              style: GoogleFonts.dmSans(
+                                fontSize: 15.sp,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: 2.0,
+                              ),
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 2.w),
+                        GestureDetector(
+                          onTap: () {
+                            Clipboard.setData(
+                              ClipboardData(text: _referralCode!),
+                            );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Referral code copied!',
+                                  style: GoogleFonts.dmSans(fontSize: 12.sp),
+                                ),
+                                behavior: SnackBarBehavior.floating,
+                                backgroundColor: _gold.withValues(alpha: 0.9),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10.0),
+                                ),
+                                margin: EdgeInsets.symmetric(
+                                  horizontal: 4.w,
+                                  vertical: 2.h,
+                                ),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: EdgeInsets.all(3.w),
+                            decoration: BoxDecoration(
+                              color: _gold.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10.0),
+                              border: Border.all(
+                                color: _gold.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.copy_rounded,
+                              color: _gold,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 2.w),
+                        GestureDetector(
+                          onTap: () {
+                            final shareText =
+                                'Join me on RydMatch! Use my referral code $_referralCode to sign up and we both get a 7-day free Premium trial! 🏍️🔥';
+                            Share.share(
+                              shareText,
+                              subject: 'RydMatch Referral Code',
+                            );
+                          },
+                          child: Container(
+                            padding: EdgeInsets.all(3.w),
+                            decoration: BoxDecoration(
+                              color: _orange.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10.0),
+                              border: Border.all(
+                                color: _orange.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.share_rounded,
+                              color: _orange,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 1.2.h),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          color: _gold.withValues(alpha: 0.7),
+                          size: 14,
+                        ),
+                        SizedBox(width: 1.5.w),
+                        Expanded(
+                          child: Text(
+                            'When a friend signs up with your code, you both receive 7 days of free Premium.',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 10.sp,
+                              color: Colors.white.withValues(alpha: 0.5),
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+        ],
+      ),
+    );
+  }
+}

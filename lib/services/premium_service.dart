@@ -1,0 +1,134 @@
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class PremiumService extends ChangeNotifier {
+  static final PremiumService _instance = PremiumService._internal();
+
+  factory PremiumService() => _instance;
+
+  PremiumService._internal();
+
+  bool _isPremiumAccount = false;
+  bool _isAdmin = false;
+  bool _priorityListingsEnabled = false;
+  bool _isLoaded = false;
+
+  /// Existing app code mostly checks isPremium.
+  /// Admin users should receive full access too, so this returns true for either.
+  bool get isPremium => _isPremiumAccount || _isAdmin;
+
+  /// The actual paid/trial premium flag from the database.
+  bool get isPremiumAccount => _isPremiumAccount;
+
+  /// Admin profile flag from user_profiles.is_admin.
+  bool get isAdmin => _isAdmin;
+
+  /// Clearer name for future screens.
+  bool get hasFullAccess => isPremium;
+
+  bool get priorityListingsEnabled => _priorityListingsEnabled;
+  bool get isLoaded => _isLoaded;
+
+  Future<void> init() async {
+    await refresh();
+  }
+
+  Future<void> refresh() async {
+    final supabase = Supabase.instance.client;
+    final currentUser = supabase.auth.currentUser;
+
+    if (currentUser == null) {
+      _isPremiumAccount = false;
+      _isAdmin = false;
+      _priorityListingsEnabled = false;
+      _isLoaded = true;
+      notifyListeners();
+      return;
+    }
+
+    try {
+      final profile = await supabase
+          .from('user_profiles')
+          .select('is_premium, is_admin')
+          .eq('id', currentUser.id)
+          .maybeSingle();
+
+      _isPremiumAccount = profile?['is_premium'] == true;
+      _isAdmin = profile?['is_admin'] == true;
+
+      // Admins should have access to priority listings as part of full access.
+      _priorityListingsEnabled = _isAdmin ? true : _priorityListingsEnabled;
+
+      _isLoaded = true;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('PremiumService.refresh error: $e');
+      _isPremiumAccount = false;
+      _isAdmin = false;
+      _priorityListingsEnabled = false;
+      _isLoaded = true;
+      notifyListeners();
+    }
+  }
+
+  Future<void> activatePremium() async {
+    final supabase = Supabase.instance.client;
+    final currentUser = supabase.auth.currentUser;
+
+    if (currentUser == null) return;
+
+    await supabase.from('user_profiles').update({
+      'is_premium': true,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', currentUser.id);
+
+    _isPremiumAccount = true;
+    notifyListeners();
+  }
+
+  Future<void> setPriorityListings(bool enabled) async {
+    if (_isAdmin) {
+      _priorityListingsEnabled = true;
+      notifyListeners();
+      return;
+    }
+
+    _priorityListingsEnabled = enabled && isPremium;
+    notifyListeners();
+  }
+
+  Future<void> cancelPremium() async {
+    final supabase = Supabase.instance.client;
+    final currentUser = supabase.auth.currentUser;
+
+    if (currentUser == null) {
+      _isPremiumAccount = false;
+      _isAdmin = false;
+      _priorityListingsEnabled = false;
+      notifyListeners();
+      return;
+    }
+
+    await supabase.from('user_profiles').update({
+      'is_premium': false,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', currentUser.id);
+
+    _isPremiumAccount = false;
+
+    // Keep admin access even if paid premium is cancelled.
+    if (!_isAdmin) {
+      _priorityListingsEnabled = false;
+    }
+
+    notifyListeners();
+  }
+
+  void clearLocalState() {
+    _isPremiumAccount = false;
+    _isAdmin = false;
+    _priorityListingsEnabled = false;
+    _isLoaded = false;
+    notifyListeners();
+  }
+}

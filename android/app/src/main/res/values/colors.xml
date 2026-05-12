@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- RydMatch brand colors -->
+    <color name="ic_launcher_background">#FF0D1117</color>
+    <color name="rydmatch_primary_orange">#FFFF6B35</color>
+    <color name="rydmatch_primary_blue">#FF00B4D8</color>
+</resources>
