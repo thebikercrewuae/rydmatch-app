@@ -7,19 +7,17 @@ environment:
   sdk: ^3.9.0
 
 dependencies:
-  flutter:       # CRITICAL: Required for every Flutter project - DO NOT REMOVE
-    sdk: flutter # CRITICAL: Required for every Flutter project - DO NOT REMOVE
-  
-  # CRITICAL: Core UI and responsive design - DO NOT REMOVE OR MODIFY
+  flutter:
+    sdk: flutter
+
   supabase_flutter: ^2.9.1
-  sizer: ^2.0.15              # Required for responsive design system
-  flutter_svg: ^2.0.9        # Required for SVG icon support
-  google_fonts: ^6.1.0       # Required for typography (replaces local fonts)
-  shared_preferences: ^2.2.2 # Required for local data storage
+  sizer: ^2.0.15
+  flutter_svg: ^2.0.9
+  google_fonts: ^6.1.0
+  shared_preferences: ^2.2.2
   web: ^1.1.1
-  material_symbols_icons: ^4.2906.0 # Google Material Symbols icon set with variable weight/fill options
-  
-  # Feature dependencies - safe to modify
+  material_symbols_icons: ^4.2906.0
+
   cached_network_image: ^3.3.1
   connectivity_plus: ^6.1.4
   dio: ^5.4.0
@@ -31,34 +29,27 @@ dependencies:
   flutter_card_swiper: ^7.2.0
   flutter_slidable: ^4.0.3
   intl: ^0.19.0
-  geolocator: ^14.0.2        # GPS location access for Emergency SOS live location tracking
-  flutter_map: ^8.2.2       # Interactive map with OpenStreetMap tiles for route planning
-  latlong2: ^0.9.1          # Latitude/longitude coordinate handling for flutter_map
-  google_maps_flutter: ^2.14.2 # Google Maps integration for route planner
-  share_plus: ^12.0.2       # Native share sheet for sharing ride content to social apps
-  url_launcher: ^6.3.2      # Deep link to Instagram, TikTok, and Snapchat apps
-
+  geolocator: ^14.0.2
+  flutter_map: ^8.2.2
+  latlong2: ^0.9.1
+  google_maps_flutter: ^2.14.2
+  share_plus: ^12.0.2
+  url_launcher: ^6.3.2
   universal_html: ^2.2.4
   file_picker: ^8.1.7
 
 dev_dependencies:
-  flutter_test:    # CRITICAL: Required for Flutter project testing - DO NOT REMOVE
-    sdk: flutter   # CRITICAL: Required for Flutter project testing - DO NOT REMOVE
-  flutter_lints: ^5.0.0 # CRITICAL: Required for code quality - DO NOT REMOVE
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.14.3
 
 flutter:
-  uses-material-design: true # CRITICAL: Required for Material icon font - DO NOT REMOVE
+  uses-material-design: true
   assets:
+    - env.json
     - assets/
     - assets/images/
-  # CRITICAL ASSET MANAGEMENT RULES:
-  # - DO NOT ADD NEW ASSET DIRECTORIES (assets/svg/, assets/icons/, etc.)
-  # - ONLY USE EXISTING AND ITEMS AVAILABLE IN THE DIRECTORIES LISTED ABOVE (assets/, assets/images/)
-  
-  # CRITICAL FONTS RULE: 
-  # - THIS PROJECT USES GOOGLE FONTS INSTEAD OF LOCAL FONTS
-  # - DO NOT ADD ANY LOCAL FONTS SECTION OR FONT FILES
 
 flutter_launcher_icons:
   android: "ic_launcher"
