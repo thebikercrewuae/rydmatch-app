@@ -24,30 +24,35 @@ final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load Google Maps on web
+  bool supabaseReady = false;
+
   if (kIsWeb) {
     const googleMapsApiKey = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
     loadGoogleMapsApi(googleMapsApiKey);
   }
 
-  // Initialize Supabase
   try {
     await SupabaseService.initialize();
-  } catch (_) {
-    // Supabase initialization failed — app will handle gracefully
+    supabaseReady = true;
+  } catch (e) {
+    debugPrint('Supabase initialization failed: $e');
+    supabaseReady = false;
   }
 
-  // Start offline queue monitoring — syncs queued messages/ratings when connectivity restores
-  OfflineQueueService.instance.startMonitoring();
+  if (supabaseReady) {
+    try {
+      OfflineQueueService.instance.startMonitoring();
+    } catch (e) {
+      debugPrint('Offline queue start failed: $e');
+    }
+  }
 
   bool hasShownError = false;
 
-  // 🚨 CRITICAL: Custom error handling - DO NOT REMOVE
   ErrorWidget.builder = (FlutterErrorDetails details) {
     if (!hasShownError) {
       hasShownError = true;
 
-      // Reset flag after 3 seconds to allow error widget on new screens
       Future.delayed(const Duration(seconds: 5), () {
         hasShownError = false;
       });
@@ -57,78 +62,106 @@ void main() async {
     return const SizedBox.shrink();
   };
 
-  final bool sessionActive = await SessionService.isSessionActive();
+  String initialRoute = '/onboarding-screen';
 
-  // Password recovery links must open the reset password screen,
-  // not the normal login/onboarding route.
-  final uri = Uri.base;
-  final isPasswordResetLink =
-      uri.path == '/reset-password' ||
-      uri.fragment.contains('/reset-password') ||
-      uri.queryParameters['type'] == 'recovery' ||
-      uri.fragment.contains('type=recovery');
+  try {
+    final bool sessionActive = await SessionService.isSessionActive();
 
-  // Determine initial route: password reset → reset screen,
-  // active session → main, else check onboarding
-  String initialRoute;
+    final uri = Uri.base;
+    final isPasswordResetLink =
+        uri.path == '/reset-password' ||
+        uri.fragment.contains('/reset-password') ||
+        uri.queryParameters['type'] == 'recovery' ||
+        uri.fragment.contains('type=recovery');
 
-  if (isPasswordResetLink) {
-    initialRoute = '/reset-password';
-  } else if (sessionActive) {
-    // Verify Supabase actually has a valid session too
-    final supabaseUser = Supabase.instance.client.auth.currentUser;
-    if (supabaseUser != null) {
-      // Restore profile from Supabase so it persists across sign-outs
-      await ProfileService.restoreProfileFromSupabase();
-      initialRoute = '/main-screen';
-    } else {
-      // SharedPreferences says logged in, but Supabase session is gone
-      // Try to recover session briefly
-      bool recovered = false;
-      for (int i = 0; i < 6; i++) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (Supabase.instance.client.auth.currentUser != null) {
-          recovered = true;
-          break;
-        }
-      }
-      if (recovered) {
+    if (isPasswordResetLink) {
+      initialRoute = '/reset-password';
+    } else if (sessionActive && supabaseReady) {
+      final supabaseUser = Supabase.instance.client.auth.currentUser;
+
+      if (supabaseUser != null) {
         await ProfileService.restoreProfileFromSupabase();
         initialRoute = '/main-screen';
       } else {
-        // Session truly expired — clear stale SharedPreferences and go to login
-        await SessionService.clearSession();
-        final prefs = await SharedPreferences.getInstance();
-        final bool onboardingSeen = prefs.getBool('onboarding_seen') ?? false;
-        initialRoute = onboardingSeen ? '/' : '/onboarding-screen';
+        bool recovered = false;
+
+        for (int i = 0; i < 6; i++) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          if (Supabase.instance.client.auth.currentUser != null) {
+            recovered = true;
+            break;
+          }
+        }
+
+        if (recovered) {
+          await ProfileService.restoreProfileFromSupabase();
+          initialRoute = '/main-screen';
+        } else {
+          await SessionService.clearSession();
+          final prefs = await SharedPreferences.getInstance();
+          final bool onboardingSeen =
+              prefs.getBool('onboarding_seen') ?? false;
+          initialRoute = onboardingSeen ? '/' : '/onboarding-screen';
+        }
       }
+    } else {
+      final prefs = await SharedPreferences.getInstance();
+      final bool onboardingSeen = prefs.getBool('onboarding_seen') ?? false;
+      initialRoute = onboardingSeen ? '/' : '/onboarding-screen';
     }
-  } else {
-    final prefs = await SharedPreferences.getInstance();
-    final bool onboardingSeen = prefs.getBool('onboarding_seen') ?? false;
-    initialRoute = onboardingSeen ? '/' : '/onboarding-screen';
+  } catch (e) {
+    debugPrint('Startup route resolution failed: $e');
+    initialRoute = '/onboarding-screen';
   }
 
-  await ThemeService().loadThemeMode();
-  await HapticService.instance.init();
-  await PremiumService().init();
+  try {
+    await ThemeService().loadThemeMode();
+  } catch (e) {
+    debugPrint('Theme load failed: $e');
+  }
+
+  try {
+    await HapticService.instance.init();
+  } catch (e) {
+    debugPrint('Haptic init failed: $e');
+  }
+
+  if (supabaseReady) {
+    try {
+      await PremiumService().init();
+    } catch (e) {
+      debugPrint('Premium init failed: $e');
+    }
+  }
+
+  void launchApp() {
+    runApp(MyApp(initialRoute: initialRoute, supabaseReady: supabaseReady));
+  }
 
   if (kIsWeb) {
-    // SystemChrome orientation lock is not supported on web — skip it
-    runApp(MyApp(initialRoute: initialRoute));
+    launchApp();
   } else {
-    // 🚨 CRITICAL: Device orientation lock - DO NOT REMOVE
-    Future.wait([
-      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]),
-    ]).then((value) {
-      runApp(MyApp(initialRoute: initialRoute));
-    });
+    try {
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
+    } catch (e) {
+      debugPrint('Orientation lock failed: $e');
+    }
+
+    launchApp();
   }
 }
 
 class MyApp extends StatefulWidget {
   final String initialRoute;
-  const MyApp({super.key, required this.initialRoute});
+  final bool supabaseReady;
+
+  const MyApp({
+    super.key,
+    required this.initialRoute,
+    required this.supabaseReady,
+  });
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -136,18 +169,22 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final ThemeService _themeService = ThemeService();
-  late final StreamSubscription<AuthState> _authSubscription;
+  StreamSubscription<AuthState>? _authSubscription;
   RealtimeChannel? _notificationChannel;
 
   @override
   void initState() {
     super.initState();
     _themeService.addListener(_onThemeChanged);
+
+    if (!widget.supabaseReady) {
+      return;
+    }
+
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
       data,
     ) {
       if (data.event == AuthChangeEvent.passwordRecovery) {
-        // Navigate to reset password screen when recovery link is clicked
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _navigatorKey.currentState?.pushNamedAndRemoveUntil(
             '/reset-password',
@@ -156,7 +193,6 @@ class _MyAppState extends State<MyApp> {
         });
       }
 
-      // Start/stop global notification listener based on auth state
       if (data.event == AuthChangeEvent.signedIn ||
           data.event == AuthChangeEvent.tokenRefreshed) {
         final userId = data.session?.user.id;
@@ -168,7 +204,6 @@ class _MyAppState extends State<MyApp> {
       }
     });
 
-    // If already logged in when app starts, start listener immediately
     final currentUser = Supabase.instance.client.auth.currentUser;
     if (currentUser != null) {
       _startNotificationListener(currentUser.id);
@@ -176,7 +211,10 @@ class _MyAppState extends State<MyApp> {
   }
 
   void _startNotificationListener(String userId) {
+    if (!widget.supabaseReady) return;
+
     _stopNotificationListener();
+
     _notificationChannel = Supabase.instance.client
         .channel('user_notifications_global')
         .onPostgresChanges(
@@ -190,6 +228,7 @@ class _MyAppState extends State<MyApp> {
           ),
           callback: (payload) {
             final row = payload.newRecord;
+
             if (row['notification_type'] == 'new_message' &&
                 row['is_read'] == false) {
               final senderId = row['reference_id'] as String?;
@@ -205,109 +244,109 @@ class _MyAppState extends State<MyApp> {
                         .select('full_name')
                         .eq('id', senderId)
                         .maybeSingle();
+
                     if (profile != null) {
                       senderName =
                           profile['full_name'] as String? ?? 'New Message';
                     }
-                  } catch (_) {
-                    // Non-blocking sender name fetch error
-                  }
+                  } catch (_) {}
                 }
 
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   final context = _navigatorKey.currentContext;
-                  if (context != null) {
-                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  if (context == null) return;
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: GestureDetector(
-                          onTap: () {
-                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                            if (senderId != null) {
-                              // Pop back to main screen first, then push chat
-                              _navigatorKey.currentState
-                                  ?.pushNamedAndRemoveUntil(
-                                    '/main-screen',
-                                    (route) => false,
-                                  );
-                              _navigatorKey.currentState?.pushNamed(
-                                '/chat-screen',
-                                arguments: {
-                                  'otherUserId': senderId,
-                                  'otherUserName': senderName,
-                                },
-                              );
-                            }
-                          },
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: GestureDetector(
+                        onTap: () {
+                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+                          if (senderId != null) {
+                            _navigatorKey.currentState
+                                ?.pushNamedAndRemoveUntil(
+                                  '/main-screen',
+                                  (route) => false,
+                                );
+
+                            _navigatorKey.currentState?.pushNamed(
+                              '/chat-screen',
+                              arguments: {
+                                'otherUserId': senderId,
+                                'otherUserName': senderName,
+                              },
+                            );
+                          }
+                        },
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    senderName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13.0,
+                                      color: Colors.white,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (messageText.isNotEmpty)
                                     Text(
-                                      senderName,
+                                      messageText,
                                       style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 13.0,
-                                        color: Colors.white,
+                                        fontSize: 12.0,
+                                        color: Colors.white70,
                                       ),
-                                      maxLines: 1,
+                                      maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
-                                    if (messageText.isNotEmpty)
-                                      Text(
-                                        messageText,
-                                        style: const TextStyle(
-                                          fontSize: 12.0,
-                                          color: Colors.white70,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12.0,
+                                vertical: 6.0,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white24,
+                                borderRadius: BorderRadius.circular(8.0),
+                              ),
+                              child: const Text(
+                                'View',
+                                style: TextStyle(
+                                  fontSize: 12.0,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12.0,
-                                  vertical: 6.0,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white24,
-                                  borderRadius: BorderRadius.circular(8.0),
-                                ),
-                                child: const Text(
-                                  'View',
-                                  style: TextStyle(
-                                    fontSize: 12.0,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                        backgroundColor: const Color(0xFF1B365D),
-                        behavior: SnackBarBehavior.floating,
-                        margin: const EdgeInsets.fromLTRB(
-                          12.0,
-                          8.0,
-                          12.0,
-                          12.0,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12.0),
-                        ),
-                        duration: const Duration(seconds: 5),
-                        dismissDirection: DismissDirection.horizontal,
                       ),
-                    );
-                  }
+                      backgroundColor: const Color(0xFF1B365D),
+                      behavior: SnackBarBehavior.floating,
+                      margin: const EdgeInsets.fromLTRB(
+                        12.0,
+                        8.0,
+                        12.0,
+                        12.0,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.0),
+                      ),
+                      duration: const Duration(seconds: 5),
+                      dismissDirection: DismissDirection.horizontal,
+                    ),
+                  );
                 });
               }();
             }
@@ -323,7 +362,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void dispose() {
-    _authSubscription.cancel();
+    _authSubscription?.cancel();
     _stopNotificationListener();
     _themeService.removeListener(_onThemeChanged);
     super.dispose();
@@ -342,7 +381,6 @@ class _MyAppState extends State<MyApp> {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: _themeService.themeMode,
-          // 🚨 CRITICAL: NEVER REMOVE OR MODIFY
           builder: (context, child) {
             return MediaQuery(
               data: MediaQuery.of(
@@ -351,7 +389,6 @@ class _MyAppState extends State<MyApp> {
               child: child!,
             );
           },
-          // 🚨 END CRITICAL SECTION
           debugShowCheckedModeBanner: false,
           navigatorKey: _navigatorKey,
           routes: AppRoutes.routes,
