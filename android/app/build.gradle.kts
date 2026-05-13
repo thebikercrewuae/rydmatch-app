@@ -24,7 +24,7 @@ android {
 
     defaultConfig {
         applicationId = "com.rydmatch.app"
-        minSdk = 21
+        minSdk = 24
         targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
