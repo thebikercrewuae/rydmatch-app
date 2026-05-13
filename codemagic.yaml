@@ -18,7 +18,7 @@ workflows:
         script: |
           dart run flutter_launcher_icons
 
-            - name: Build Android APK
+      - name: Build Android APK
         script: |
           flutter build apk --release \
             --dart-define=SUPABASE_URL=$SUPABASE_URL \
