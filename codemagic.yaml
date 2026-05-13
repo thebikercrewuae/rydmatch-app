@@ -48,10 +48,6 @@ workflows:
           perl -0pi -e 's/minSdk\s*=\s*flutter\.minSdkVersion/minSdk = 21/g' android/app/build.gradle.kts
           sed -n '20,35p' android/app/build.gradle.kts
 
-      - name: Print Android Gradle file
-        script: |
-          sed -n '20,35p' android/app/build.gradle.kts
-
       - name: Build Android App Bundle
         script: |
           flutter build appbundle --release \
