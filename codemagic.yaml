@@ -6,6 +6,8 @@ workflows:
 
     environment:
       flutter: stable
+      groups:
+        - rydmatch-prod
 
     scripts:
       - name: Get Flutter packages
