@@ -10,6 +10,30 @@ workflows:
         - rydmatch-prod
 
     scripts:
+      - name: Generate release keystore
+        script: |
+          if [ ! -f "$CM_BUILD_DIR/rydmatch-release-key.jks" ]; then
+            keytool -genkeypair \
+              -v \
+              -keystore "$CM_BUILD_DIR/rydmatch-release-key.jks" \
+              -storepass "$CM_KEYSTORE_PASSWORD" \
+              -keypass "$CM_KEY_PASSWORD" \
+              -alias "$CM_KEY_ALIAS" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=RydMatch, OU=RydMatch, O=RydMatch, L=Dubai, ST=Dubai, C=AE"
+          fi
+
+      - name: Create key.properties
+        script: |
+          cat > "$CM_BUILD_DIR/android/key.properties" <<EOF
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyPassword=$CM_KEY_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          storeFile=$CM_BUILD_DIR/rydmatch-release-key.jks
+          EOF
+
       - name: Get Flutter packages
         script: |
           flutter pub get
@@ -25,5 +49,6 @@ workflows:
             --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY \
             --dart-define=GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY
 
-       artifacts:
+    artifacts:
       - build/app/outputs/bundle/release/app-release.aab
+      - rydmatch-release-key.jks
