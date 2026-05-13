@@ -42,7 +42,7 @@ workflows:
         script: |
           dart run flutter_launcher_icons
 
-      - name: Build Android App Bundle
+            - name: Build Android App Bundle
         script: |
           patch_gradle_file() {
             perl -0pi -e 's/minSdkVersion\s+flutter\.minSdkVersion/minSdk = 21/g' android/app/build.gradle.kts
@@ -50,25 +50,22 @@ workflows:
             sed -n '20,35p' android/app/build.gradle.kts
           }
 
+          encode_define() {
+            printf "%s" "$1" | base64 | tr -d '\n'
+          }
+
+          DART_DEFINES="$(encode_define "SUPABASE_URL=$SUPABASE_URL"),$(encode_define "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"),$(encode_define "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY")"
+
           patch_gradle_file
 
-          set +e
-          flutter build appbundle --release \
-            --dart-define=SUPABASE_URL=$SUPABASE_URL \
-            --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY \
-            --dart-define=GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY
-          BUILD_STATUS=$?
-          set -e
-
-          if [ $BUILD_STATUS -ne 0 ]; then
-            echo "First build failed. Patching Gradle file again after Flutter upgrade..."
-            patch_gradle_file
-
-            flutter build appbundle --release \
-              --dart-define=SUPABASE_URL=$SUPABASE_URL \
-              --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY \
-              --dart-define=GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY
-          fi
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease \
+            -Pdart-defines="$DART_DEFINES" \
+            -Ptarget-platform=android-arm,android-arm64,android-x64 \
+            -Ptarget=lib/main.dart \
+            -Ptrack-widget-creation=false \
+            -Ptree-shake-icons=true
 
     artifacts:
       - build/app/outputs/bundle/release/app-release.aab
