@@ -59,8 +59,15 @@ workflows:
           patch_gradle_file
 
           cd android
-          chmod +x gradlew
-          ./gradlew bundleRelease \
+
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            GRADLE_CMD="./gradlew"
+          else
+            GRADLE_CMD="gradle"
+          fi
+
+          $GRADLE_CMD bundleRelease \
             -Pdart-defines="$DART_DEFINES" \
             -Ptarget-platform=android-arm,android-arm64,android-x64 \
             -Ptarget=lib/main.dart \
@@ -69,4 +76,5 @@ workflows:
 
     artifacts:
       - build/app/outputs/bundle/release/app-release.aab
+      - android/app/build/outputs/bundle/release/app-release.aab
       - rydmatch-release-key.jks
