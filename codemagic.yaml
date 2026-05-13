@@ -16,9 +16,12 @@ workflows:
         script: |
           dart run flutter_launcher_icons
 
-      - name: Build Android APK
+            - name: Build Android APK
         script: |
-          flutter build apk --release
+          flutter build apk --release \
+            --dart-define=SUPABASE_URL=$SUPABASE_URL \
+            --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY \
+            --dart-define=GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY
 
     artifacts:
       - build/app/outputs/flutter-apk/app-release.apk
