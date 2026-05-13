@@ -67,14 +67,24 @@ workflows:
             GRADLE_CMD="gradle"
           fi
 
+          set +e
           $GRADLE_CMD bundleRelease \
             -Pdart-defines="$DART_DEFINES" \
             -Ptarget-platform=android-arm,android-arm64,android-x64 \
             -Ptarget=lib/main.dart \
             -Ptrack-widget-creation=false \
-            -Ptree-shake-icons=true
+            -Ptree-shake-icons=true \
+            --stacktrace 2>&1 | tee ../gradle-build.log
+          BUILD_STATUS=${PIPESTATUS[0]}
+          set -e
+
+          echo "Last 200 lines of Gradle log:"
+          tail -n 200 ../gradle-build.log
+
+          exit $BUILD_STATUS
 
     artifacts:
       - build/app/outputs/bundle/release/app-release.aab
       - android/app/build/outputs/bundle/release/app-release.aab
       - rydmatch-release-key.jks
+      - gradle-build.log
