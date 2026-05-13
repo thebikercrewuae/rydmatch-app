@@ -42,6 +42,10 @@ workflows:
         script: |
           dart run flutter_launcher_icons
 
+      - name: Print Android Gradle file
+        script: |
+          sed -n '20,35p' android/app/build.gradle.kts
+
       - name: Build Android App Bundle
         script: |
           flutter build appbundle --release \
@@ -52,7 +56,3 @@ workflows:
     artifacts:
       - build/app/outputs/bundle/release/app-release.aab
       - rydmatch-release-key.jks
-
-      - name: Print Android Gradle file
-        script: |
-          sed -n '20,35p' android/app/build.gradle.kts
