@@ -53,9 +53,13 @@ flutter:
 
 flutter_launcher_icons:
   android: "ic_launcher"
-  ios: false
-  image_path_android: "assets/images/rydmatch_app_icon.png"
+  ios: true
+  image_path: "assets/images/ChatGPT_Image_May_12__2026__04_32_00_PM-1778589205134.png"
   min_sdk_android: 21
   adaptive_icon_background: "#000000"
-  adaptive_icon_foreground: "assets/images/rydmatch_app_icon.png"
-
+  adaptive_icon_foreground: "assets/images/ChatGPT_Image_May_12__2026__04_32_00_PM-1778589205134.png"
+  web:
+    generate: true
+    image_path: "assets/images/ChatGPT_Image_May_12__2026__04_32_00_PM-1778589205134.png"
+    background_color: "#000000"
+    theme_color: "#000000"

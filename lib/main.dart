@@ -17,14 +17,11 @@ import './services/theme_service.dart';
 import './widgets/custom_error_widget.dart';
 import 'core/app_export.dart';
 import 'web_utils.dart' if (dart.library.io) 'web_utils_stub.dart';
-import 'presentation/admin_verification_screen/admin_verification_screen.dart';
 
 final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  bool supabaseReady = false;
 
   if (kIsWeb) {
     const googleMapsApiKey = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
@@ -33,19 +30,15 @@ void main() async {
 
   try {
     await SupabaseService.initialize();
-    supabaseReady = true;
-  } catch (e) {
+  } catch (e, stack) {
     debugPrint('Supabase initialization failed: $e');
-    supabaseReady = false;
+    debugPrintStack(stackTrace: stack);
+
+    runApp(_StartupFailureApp(error: e.toString()));
+    return;
   }
 
-  if (supabaseReady) {
-    try {
-      OfflineQueueService.instance.startMonitoring();
-    } catch (e) {
-      debugPrint('Offline queue start failed: $e');
-    }
-  }
+  OfflineQueueService.instance.startMonitoring();
 
   bool hasShownError = false;
 
@@ -59,83 +52,62 @@ void main() async {
 
       return CustomErrorWidget(errorDetails: details);
     }
+
     return const SizedBox.shrink();
   };
 
-  String initialRoute = '/onboarding-screen';
+  final bool sessionActive = await SessionService.isSessionActive();
 
-  try {
-    final bool sessionActive = await SessionService.isSessionActive();
+  final uri = Uri.base;
+  final isPasswordResetLink =
+      uri.path == '/reset-password' ||
+      uri.fragment.contains('/reset-password') ||
+      uri.queryParameters['type'] == 'recovery' ||
+      uri.fragment.contains('type=recovery');
 
-    final uri = Uri.base;
-    final isPasswordResetLink =
-        uri.path == '/reset-password' ||
-        uri.fragment.contains('/reset-password') ||
-        uri.queryParameters['type'] == 'recovery' ||
-        uri.fragment.contains('type=recovery');
+  String initialRoute;
 
-    if (isPasswordResetLink) {
-      initialRoute = '/reset-password';
-    } else if (sessionActive && supabaseReady) {
-      final supabaseUser = Supabase.instance.client.auth.currentUser;
+  if (isPasswordResetLink) {
+    initialRoute = '/reset-password';
+  } else if (sessionActive) {
+    final supabaseUser = Supabase.instance.client.auth.currentUser;
 
-      if (supabaseUser != null) {
+    if (supabaseUser != null) {
+      await ProfileService.restoreProfileFromSupabase();
+      initialRoute = '/main-screen';
+    } else {
+      bool recovered = false;
+
+      for (int i = 0; i < 6; i++) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (Supabase.instance.client.auth.currentUser != null) {
+          recovered = true;
+          break;
+        }
+      }
+
+      if (recovered) {
         await ProfileService.restoreProfileFromSupabase();
         initialRoute = '/main-screen';
       } else {
-        bool recovered = false;
-
-        for (int i = 0; i < 6; i++) {
-          await Future.delayed(const Duration(milliseconds: 500));
-          if (Supabase.instance.client.auth.currentUser != null) {
-            recovered = true;
-            break;
-          }
-        }
-
-        if (recovered) {
-          await ProfileService.restoreProfileFromSupabase();
-          initialRoute = '/main-screen';
-        } else {
-          await SessionService.clearSession();
-          final prefs = await SharedPreferences.getInstance();
-          final bool onboardingSeen =
-              prefs.getBool('onboarding_seen') ?? false;
-          initialRoute = onboardingSeen ? '/' : '/onboarding-screen';
-        }
+        await SessionService.clearSession();
+        final prefs = await SharedPreferences.getInstance();
+        final onboardingSeen = prefs.getBool('onboarding_seen') ?? false;
+        initialRoute = onboardingSeen ? '/' : '/onboarding-screen';
       }
-    } else {
-      final prefs = await SharedPreferences.getInstance();
-      final bool onboardingSeen = prefs.getBool('onboarding_seen') ?? false;
-      initialRoute = onboardingSeen ? '/' : '/onboarding-screen';
     }
-  } catch (e) {
-    debugPrint('Startup route resolution failed: $e');
-    initialRoute = '/onboarding-screen';
+  } else {
+    final prefs = await SharedPreferences.getInstance();
+    final onboardingSeen = prefs.getBool('onboarding_seen') ?? false;
+    initialRoute = onboardingSeen ? '/' : '/onboarding-screen';
   }
 
-  try {
-    await ThemeService().loadThemeMode();
-  } catch (e) {
-    debugPrint('Theme load failed: $e');
-  }
-
-  try {
-    await HapticService.instance.init();
-  } catch (e) {
-    debugPrint('Haptic init failed: $e');
-  }
-
-  if (supabaseReady) {
-    try {
-      await PremiumService().init();
-    } catch (e) {
-      debugPrint('Premium init failed: $e');
-    }
-  }
+  await ThemeService().loadThemeMode();
+  await HapticService.instance.init();
+  await PremiumService().init();
 
   void launchApp() {
-    runApp(MyApp(initialRoute: initialRoute, supabaseReady: supabaseReady));
+    runApp(MyApp(initialRoute: initialRoute));
   }
 
   if (kIsWeb) {
@@ -153,15 +125,44 @@ void main() async {
   }
 }
 
+class _StartupFailureApp extends StatelessWidget {
+  final String error;
+
+  const _StartupFailureApp({required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'RydMatch',
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: const Color(0xFF0D1B2A),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text(
+                    'RydMatch could not connect.\n\n$error',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class MyApp extends StatefulWidget {
   final String initialRoute;
-  final bool supabaseReady;
 
-  const MyApp({
-    super.key,
-    required this.initialRoute,
-    required this.supabaseReady,
-  });
+  const MyApp({super.key, required this.initialRoute});
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -175,11 +176,8 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    _themeService.addListener(_onThemeChanged);
 
-    if (!widget.supabaseReady) {
-      return;
-    }
+    _themeService.addListener(_onThemeChanged);
 
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
       data,
@@ -211,8 +209,6 @@ class _MyAppState extends State<MyApp> {
   }
 
   void _startNotificationListener(String userId) {
-    if (!widget.supabaseReady) return;
-
     _stopNotificationListener();
 
     _notificationChannel = Supabase.instance.client
@@ -235,7 +231,7 @@ class _MyAppState extends State<MyApp> {
 
               () async {
                 String senderName = 'New Message';
-                String messageText = row['message'] as String? ?? '';
+                final messageText = row['message'] as String? ?? '';
 
                 if (senderId != null) {
                   try {
@@ -257,7 +253,6 @@ class _MyAppState extends State<MyApp> {
                   if (context == null) return;
 
                   ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: GestureDetector(
@@ -291,7 +286,7 @@ class _MyAppState extends State<MyApp> {
                                     senderName,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 13.0,
+                                      fontSize: 13,
                                       color: Colors.white,
                                     ),
                                     maxLines: 1,
@@ -301,7 +296,7 @@ class _MyAppState extends State<MyApp> {
                                     Text(
                                       messageText,
                                       style: const TextStyle(
-                                        fontSize: 12.0,
+                                        fontSize: 12,
                                         color: Colors.white70,
                                       ),
                                       maxLines: 2,
@@ -313,17 +308,17 @@ class _MyAppState extends State<MyApp> {
                             const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 12.0,
-                                vertical: 6.0,
+                                horizontal: 12,
+                                vertical: 6,
                               ),
                               decoration: BoxDecoration(
                                 color: Colors.white24,
-                                borderRadius: BorderRadius.circular(8.0),
+                                borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Text(
                                 'View',
                                 style: TextStyle(
-                                  fontSize: 12.0,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.white,
                                 ),
@@ -334,14 +329,9 @@ class _MyAppState extends State<MyApp> {
                       ),
                       backgroundColor: const Color(0xFF1B365D),
                       behavior: SnackBarBehavior.floating,
-                      margin: const EdgeInsets.fromLTRB(
-                        12.0,
-                        8.0,
-                        12.0,
-                        12.0,
-                      ),
+                      margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12.0),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       duration: const Duration(seconds: 5),
                       dismissDirection: DismissDirection.horizontal,
