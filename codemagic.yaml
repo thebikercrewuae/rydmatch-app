@@ -52,3 +52,7 @@ workflows:
     artifacts:
       - build/app/outputs/bundle/release/app-release.aab
       - rydmatch-release-key.jks
+
+      - name: Print Android Gradle file
+        script: |
+          sed -n '20,35p' android/app/build.gradle.kts
