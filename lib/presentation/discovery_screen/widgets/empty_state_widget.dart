@@ -113,7 +113,7 @@ class EmptyStateWidget extends StatelessWidget {
                 rootNavigator: true,
               ).pushNamed('/profile-setup-screen'),
               icon: Icon(
-                AppIcons.tune,
+                Icons.tune_rounded,
                 size: 16,
                 color: theme.colorScheme.primary,
               ),
