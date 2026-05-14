@@ -45,7 +45,7 @@ class _MainScreenState extends State<MainScreen> {
     Navigator.of(context, rootNavigator: true).pushNamed(route).then((_) {
       if (mounted) setState(() => _currentIndex = 0);
     });
-    setState(() => _currentIndex = 2);
+    setState(() => _currentIndex = 3);
   }
 
   void _openNotifications() {
@@ -146,17 +146,27 @@ class _MainScreenState extends State<MainScreen> {
                     return;
                   }
                   if (index == 2) {
-                    _handleProfileTap();
+                    Navigator.of(
+                      context,
+                      rootNavigator: true,
+                    ).pushNamed('/ride-feed-screen').then((_) {
+                      if (mounted) setState(() => _currentIndex = 0);
+                    });
+                    setState(() => _currentIndex = 2);
                     return;
                   }
                   if (index == 3) {
+                    _handleProfileTap();
+                    return;
+                  }
+                  if (index == 4) {
                     Navigator.of(
                       context,
                       rootNavigator: true,
                     ).pushNamed('/garage-screen').then((_) {
                       if (mounted) setState(() => _currentIndex = 0);
                     });
-                    setState(() => _currentIndex = 3);
+                    setState(() => _currentIndex = 4);
                     return;
                   }
                   setState(() => _currentIndex = index);

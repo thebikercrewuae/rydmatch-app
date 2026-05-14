@@ -949,35 +949,6 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                         width: double.infinity,
                         height: 6.h,
                         child: ElevatedButton.icon(
-                          onPressed: () =>
-                              Navigator.pushNamed(context, '/ride-feed-screen'),
-                          icon: const Icon(
-                            Icons.photo_library_rounded,
-                            color: Colors.white,
-                          ),
-                          label: Text(
-                            PremiumService().isPremium
-                                ? 'Ride Feed'
-                                : 'Ride Feed (Premium)',
-                            style: GoogleFonts.dmSans(
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFE85A4F),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12.0),
-                            ),
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 1.5.h),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 6.h,
-                        child: ElevatedButton.icon(
                           onPressed: () => Navigator.pushNamed(
                             context,
                             '/leaderboard-screen',
