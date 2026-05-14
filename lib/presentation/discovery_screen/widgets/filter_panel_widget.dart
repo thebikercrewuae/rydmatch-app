@@ -6,62 +6,54 @@ import '../../../widgets/app_icons.dart';
 
 class FilterState {
   final double distance;
+  final String rideCommunity;
   final String skillLevel;
   final String bikeType;
-  final List<String> bikeBrands;
-  final RangeValues engineSize;
   final List<String> ridingStyles;
   final bool onlineOnly;
 
   const FilterState({
-    this.distance = 500,
+    this.distance = 100,
+    this.rideCommunity = 'All',
     this.skillLevel = 'All',
     this.bikeType = 'All',
-    this.bikeBrands = const ['All'],
-    this.engineSize = const RangeValues(125, 2000),
     this.ridingStyles = const ['All'],
     this.onlineOnly = false,
   });
 
   FilterState copyWith({
     double? distance,
+    String? rideCommunity,
     String? skillLevel,
     String? bikeType,
-    List<String>? bikeBrands,
-    RangeValues? engineSize,
     List<String>? ridingStyles,
     bool? onlineOnly,
   }) {
     return FilterState(
       distance: distance ?? this.distance,
+      rideCommunity: rideCommunity ?? this.rideCommunity,
       skillLevel: skillLevel ?? this.skillLevel,
       bikeType: bikeType ?? this.bikeType,
-      bikeBrands: bikeBrands ?? this.bikeBrands,
-      engineSize: engineSize ?? this.engineSize,
       ridingStyles: ridingStyles ?? this.ridingStyles,
       onlineOnly: onlineOnly ?? this.onlineOnly,
     );
   }
 
   bool get isDefault =>
-      distance == 500 &&
+      distance == 100 &&
+      rideCommunity == 'All' &&
       skillLevel == 'All' &&
       bikeType == 'All' &&
-      bikeBrands.length == 1 &&
-      bikeBrands.first == 'All' &&
-      engineSize.start == 125 &&
-      engineSize.end == 2000 &&
       ridingStyles.length == 1 &&
       ridingStyles.first == 'All' &&
       !onlineOnly;
 
   int get activeCount {
     int count = 0;
-    if (distance != 500) count++;
+    if (distance != 100) count++;
+    if (rideCommunity != 'All') count++;
     if (skillLevel != 'All') count++;
     if (bikeType != 'All') count++;
-    if (!(bikeBrands.length == 1 && bikeBrands.first == 'All')) count++;
-    if (engineSize.start != 125 || engineSize.end != 2000) count++;
     if (!(ridingStyles.length == 1 && ridingStyles.first == 'All')) count++;
     if (onlineOnly) count++;
     return count;
@@ -86,10 +78,9 @@ class FilterPanelWidget extends StatefulWidget {
 
 class _FilterPanelWidgetState extends State<FilterPanelWidget> {
   late double _distance;
+  late String _selectedRideCommunity;
   late String _selectedSkill;
   late String _selectedBikeType;
-  late List<String> _selectedBikeBrands;
-  late RangeValues _engineSize;
   late List<String> _selectedRidingStyles;
   late bool _onlineOnly;
   bool _isMetric = true;
@@ -101,35 +92,42 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
     'Advanced',
     'Expert',
   ];
-  final List<String> _bikeTypes = [
+  final List<String> _rideCommunities = [
     'All',
-    'Sport',
-    'Cruiser',
-    'Adventure',
-    'Naked',
-    'Touring',
+    'motorcycle',
+    'bicycle',
   ];
-  final List<String> _bikeBrands = [
+  final List<String> _motorcycleTypes = [
     'All',
-    'Ducati',
-    'BMW',
-    'Honda',
-    'Kawasaki',
-    'Yamaha',
-    'Suzuki',
-    'Harley-Davidson',
-    'KTM',
-    'Triumph',
-    'Royal Enfield',
-    'Other',
+    'sport',
+    'naked',
+    'cruiser',
+    'adventure',
+    'touring',
+    'scrambler',
+    'dirt',
+    'scooter',
+  ];
+  final List<String> _bicycleTypes = [
+    'All',
+    'road_bicycle',
+    'gravel_bicycle',
+    'mountain_bicycle',
+    'hybrid_bicycle',
+    'e_bike',
+    'touring_bicycle',
+    'bmx',
+    'folding_bicycle',
   ];
   final List<String> _ridingStyles = [
     'All',
+    'Social',
+    'Fitness',
     'Touring',
     'Sport',
-    'Off-Road',
+    'Off-road',
     'Commuting',
-    'Track Day',
+    'Track / Training',
     'Casual',
   ];
 
@@ -137,10 +135,9 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
   void initState() {
     super.initState();
     _distance = widget.initialState.distance;
+    _selectedRideCommunity = widget.initialState.rideCommunity;
     _selectedSkill = widget.initialState.skillLevel;
     _selectedBikeType = widget.initialState.bikeType;
-    _selectedBikeBrands = List.from(widget.initialState.bikeBrands);
-    _engineSize = widget.initialState.engineSize;
     _selectedRidingStyles = List.from(widget.initialState.ridingStyles);
     _onlineOnly = widget.initialState.onlineOnly;
     _loadUnitPreference();
@@ -173,13 +170,66 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
     });
   }
 
+  List<String> get _vehicleTypeOptions {
+    if (_selectedRideCommunity == 'motorcycle') return _motorcycleTypes;
+    if (_selectedRideCommunity == 'bicycle') return _bicycleTypes;
+
+    return [
+      'All',
+      ..._motorcycleTypes.where((type) => type != 'All'),
+      ..._bicycleTypes.where((type) => type != 'All'),
+    ];
+  }
+
+  String _labelForOption(String value) {
+    switch (value) {
+      case 'motorcycle':
+        return 'Motorcycle';
+      case 'bicycle':
+        return 'Bicycle';
+      case 'sport':
+        return 'Sport';
+      case 'naked':
+        return 'Naked';
+      case 'cruiser':
+        return 'Cruiser';
+      case 'adventure':
+        return 'Adventure';
+      case 'touring':
+        return 'Touring';
+      case 'scrambler':
+        return 'Scrambler';
+      case 'dirt':
+        return 'Dirt / Enduro';
+      case 'scooter':
+        return 'Scooter';
+      case 'road_bicycle':
+        return 'Road';
+      case 'gravel_bicycle':
+        return 'Gravel';
+      case 'mountain_bicycle':
+        return 'Mountain';
+      case 'hybrid_bicycle':
+        return 'Hybrid';
+      case 'e_bike':
+        return 'E-Bike';
+      case 'touring_bicycle':
+        return 'Cycle Touring';
+      case 'bmx':
+        return 'BMX';
+      case 'folding_bicycle':
+        return 'Folding';
+      default:
+        return value;
+    }
+  }
+
   void _resetAll() {
     setState(() {
-      _distance = 500;
+      _distance = 100;
+      _selectedRideCommunity = 'All';
       _selectedSkill = 'All';
       _selectedBikeType = 'All';
-      _selectedBikeBrands = ['All'];
-      _engineSize = const RangeValues(125, 2000);
       _selectedRidingStyles = ['All'];
       _onlineOnly = false;
     });
@@ -189,10 +239,9 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
     widget.onApply(
       FilterState(
         distance: _distance,
+        rideCommunity: _selectedRideCommunity,
         skillLevel: _selectedSkill,
         bikeType: _selectedBikeType,
-        bikeBrands: List.from(_selectedBikeBrands),
-        engineSize: _engineSize,
         ridingStyles: List.from(_selectedRidingStyles),
         onlineOnly: _onlineOnly,
       ),
@@ -216,6 +265,7 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
     required List<String> selected,
     required Color activeColor,
     required void Function(String) onTap,
+    String Function(String)? labelBuilder,
   }) {
     return SizedBox(
       height: 5.h,
@@ -237,7 +287,7 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
                 ),
               ),
               child: Text(
-                options[i],
+                labelBuilder?.call(options[i]) ?? options[i],
                 style: TextStyle(
                   color: isSelected
                       ? Colors.white
@@ -256,9 +306,6 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final engineStart = _engineSize.start.round();
-    final engineEnd = _engineSize.end.round();
-    final engineEndLabel = engineEnd >= 2000 ? '2000cc+' : '${engineEnd}cc';
 
     return Container(
       margin: EdgeInsets.only(bottom: 1.h),
@@ -329,6 +376,21 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
             ),
             SizedBox(height: 0.5.h),
 
+            // Ride Community
+            _buildSectionLabel(theme, 'Ride Community'),
+            _buildChipRow(
+              theme: theme,
+              options: _rideCommunities,
+              selected: [_selectedRideCommunity],
+              activeColor: theme.colorScheme.primary,
+              labelBuilder: _labelForOption,
+              onTap: (v) => setState(() {
+                _selectedRideCommunity = v;
+                _selectedBikeType = 'All';
+              }),
+            ),
+            SizedBox(height: 1.h),
+
             // Skill Level
             _buildSectionLabel(theme, 'Skill Level'),
             _buildChipRow(
@@ -340,52 +402,17 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
             ),
             SizedBox(height: 1.h),
 
-            // Bike Type
-            _buildSectionLabel(theme, 'Bike Type'),
+            // Vehicle Type
+            _buildSectionLabel(theme, 'Vehicle Type'),
             _buildChipRow(
               theme: theme,
-              options: _bikeTypes,
+              options: _vehicleTypeOptions,
               selected: [_selectedBikeType],
               activeColor: theme.colorScheme.secondary,
+              labelBuilder: _labelForOption,
               onTap: (v) => setState(() => _selectedBikeType = v),
             ),
             SizedBox(height: 1.h),
-
-            // Bike Brand
-            _buildSectionLabel(theme, 'Bike Brand'),
-            _buildChipRow(
-              theme: theme,
-              options: _bikeBrands,
-              selected: _selectedBikeBrands,
-              activeColor: theme.colorScheme.primary,
-              onTap: (v) => _toggleMultiSelect(_selectedBikeBrands, v),
-            ),
-            SizedBox(height: 1.h),
-
-            // Engine Size
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Engine Size',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  '${engineStart}cc – $engineEndLabel',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ),
-            RangeSlider(
-              values: _engineSize,
-              min: 125,
-              max: 2000,
-              divisions: 38,
-              onChanged: (v) => setState(() => _engineSize = v),
-            ),
-            SizedBox(height: 0.5.h),
 
             // Riding Style
             _buildSectionLabel(theme, 'Riding Style'),
@@ -393,8 +420,7 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
               theme: theme,
               options: _ridingStyles,
               selected: _selectedRidingStyles,
-              activeColor:
-                  theme.colorScheme.tertiary ?? theme.colorScheme.primary,
+              activeColor: theme.colorScheme.tertiary,
               onTap: (v) => _toggleMultiSelect(_selectedRidingStyles, v),
             ),
             SizedBox(height: 1.h),

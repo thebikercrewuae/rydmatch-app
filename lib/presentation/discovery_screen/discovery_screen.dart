@@ -433,6 +433,11 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         if (skill != filters.skillLevel) return false;
       }
 
+      if (filters.rideCommunity != 'All') {
+        final rideMode = rider['rideMode'] as String? ?? 'motorcycle';
+        if (rideMode != filters.rideCommunity) return false;
+      }
+
       if (filters.bikeType != 'All') {
         final bikeTypes = List<String>.from(rider['bikeTypes'] as List? ?? []);
         if (bikeTypes.isNotEmpty && !bikeTypes.contains(filters.bikeType)) {
@@ -440,27 +445,10 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         }
       }
 
-      if (!(filters.bikeBrands.length == 1 &&
-          filters.bikeBrands.first == 'All')) {
-        final brand = rider['bikeBrand'] as String? ?? '';
-        if (!filters.bikeBrands.contains(brand)) return false;
-      }
-
       if (!(filters.ridingStyles.length == 1 &&
           filters.ridingStyles.first == 'All')) {
         final style = rider['ridingStyle'] as String? ?? '';
         if (!filters.ridingStyles.contains(style)) return false;
-      }
-
-      if (filters.engineSize.start != 125 || filters.engineSize.end != 2000) {
-        final engine = (rider['engineSize'] as num?)?.toDouble();
-        if (engine != null) {
-          if (engine < filters.engineSize.start) return false;
-          if (filters.engineSize.end < 2000 &&
-              engine > filters.engineSize.end) {
-            return false;
-          }
-        }
       }
 
       return true;
@@ -573,7 +561,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                 'name': swipedName,
                 'image': swipedPhoto,
                 'userId': swipedId,
-                'bike': 'Motorcycle',
+                'bike': 'Ride partner',
                 'isOnline': false,
               },
             );
@@ -822,6 +810,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     }.toList();
 
     final bio = (rider['bio'] as String?)?.trim();
+    final rideMode = rider['rideMode'] as String? ?? 'motorcycle';
     final bikeTypes = List<String>.from(rider['bikeTypes'] as List? ?? []);
     final skillLevels = List<String>.from(rider['skillLevels'] as List? ?? []);
     final preferredRoads = List<String>.from(
@@ -983,11 +972,11 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                           ),
                         ),
                         SizedBox(height: 2.5.h),
-                        _sectionTitle(theme, 'Garage'),
+                        _sectionTitle(theme, 'Ride Setup'),
                         SizedBox(height: 1.h),
                         if (bikeTypes.isEmpty)
                           Text(
-                            'No garage details added yet.',
+                            'No ride setup details added yet.',
                             style: GoogleFonts.dmSans(
                               fontSize: 12.sp,
                               color: theme.colorScheme.onSurfaceVariant,
@@ -1001,7 +990,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                                 .map(
                                   (bike) => _chip(
                                     theme,
-                                    Icons.two_wheeler_rounded,
+                                    rideMode == 'bicycle'
+                                        ? Icons.directions_bike_rounded
+                                        : Icons.two_wheeler_rounded,
                                     bike,
                                   ),
                                 )
@@ -1130,7 +1121,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                   Row(
                     children: [
                       Icon(
-                        AppIcons.motorcycle,
+                        Icons.route_rounded,
                         color: theme.colorScheme.primary,
                         size: 28,
                       ),

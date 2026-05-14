@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 
-import '../../../widgets/app_icons.dart';
-
 class EmptyStateWidget extends StatelessWidget {
   final VoidCallback onExpandRadius;
 
@@ -41,7 +39,7 @@ class EmptyStateWidget extends StatelessWidget {
                   ),
                 ),
                 Icon(
-                  AppIcons.motorcycle,
+                  Icons.route_rounded,
                   color: theme.colorScheme.primary.withValues(alpha: 0.45),
                   size: 52,
                 ),

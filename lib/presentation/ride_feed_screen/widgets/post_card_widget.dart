@@ -203,7 +203,7 @@ class _PostCardWidgetState extends State<PostCardWidget>
                 color: const Color(0xFF1B365D).withValues(alpha: 0.1),
                 child: const Center(
                   child: Icon(
-                    Icons.motorcycle_rounded,
+                    Icons.route_rounded,
                     size: 48,
                     color: Color(0xFF1B365D),
                   ),

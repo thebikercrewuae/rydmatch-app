@@ -5,21 +5,28 @@ import 'package:sizer/sizer.dart';
 class BikeSelectorWidget extends StatelessWidget {
   final List<String> bikes;
   final String? selectedBike;
+  final String rideMode;
   final ValueChanged<String?> onChanged;
 
   const BikeSelectorWidget({
     super.key,
     required this.bikes,
     this.selectedBike,
+    this.rideMode = 'motorcycle',
     required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final vehicleLabel = rideMode == 'bicycle' ? 'bicycle' : 'motorcycle';
+    final vehicleIcon = rideMode == 'bicycle'
+        ? Icons.directions_bike_rounded
+        : Icons.motorcycle_rounded;
+
     if (bikes.isEmpty) {
       return Text(
-        'No bikes in garage. Add a bike first.',
+        'No $vehicleLabel saved yet. Add one first.',
         style: GoogleFonts.dmSans(
           fontSize: 11.sp,
           color: theme.colorScheme.onSurfaceVariant,
@@ -55,7 +62,7 @@ class BikeSelectorWidget extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    Icons.motorcycle_rounded,
+                    vehicleIcon,
                     size: 16,
                     color: isSelected
                         ? Colors.white

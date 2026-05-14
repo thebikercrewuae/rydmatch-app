@@ -503,7 +503,7 @@ class _RiderCardWidgetState extends State<RiderCardWidget>
                           _detailRow(
                             context,
                             'category',
-                            "Bike Type: ${rider["bikeType"]}",
+                            "Vehicle Type: ${rider["bikeType"]}",
                           ),
                         ],
                       ),

@@ -22,7 +22,7 @@ class FeedEmptyStateWidget extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.motorcycle_rounded,
+                Icons.route_rounded,
                 size: 48,
                 color: Color(0xFF1B365D),
               ),
@@ -39,7 +39,7 @@ class FeedEmptyStateWidget extends StatelessWidget {
             ),
             SizedBox(height: 1.h),
             Text(
-              'When your matched riders share rides, they will appear here.',
+              'When your matched ride partners share rides, they will appear here.',
               style: GoogleFonts.dmSans(
                 fontSize: 12.sp,
                 color: theme.colorScheme.onSurfaceVariant,

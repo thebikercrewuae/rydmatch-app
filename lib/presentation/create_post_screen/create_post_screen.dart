@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/ride_feed_service.dart';
+import '../../services/profile_service.dart';
 import './widgets/image_upload_widget.dart';
 import './widgets/bike_selector_widget.dart';
 import './widgets/route_selector_widget.dart';
@@ -25,6 +26,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   String? _selectedRoute;
   String? _selectedBike;
+  String _rideMode = 'motorcycle';
   String _distanceUnit = 'km';
   bool _isMetric = true;
   bool _isPosting = false;
@@ -71,6 +73,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       _instagramConnected = prefs.getBool(_instagramConnectedKey) ?? false;
       _tiktokConnected = prefs.getBool(_tiktokConnectedKey) ?? false;
       _youtubeConnected = prefs.getBool(_youtubeConnectedKey) ?? false;
+
+      final profile = await ProfileService.loadProfile();
+      _rideMode = profile['rideMode'] as String? ?? 'motorcycle';
     } catch (_) {}
 
     final routes = await RideFeedService.instance.fetchSavedRouteNames();
@@ -137,13 +142,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     if (caption.isNotEmpty) parts.add(caption);
     if (distance.isNotEmpty) parts.add('Distance: $distance $_distanceUnit');
     if (route != null && route.isNotEmpty) parts.add('Route: $route');
-    if (bike != null && bike.isNotEmpty) parts.add('Bike: $bike');
+    if (bike != null && bike.isNotEmpty) {
+      parts.add('${_rideMode == 'bicycle' ? 'Bicycle' : 'Motorcycle'}: $bike');
+    }
 
     if (platform != null && destination != null) {
       parts.add('Shared to $platform $destination from RydMatch');
     }
 
-    parts.add('#RydMatch #RideLife #Motorcycles');
+    parts.add(
+      _rideMode == 'bicycle'
+          ? '#RydMatch #RideLife #Cycling'
+          : '#RydMatch #RideLife #Motorcycles',
+    );
     return parts.join('\n');
   }
 
@@ -754,11 +765,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           ),
           SizedBox(height: 1.5.h),
 
-          _buildSectionLabel(theme, 'Bike Used'),
+          _buildSectionLabel(
+            theme,
+            _rideMode == 'bicycle' ? 'Bicycle Used' : 'Motorcycle Used',
+          ),
           SizedBox(height: 0.8.h),
           BikeSelectorWidget(
             bikes: _garageBikes,
             selectedBike: _selectedBike,
+            rideMode: _rideMode,
             onChanged: (v) => setState(() => _selectedBike = v),
           ),
           SizedBox(height: 2.5.h),

@@ -218,7 +218,7 @@ class _RideFeedScreenState extends State<RideFeedScreen> {
             ),
             SizedBox(height: 1.h),
             Text(
-              'Share your ride photos, routes, and distances with your matched riders. Like and comment on their adventures.',
+              'Share ride photos, routes, and distances with your matched ride partners. Like and comment on their adventures.',
               style: GoogleFonts.dmSans(
                 fontSize: 12.sp,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
