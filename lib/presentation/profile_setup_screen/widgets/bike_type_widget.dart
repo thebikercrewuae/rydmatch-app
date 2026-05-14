@@ -8,17 +8,19 @@ import '../../../widgets/custom_icon_widget.dart';
 class BikeTypeWidget extends StatelessWidget {
   final List<String> selectedBikes;
   final ValueChanged<List<String>> onBikesChanged;
+  final String rideMode;
 
   const BikeTypeWidget({
     super.key,
     required this.selectedBikes,
     required this.onBikesChanged,
+    this.rideMode = 'motorcycle',
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bikeTypes = [
+    final motorcycleTypes = [
       {
         'id': 'sport',
         'title': 'Sport / Supersport',
@@ -68,13 +70,65 @@ class BikeTypeWidget extends StatelessWidget {
         'desc': 'TMAX, Forza, Burgman',
       },
     ];
+    final bicycleTypes = [
+      {
+        'id': 'road_bicycle',
+        'title': 'Road',
+        'icon': 'directions_bike',
+        'desc': 'Fast group rides',
+      },
+      {
+        'id': 'gravel_bicycle',
+        'title': 'Gravel',
+        'icon': 'terrain',
+        'desc': 'Mixed surface rides',
+      },
+      {
+        'id': 'mountain_bicycle',
+        'title': 'Mountain',
+        'icon': 'landscape',
+        'desc': 'Trails & technical routes',
+      },
+      {
+        'id': 'hybrid_bicycle',
+        'title': 'Hybrid / Fitness',
+        'icon': 'directions_bike',
+        'desc': 'City and fitness rides',
+      },
+      {
+        'id': 'e_bike',
+        'title': 'E-Bike',
+        'icon': 'electric_bike',
+        'desc': 'Assisted rides',
+      },
+      {
+        'id': 'touring_bicycle',
+        'title': 'Touring',
+        'icon': 'luggage',
+        'desc': 'Long distance cycling',
+      },
+      {
+        'id': 'bmx',
+        'title': 'BMX',
+        'icon': 'sports_motorsports',
+        'desc': 'Park and street',
+      },
+      {
+        'id': 'folding_bicycle',
+        'title': 'Folding',
+        'icon': 'commute',
+        'desc': 'Compact commuting',
+      },
+    ];
+    final bikeTypes = rideMode == 'bicycle' ? bicycleTypes : motorcycleTypes;
+    final modeLabel = rideMode == 'bicycle' ? 'bicycle' : 'motorcycle';
 
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'What type of bike do you ride?',
+            'What type of $modeLabel do you ride?',
             style: theme.textTheme.headlineSmall,
           ),
           SizedBox(height: 1.h),

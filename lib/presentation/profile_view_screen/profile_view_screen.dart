@@ -52,6 +52,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   String _riderBio = '';
   bool _isMetric = false;
   String? _gender;
+  String _rideMode = 'motorcycle';
+  bool _mixedCommunityMatching = false;
   double _averageRating = 0.0;
   int _totalRatings = 0;
   List<String> _allSafetyTags = [];
@@ -229,7 +231,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       final profile = await Supabase.instance.client
           .from('user_profiles')
           .select(
-            'id, full_name, email, avatar_url, bio, skill_levels, bike_types, preferred_roads, riding_speed, gender, is_verified',
+            'id, full_name, email, avatar_url, bio, skill_levels, bike_types, preferred_roads, riding_speed, gender, is_verified, ride_mode, mixed_community_matching',
           )
           .eq('id', otherUserId)
           .maybeSingle();
@@ -248,6 +250,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
           _ridingSpeed = 60.0;
           _isMetric = false;
           _gender = null;
+          _rideMode = 'motorcycle';
+          _mixedCommunityMatching = false;
           _isVerified = false;
           _isLoading = false;
         });
@@ -278,6 +282,9 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             (profile['riding_speed'] as num?)?.toDouble() ?? 60.0;
         _isMetric = false;
         _gender = profile['gender'] as String?;
+        _rideMode = profile['ride_mode'] as String? ?? 'motorcycle';
+        _mixedCommunityMatching =
+            (profile['mixed_community_matching'] as bool?) ?? false;
         _bikePhotoPaths = [];
         _isVerified = profile['is_verified'] == true;
         _isLoading = false;
@@ -301,6 +308,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         _ridingSpeed = 60.0;
         _isMetric = false;
         _gender = null;
+        _rideMode = 'motorcycle';
+        _mixedCommunityMatching = false;
         _isVerified = false;
         _isLoading = false;
       });
@@ -323,6 +332,9 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       _riderBio = data['riderBio'] as String;
       _isMetric = data['isMetric'] as bool? ?? false;
       _gender = data['gender'] as String?;
+      _rideMode = data['rideMode'] as String? ?? 'motorcycle';
+      _mixedCommunityMatching =
+          (data['mixedCommunityMatching'] as bool?) ?? false;
       _isLoading = false;
     });
   }
@@ -401,6 +413,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       riderBio: _riderBio,
       isMetric: isMetric ?? _isMetric,
       gender: _gender,
+      rideMode: _rideMode,
+      mixedCommunityMatching: _mixedCommunityMatching,
     );
     await _loadProfile();
   }
@@ -438,6 +452,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
           onUnitChanged: (val) {
             setSheetState(() => tempMetric = val);
           },
+          rideMode: _rideMode,
         ),
       ),
       onSave: () async {
@@ -456,6 +471,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
           onBikesChanged: (updated) {
             setSheetState(() => tempBikes = updated);
           },
+          rideMode: _rideMode,
         ),
       ),
       onSave: () async {

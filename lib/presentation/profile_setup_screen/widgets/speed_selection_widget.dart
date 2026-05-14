@@ -10,6 +10,7 @@ class SpeedSelectionWidget extends StatelessWidget {
   final bool isMetric;
   final ValueChanged<double> onSpeedChanged;
   final ValueChanged<bool> onUnitChanged;
+  final String rideMode;
 
   const SpeedSelectionWidget({
     super.key,
@@ -17,14 +18,32 @@ class SpeedSelectionWidget extends StatelessWidget {
     required this.isMetric,
     required this.onSpeedChanged,
     required this.onUnitChanged,
+    this.rideMode = 'motorcycle',
   });
 
+  bool get _isBicycle => rideMode == 'bicycle';
+
+  double get _minSpeed => _isBicycle ? 5 : 20;
+  double get _maxSpeed => _isBicycle ? 35 : 120;
+  int get _divisions => _isBicycle ? 30 : 20;
+  double get _effectiveSpeed =>
+      ridingSpeed.clamp(_minSpeed, _maxSpeed).toDouble();
+
   // Convert mph to km/h for display
-  double get _displaySpeed => isMetric ? (ridingSpeed * 1.60934) : ridingSpeed;
+  double get _displaySpeed =>
+      isMetric ? (_effectiveSpeed * 1.60934) : _effectiveSpeed;
 
   String get _unitLabel => isMetric ? 'km/h avg' : 'mph avg';
 
   String get _speedLabel {
+    if (_isBicycle) {
+      if (_effectiveSpeed <= 10) return 'Easy Spin';
+      if (_effectiveSpeed <= 15) return 'Social Pace';
+      if (_effectiveSpeed <= 22) return 'Steady Ride';
+      if (_effectiveSpeed <= 28) return 'Fast Group';
+      return 'Race Pace';
+    }
+
     // Labels based on mph value
     if (ridingSpeed <= 40) return 'Casual Cruiser';
     if (ridingSpeed <= 65) return 'Relaxed Rider';
@@ -34,6 +53,13 @@ class SpeedSelectionWidget extends StatelessWidget {
   }
 
   Color _speedColor(ThemeData theme) {
+    if (_isBicycle) {
+      if (_effectiveSpeed <= 10) return theme.colorScheme.tertiary;
+      if (_effectiveSpeed <= 22) return theme.colorScheme.primary;
+      if (_effectiveSpeed <= 28) return const Color(0xFFB7791F);
+      return theme.colorScheme.secondary;
+    }
+
     if (ridingSpeed <= 40) return theme.colorScheme.tertiary;
     if (ridingSpeed <= 65) return theme.colorScheme.primary;
     if (ridingSpeed <= 85) return const Color(0xFFB7791F);
@@ -137,11 +163,15 @@ class SpeedSelectionWidget extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                isMetric ? '32 km/h' : '20 mph',
+                isMetric
+                    ? '${(_minSpeed * 1.60934).round()} km/h'
+                    : '${_minSpeed.round()} mph',
                 style: theme.textTheme.labelSmall,
               ),
               Text(
-                isMetric ? '193 km/h' : '120 mph',
+                isMetric
+                    ? '${(_maxSpeed * 1.60934).round()} km/h'
+                    : '${_maxSpeed.round()} mph',
                 style: theme.textTheme.labelSmall,
               ),
             ],
@@ -154,10 +184,10 @@ class SpeedSelectionWidget extends StatelessWidget {
               inactiveTrackColor: theme.colorScheme.outline,
             ),
             child: Slider(
-              value: ridingSpeed,
-              min: 20,
-              max: 120,
-              divisions: 20,
+              value: _effectiveSpeed,
+              min: _minSpeed,
+              max: _maxSpeed,
+              divisions: _divisions,
               onChanged: (val) {
                 HapticFeedback.selectionClick();
                 onSpeedChanged(val);
@@ -172,6 +202,42 @@ class SpeedSelectionWidget extends StatelessWidget {
   }
 
   Widget _buildSpeedLegend(ThemeData theme) {
+    if (_isBicycle) {
+      final items = isMetric
+          ? [
+              {'label': 'Easy', 'range': '8-16 km/h', 'icon': 'directions_bike'},
+              {'label': 'Social', 'range': '17-24 km/h', 'icon': 'groups'},
+              {'label': 'Steady', 'range': '25-35 km/h', 'icon': 'speed'},
+              {'label': 'Fast', 'range': '36-56 km/h', 'icon': 'flash_on'},
+            ]
+          : [
+              {'label': 'Easy', 'range': '5-10 mph', 'icon': 'directions_bike'},
+              {'label': 'Social', 'range': '11-15 mph', 'icon': 'groups'},
+              {'label': 'Steady', 'range': '16-22 mph', 'icon': 'speed'},
+              {'label': 'Fast', 'range': '23-35 mph', 'icon': 'flash_on'},
+            ];
+      return Column(
+        children: items.map((item) {
+          return Padding(
+            padding: EdgeInsets.symmetric(vertical: 0.5.h),
+            child: Row(
+              children: [
+                CustomIconWidget(
+                  iconName: item['icon'] as String,
+                  color: theme.colorScheme.onSurfaceVariant,
+                  size: 18,
+                ),
+                SizedBox(width: 3.w),
+                Text(item['label'] as String, style: theme.textTheme.bodyMedium),
+                const Spacer(),
+                Text(item['range'] as String, style: theme.textTheme.bodySmall),
+              ],
+            ),
+          );
+        }).toList(),
+      );
+    }
+
     final items = isMetric
         ? [
             {

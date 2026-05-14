@@ -22,6 +22,9 @@ class ProfileService {
   static const String _keySpeedUnit =
       'profile_speed_unit'; // 'metric' or 'imperial'
   static const String _keyGender = 'profile_gender';
+  static const String _keyRideMode = 'profile_ride_mode';
+  static const String _keyMixedCommunityMatching =
+      'profile_mixed_community_matching';
 
   static Future<bool> isProfileComplete() async {
     final prefs = await SharedPreferences.getInstance();
@@ -105,6 +108,8 @@ class ProfileService {
     String riderBio = '',
     bool isMetric = false,
     String? gender,
+    String rideMode = 'motorcycle',
+    bool mixedCommunityMatching = false,
     XFile? riderPhotoFile,
   }) async {
     final prefs = await SharedPreferences.getInstance();
@@ -168,6 +173,8 @@ class ProfileService {
     await prefs.setString(_keyRiderName, riderName);
     await prefs.setString(_keyRiderBio, riderBio);
     await prefs.setString(_keySpeedUnit, isMetric ? 'metric' : 'imperial');
+    await prefs.setString(_keyRideMode, rideMode);
+    await prefs.setBool(_keyMixedCommunityMatching, mixedCommunityMatching);
     if (gender != null) {
       await prefs.setString(_keyGender, gender);
     }
@@ -183,6 +190,8 @@ class ProfileService {
         riderName: riderName,
         riderBio: riderBio,
         gender: gender,
+        rideMode: rideMode,
+        mixedCommunityMatching: mixedCommunityMatching,
         avatarUrl: resolvedPhotoUrl,
       );
     } else {
@@ -201,6 +210,8 @@ class ProfileService {
     String riderName = '',
     String riderBio = '',
     String? gender,
+    String rideMode = 'motorcycle',
+    bool mixedCommunityMatching = false,
     String? avatarUrl,
   }) async {
     try {
@@ -221,6 +232,8 @@ class ProfileService {
         'bike_types': bikeTypes,
         'preferred_roads': preferredRoads,
         'riding_speed': ridingSpeed,
+        'ride_mode': rideMode,
+        'mixed_community_matching': mixedCommunityMatching,
         'bio': riderBio,
         'is_profile_complete': true,
         'avatar_url': avatarUrl,
@@ -263,6 +276,9 @@ class ProfileService {
       'riderBio': prefs.getString(_keyRiderBio) ?? '',
       'isMetric': (prefs.getString(_keySpeedUnit) ?? 'imperial') == 'metric',
       'gender': prefs.getString(_keyGender),
+      'rideMode': prefs.getString(_keyRideMode) ?? 'motorcycle',
+      'mixedCommunityMatching':
+          prefs.getBool(_keyMixedCommunityMatching) ?? false,
     };
   }
 
@@ -278,6 +294,8 @@ class ProfileService {
     await prefs.remove(_keyBikePhotoPaths);
     await prefs.remove(_keyRiderName);
     await prefs.remove(_keyRiderBio);
+    await prefs.remove(_keyRideMode);
+    await prefs.remove(_keyMixedCommunityMatching);
   }
 
   /// Fetches the profile from Supabase and restores it to SharedPreferences.
@@ -348,6 +366,20 @@ class ProfileService {
       final gender = response['gender'] as String?;
       if (gender != null) {
         await prefs.setString(_keyGender, gender);
+      }
+
+      final rideMode = response['ride_mode'] as String?;
+      if (rideMode != null && rideMode.isNotEmpty) {
+        await prefs.setString(_keyRideMode, rideMode);
+      }
+
+      final mixedCommunityMatching =
+          response['mixed_community_matching'] as bool?;
+      if (mixedCommunityMatching != null) {
+        await prefs.setBool(
+          _keyMixedCommunityMatching,
+          mixedCommunityMatching,
+        );
       }
 
       // Restore avatar/photo URL

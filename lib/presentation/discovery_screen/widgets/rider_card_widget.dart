@@ -130,6 +130,7 @@ class _RiderCardWidgetState extends State<RiderCardWidget>
     final rider = widget.rider;
     final swipe = widget.swipePercent;
     final compatibility = rider["compatibility"] as int? ?? 0;
+    final rideMode = rider["rideMode"] as String? ?? 'motorcycle';
 
     final Color badgeAccent = compatibility >= 85
         ? const Color(0xFFFF6B00)
@@ -342,7 +343,9 @@ class _RiderCardWidgetState extends State<RiderCardWidget>
                   Row(
                     children: [
                       Icon(
-                        Icons.two_wheeler_rounded,
+                        rideMode == 'bicycle'
+                            ? Icons.directions_bike_rounded
+                            : Icons.two_wheeler_rounded,
                         color: Colors.white.withValues(alpha: 0.75),
                         size: 14,
                       ),

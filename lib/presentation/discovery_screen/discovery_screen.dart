@@ -56,6 +56,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
   String _myName = 'You';
   String? _myPhoto;
+  String _myRideMode = 'motorcycle';
+  bool _mixedCommunityMatching = false;
 
   bool _showMatchOverlay = false;
   String? _overlayLeftPhoto;
@@ -168,7 +170,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
       final data = await supabase
           .from('user_profiles')
-          .select('full_name, email, avatar_url')
+          .select(
+            'full_name, email, avatar_url, ride_mode, mixed_community_matching',
+          )
           .eq('id', currentUser.id)
           .single();
 
@@ -182,6 +186,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         setState(() {
           _myName = name;
           _myPhoto = (photo != null && photo.isNotEmpty) ? photo : null;
+          _myRideMode = data['ride_mode'] as String? ?? 'motorcycle';
+          _mixedCommunityMatching =
+              (data['mixed_community_matching'] as bool?) ?? false;
         });
       }
     } catch (_) {}
@@ -250,7 +257,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       final rawAll = await supabase
           .from('user_profiles')
           .select(
-            'id, full_name, email, skill_levels, bike_types, preferred_roads, riding_speed, gender, avatar_url, bio, latitude, longitude',
+            'id, full_name, email, skill_levels, bike_types, preferred_roads, riding_speed, gender, avatar_url, bio, latitude, longitude, ride_mode, mixed_community_matching',
           );
 
       allProfiles = List<Map<String, dynamic>>.from(rawAll);
@@ -294,7 +301,11 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
               .where((p) => !blockedIds.contains(p['id']))
               .toList();
 
-    final riders = afterExcludeBlocked.map((p) {
+    final afterCommunityFilter = afterExcludeBlocked
+        .where(_canShowForRideCommunity)
+        .toList();
+
+    final riders = afterCommunityFilter.map((p) {
       final name = (p['full_name'] as String?)?.isNotEmpty == true
           ? p['full_name'] as String
           : (p['email'] as String?)?.split('@').first ?? 'Rider';
@@ -317,6 +328,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
       final otherLat = (p['latitude'] as num?)?.toDouble();
       final otherLng = (p['longitude'] as num?)?.toDouble();
+      final rideMode = p['ride_mode'] as String? ?? 'motorcycle';
+      final rideModeLabel = _rideModeLabel(rideMode);
 
       String distanceLabel = _isMetric ? '— km' : '— mi';
       double? distanceMilesValue;
@@ -336,7 +349,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         'photo': imageUrl,
         'image': imageUrl,
         'photos': <String>[imageUrl],
-        'semanticLabel': '$name motorcycle rider profile photo',
+        'semanticLabel': '$name ${rideModeLabel.toLowerCase()} rider profile photo',
+        'rideMode': rideMode,
+        'rideModeLabel': rideModeLabel,
         'age': p['age'] as int? ?? '',
         'isVerified': false,
         'bikeModel': bikeType,
@@ -357,7 +372,12 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         'preferredRoads': preferredRoads,
         'preferredRoutes': preferredRoads.join(', '),
         'availability': 'Weekends',
-        'tags': <String>[bikeType, skillLevel, ...preferredRoads],
+        'tags': <String>[
+          rideModeLabel,
+          bikeType,
+          skillLevel,
+          ...preferredRoads,
+        ],
         '_rawLat': otherLat,
         '_rawLng': otherLng,
       };
@@ -379,6 +399,19 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
   int _calcCompatibility(Map<String, dynamic> otherProfile) {
     return 70 + (otherProfile['id'].hashCode.abs() % 25);
+  }
+
+  bool _canShowForRideCommunity(Map<String, dynamic> profile) {
+    final otherRideMode = profile['ride_mode'] as String? ?? 'motorcycle';
+    if (otherRideMode == _myRideMode) return true;
+
+    final otherMixed =
+        (profile['mixed_community_matching'] as bool?) ?? false;
+    return _mixedCommunityMatching && otherMixed;
+  }
+
+  String _rideModeLabel(String rideMode) {
+    return rideMode == 'bicycle' ? 'Bicycle' : 'Motorcycle';
   }
 
   List<Map<String, dynamic>> _applyFiltersToList(

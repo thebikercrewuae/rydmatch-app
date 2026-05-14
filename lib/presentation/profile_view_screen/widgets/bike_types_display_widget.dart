@@ -16,6 +16,15 @@ class BikeTypesDisplayWidget extends StatelessWidget {
     'dirt': {'label': 'Dirt / Off-road', 'icon': 'landscape'},
     'scooter': {'label': 'Scooter', 'icon': 'electric_scooter'},
     'classic': {'label': 'Classic / Vintage', 'icon': 'history'},
+    'scrambler': {'label': 'Scrambler / Cafe', 'icon': 'explore'},
+    'road_bicycle': {'label': 'Road', 'icon': 'directions_bike'},
+    'gravel_bicycle': {'label': 'Gravel', 'icon': 'terrain'},
+    'mountain_bicycle': {'label': 'Mountain', 'icon': 'landscape'},
+    'hybrid_bicycle': {'label': 'Hybrid / Fitness', 'icon': 'directions_bike'},
+    'e_bike': {'label': 'E-Bike', 'icon': 'electric_bike'},
+    'touring_bicycle': {'label': 'Touring Bicycle', 'icon': 'luggage'},
+    'bmx': {'label': 'BMX', 'icon': 'sports_motorsports'},
+    'folding_bicycle': {'label': 'Folding', 'icon': 'commute'},
   };
 
   @override

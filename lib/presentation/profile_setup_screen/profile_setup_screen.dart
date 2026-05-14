@@ -42,6 +42,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   double _ridingSpeed = 60.0;
   bool _isMetric = false;
   String? _gender;
+  String _rideMode = 'motorcycle';
+  bool _mixedCommunityMatching = false;
   List<String> _skillLevels = [];
   List<String> _bikeTypes = [];
   List<String> _preferredRoads = [];
@@ -130,6 +132,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           _ridingSpeed = (data['ridingSpeed'] as num?)?.toDouble() ?? 60.0;
           _isMetric = data['isMetric'] as bool? ?? false;
           _gender = data['gender'] as String?;
+          _rideMode = data['rideMode'] as String? ?? 'motorcycle';
+          _mixedCommunityMatching =
+              (data['mixedCommunityMatching'] as bool?) ?? false;
 
           _skillLevels = List<String>.from(data['skillLevels'] ?? []);
           _bikeTypes = List<String>.from(data['bikeTypes'] ?? []);
@@ -363,6 +368,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       bikePhotoPaths: _bikePhotos.map((f) => f.path).toList(),
       isMetric: _isMetric,
       gender: _gender,
+      rideMode: _rideMode,
+      mixedCommunityMatching: _mixedCommunityMatching,
       riderName: fullName,
       riderBio: _bioController.text.trim(),
     );
@@ -456,6 +463,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       onSpeedChanged: (val) =>
                           setState(() => _ridingSpeed = val),
                       onUnitChanged: (val) => setState(() => _isMetric = val),
+                      rideMode: _rideMode,
                     ),
                     GenderSelectionWidget(
                       selectedGender: _gender,
@@ -469,6 +477,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     BikeTypeWidget(
                       selectedBikes: _bikeTypes,
                       onBikesChanged: (val) => setState(() => _bikeTypes = val),
+                      rideMode: _rideMode,
                     ),
                     PreferredRoadsWidget(
                       selectedRoads: _preferredRoads,
@@ -640,6 +649,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             textCapitalization: TextCapitalization.words,
           ),
           SizedBox(height: 2.5.h),
+          _buildRideCommunitySection(theme),
+          SizedBox(height: 2.5.h),
           _buildTextLabel(theme, 'Bio'),
           SizedBox(height: 1.h),
           TextField(
@@ -691,6 +702,129 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRideCommunitySection(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildTextLabel(theme, 'Ride Community'),
+        SizedBox(height: 1.h),
+        Row(
+          children: [
+            Expanded(
+              child: _buildRideModeButton(
+                theme: theme,
+                value: 'motorcycle',
+                label: 'Motorcycle',
+                icon: Icons.two_wheeler_rounded,
+              ),
+            ),
+            SizedBox(width: 3.w),
+            Expanded(
+              child: _buildRideModeButton(
+                theme: theme,
+                value: 'bicycle',
+                label: 'Bicycle',
+                icon: Icons.directions_bike_rounded,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 1.5.h),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.2.h),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: theme.colorScheme.outline),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Open to mixed motorcycle and bicycle matches',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 11.5.sp,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              Switch(
+                value: _mixedCommunityMatching,
+                activeColor: theme.colorScheme.primary,
+                onChanged: (value) =>
+                    setState(() => _mixedCommunityMatching = value),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRideModeButton({
+    required ThemeData theme,
+    required String value,
+    required String label,
+    required IconData icon,
+  }) {
+    final isSelected = _rideMode == value;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (_rideMode != value) {
+            _rideMode = value;
+            _bikeTypes = [];
+            if (value == 'bicycle' && _ridingSpeed > 35) {
+              _ridingSpeed = 15;
+            } else if (value == 'motorcycle' && _ridingSpeed < 20) {
+              _ridingSpeed = 60;
+            }
+          }
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.6.h),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? theme.colorScheme.primary.withValues(alpha: 0.1)
+              : theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outline,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              color: isSelected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+              size: 26,
+            ),
+            SizedBox(height: 0.7.h),
+            Text(
+              label,
+              style: GoogleFonts.dmSans(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w700,
+                color: isSelected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
