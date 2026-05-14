@@ -106,26 +106,6 @@ class EmptyStateWidget extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(height: 1.5.h),
-            TextButton.icon(
-              onPressed: () => Navigator.of(
-                context,
-                rootNavigator: true,
-              ).pushNamed('/profile-setup-screen'),
-              icon: Icon(
-                Icons.tune_rounded,
-                size: 16,
-                color: theme.colorScheme.primary,
-              ),
-              label: Text(
-                'Update my preferences',
-                style: GoogleFonts.manrope(
-                  fontSize: 11.sp,
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-            ),
           ],
         ),
       ),
