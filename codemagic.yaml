@@ -72,40 +72,27 @@ workflows:
             sed -n '20,35p' android/app/build.gradle.kts
           }
 
-          encode_define() {
-            printf "%s" "$1" | base64 | tr -d '\n'
-          }
-
-          DART_DEFINES="$(encode_define "SUPABASE_URL=$SUPABASE_URL"),$(encode_define "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"),$(encode_define "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY")"
-
           patch_gradle_file
 
-          cd android
-
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-            GRADLE_CMD="./gradlew"
-          else
-            GRADLE_CMD="gradle"
-          fi
-
           set +e
-          $GRADLE_CMD assembleRelease \
-            -Pdart-defines="$DART_DEFINES" \
-            -Ptarget-platform=android-arm,android-arm64,android-x64 \
-            -Ptarget=lib/main.dart \
-            -Ptrack-widget-creation=false \
-            -Ptree-shake-icons=true \
-            --stacktrace 2>&1 | tee ../gradle-build.log
+          flutter build apk --release \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            --dart-define=GOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY" \
+            2>&1 | tee gradle-build.log
           BUILD_STATUS=${PIPESTATUS[0]}
           set -e
 
-          echo "Last 200 lines of Gradle log:"
-          tail -n 200 ../gradle-build.log
+          echo "APK files found:"
+          find "$CM_BUILD_DIR" -name "*.apk" -type f -print
+
+          echo "Last 200 lines of build log:"
+          tail -n 200 gradle-build.log
 
           exit $BUILD_STATUS
 
     artifacts:
-      - android/app/build/outputs/apk/release/app-release.apk
+      - build/app/outputs/flutter-apk/*.apk
+      - android/app/build/outputs/apk/**/*.apk
       - rydmatch-release-key.jks
       - gradle-build.log
