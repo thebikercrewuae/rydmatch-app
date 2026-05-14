@@ -34,8 +34,26 @@ workflows:
 
       - name: Install clean Android NDK
         script: |
+          SDK_MANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+
+          if [ ! -x "$SDK_MANAGER" ]; then
+            SDK_MANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          fi
+
+          if [ ! -x "$SDK_MANAGER" ]; then
+            SDK_MANAGER="$(find "$ANDROID_HOME" -name sdkmanager -type f | head -n 1)"
+          fi
+
+          echo "Using sdkmanager at: $SDK_MANAGER"
+
           rm -rf "$ANDROID_HOME/ndk/27.0.12077973"
-          yes | sdkmanager --install "ndk;27.0.12077973"
+
+          for attempt in 1 2 3; do
+            echo "Installing Android NDK attempt $attempt..."
+            yes | "$SDK_MANAGER" --install "ndk;27.0.12077973" && break
+            rm -rf "$ANDROID_HOME/ndk/27.0.12077973"
+            sleep 20
+          done
 
       - name: Get Flutter packages
         script: |
