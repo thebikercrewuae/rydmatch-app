@@ -163,7 +163,9 @@ class SwipeService {
     try {
       final profileResponse = await _supabase
           .from('user_profiles')
-          .select('id, full_name, email, avatar_url, bike_types, bio')
+          .select(
+            'id, full_name, email, avatar_url, bike_types, bio, ride_mode',
+          )
           .inFilter('id', uniqueIds);
 
       final profileMap = <String, Map<String, dynamic>>{};
@@ -186,6 +188,7 @@ class SwipeService {
           'email': (profile?['email'] as String?) ?? '',
           'avatar_url': profile?['avatar_url'] as String?,
           'bike_types': profile?['bike_types'],
+          'ride_mode': profile?['ride_mode'] as String? ?? 'motorcycle',
           'matched_at': matchedAtMap[otherId] ?? '',
         };
       }).toList();

@@ -223,6 +223,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       maxRiders: (row['max_riders'] as int?) ?? 4,
       memberCount: (row['member_count'] as int?) ?? 1,
       leaderName: leaderName,
+      rideCommunity: row['ride_community'] as String? ?? 'motorcycle',
       rideType: row['ride_type'] as String? ?? 'Scenic',
       difficulty: row['difficulty'] as String? ?? 'Moderate',
       duration: row['duration'] as String? ?? '2h',
@@ -341,6 +342,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
                   'max_riders': group.maxRiders,
                   'member_count': 1,
                   'leader_name': 'You',
+                  'ride_community': group.rideCommunity,
                   'ride_type': group.rideType,
                   'difficulty': group.difficulty,
                   'duration': group.duration,
@@ -1031,7 +1033,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
                             width: double.infinity,
                             fit: BoxFit.cover,
                             semanticLabel:
-                                'Scenic motorcycle route through winding mountain roads',
+                                '${group.communityLabel} ride route preview',
                             errorBuilder: (_, __, ___) => Container(
                               height: 20.h,
                               color: theme.colorScheme.surfaceContainerHighest,
@@ -1057,6 +1059,8 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
                           ),
                         ),
                         SizedBox(height: 2.h),
+                        _communityPill(group, theme),
+                        SizedBox(height: 1.h),
                         _detailRow(AppIcons.help, group.formattedDate, theme),
                         SizedBox(height: 1.h),
                         _detailRow(AppIcons.timer, group.duration, theme),
@@ -1067,7 +1071,13 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
                           theme,
                         ),
                         SizedBox(height: 1.h),
-                        _detailRow(AppIcons.help, group.rideType, theme),
+                        _detailRow(
+                          group.isBicycle
+                              ? Icons.directions_bike_rounded
+                              : Icons.motorcycle_rounded,
+                          '${group.communityLabel} - ${group.rideType}',
+                          theme,
+                        ),
                         SizedBox(height: 3.h),
                         _buildLiveRideButton(group, ctx, setModalState),
                         SizedBox(height: 1.5.h),
@@ -1194,6 +1204,8 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
                 : Icon(
                     hasActiveRide
                         ? Icons.gps_fixed_rounded
+                        : group.isBicycle
+                        ? Icons.directions_bike_rounded
                         : Icons.motorcycle_rounded,
                     size: 20,
                     color: Colors.white,
@@ -1327,6 +1339,41 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _communityPill(RideGroup group, ThemeData theme) {
+    final color = group.isBicycle
+        ? const Color(0xFF2E7D32)
+        : theme.colorScheme.primary;
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 0.8.h),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20.0),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            group.isBicycle
+                ? Icons.directions_bike_rounded
+                : Icons.motorcycle_rounded,
+            size: 16,
+            color: color,
+          ),
+          SizedBox(width: 1.5.w),
+          Text(
+            '${group.communityLabel} Ride',
+            style: GoogleFonts.dmSans(
+              fontSize: 11.sp,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

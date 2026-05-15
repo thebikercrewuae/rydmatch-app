@@ -1494,6 +1494,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                 'max_riders': group.maxRiders,
                 'member_count': 1,
                 'leader_name': 'You',
+                'ride_community': group.rideCommunity,
                 'ride_type': group.rideType,
                 'difficulty': group.difficulty,
                 'duration': group.duration,

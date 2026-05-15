@@ -8,6 +8,7 @@ class RideGroup {
   final int maxRiders;
   final int memberCount;
   final String leaderName;
+  final String rideCommunity;
   final String rideType;
   final String difficulty;
   final String duration;
@@ -21,11 +22,16 @@ class RideGroup {
     required this.maxRiders,
     required this.memberCount,
     required this.leaderName,
+    this.rideCommunity = 'motorcycle',
     required this.rideType,
     required this.difficulty,
     required this.duration,
     required this.routeImageUrl,
   });
 
-  String get formattedDate => DateFormat('EEE, MMM d · h:mm a').format(date);
+  String get formattedDate => DateFormat('EEE, MMM d - h:mm a').format(date);
+
+  bool get isBicycle => rideCommunity == 'bicycle';
+
+  String get communityLabel => isBicycle ? 'Bicycle' : 'Motorcycle';
 }

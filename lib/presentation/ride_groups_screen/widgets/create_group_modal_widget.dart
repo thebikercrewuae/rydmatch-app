@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../../models/ride_group_model.dart';
+import '../../../services/profile_service.dart';
 import '../../../services/swipe_service.dart';
 
 class CreateGroupModalWidget extends StatefulWidget {
@@ -34,6 +35,7 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
   final _routeController = TextEditingController();
 
   int _groupSize = 4;
+  String _rideCommunity = 'motorcycle';
   String _rideType = 'Scenic';
   String _difficulty = 'Moderate';
   late DateTime _selectedDate;
@@ -43,7 +45,7 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
   final Set<String> _selectedInvitees = {};
   bool _loadingRiders = false;
 
-  final List<String> _rideTypes = [
+  final List<String> _motorcycleRideTypes = [
     'Scenic',
     'Sport',
     'Adventure',
@@ -51,7 +53,23 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
     'Track Day',
   ];
 
+  final List<String> _bicycleRideTypes = [
+    'Social',
+    'Fitness',
+    'Road',
+    'Gravel',
+    'MTB',
+  ];
+
   final List<String> _difficulties = ['Easy', 'Moderate', 'Hard'];
+
+  List<String> get _rideTypes =>
+      _rideCommunity == 'bicycle' ? _bicycleRideTypes : _motorcycleRideTypes;
+
+  String get _communityLabel =>
+      _rideCommunity == 'bicycle' ? 'Bicycle' : 'Motorcycle';
+
+  String get _vehicleLabel => _rideCommunity == 'bicycle' ? 'cycle' : 'bike';
 
   @override
   void initState() {
@@ -79,6 +97,7 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
       _rideType = typeMap[widget.prefillRouteType] ?? 'Scenic';
     }
 
+    _loadRideCommunity();
     _loadMatchedRiders();
   }
 
@@ -95,9 +114,13 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
     setState(() => _loadingRiders = true);
 
     try {
+      final community = _rideCommunity;
       final matches = await SwipeService.instance.getInviteableMatches();
 
-      final riders = matches.map<Map<String, dynamic>>((match) {
+      final riders = matches.where((match) {
+        final rideMode = match['ride_mode'] as String? ?? 'motorcycle';
+        return rideMode == community;
+      }).map<Map<String, dynamic>>((match) {
         final bikeTypes = match['bike_types'];
 
         String bikeModel = '';
@@ -117,10 +140,12 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
           'name': match['full_name'] as String? ?? fallbackName,
           'image': match['avatar_url'] as String? ?? '',
           'bikeModel': bikeModel,
+          'rideMode': match['ride_mode'] as String? ?? 'motorcycle',
         };
       }).toList();
 
       if (!mounted) return;
+      if (community != _rideCommunity) return;
 
       setState(() {
         _matchedRiders = riders;
@@ -135,6 +160,22 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
         _matchedRiders = [];
         _loadingRiders = false;
       });
+    }
+  }
+
+  Future<void> _loadRideCommunity() async {
+    try {
+      final profile = await ProfileService.loadProfile();
+      final rideMode = profile['rideMode'] as String? ?? 'motorcycle';
+      if (!mounted || rideMode != 'bicycle') return;
+
+      setState(() {
+        _rideCommunity = 'bicycle';
+        _rideType = 'Social';
+      });
+      _loadMatchedRiders();
+    } catch (e) {
+      debugPrint('CreateGroupModal: _loadRideCommunity error: $e');
     }
   }
 
@@ -162,6 +203,17 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
     }
   }
 
+  void _setRideCommunity(String community) {
+    if (_rideCommunity == community) return;
+
+    setState(() {
+      _rideCommunity = community;
+      _rideType = community == 'bicycle' ? 'Social' : 'Scenic';
+      _selectedInvitees.clear();
+    });
+    _loadMatchedRiders();
+  }
+
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
 
@@ -179,11 +231,14 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
       maxRiders: _groupSize,
       memberCount: 1,
       leaderName: 'You',
+      rideCommunity: _rideCommunity,
       rideType: _rideType,
       difficulty: _difficulty,
       duration: '${2 + _groupSize ~/ 2}h',
       routeImageUrl:
-          'https://images.pexels.com/photos/1119796/pexels-photo-1119796.jpeg',
+          _rideCommunity == 'bicycle'
+              ? 'https://images.pexels.com/photos/163491/bike-mountain-mountain-biking-trail-163491.jpeg'
+              : 'https://images.pexels.com/photos/1119796/pexels-photo-1119796.jpeg',
     );
 
     widget.onCreate(group, Set<String>.from(_selectedInvitees));
@@ -269,12 +324,37 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
                 ],
               ),
               SizedBox(height: 2.h),
+              _buildLabel('Ride Community'),
+              Row(
+                children: [
+                  Expanded(
+                    child: _communityOption(
+                      theme,
+                      value: 'motorcycle',
+                      label: 'Motorcycle',
+                      icon: Icons.motorcycle_rounded,
+                    ),
+                  ),
+                  SizedBox(width: 3.w),
+                  Expanded(
+                    child: _communityOption(
+                      theme,
+                      value: 'bicycle',
+                      label: 'Bicycle',
+                      icon: Icons.directions_bike_rounded,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 1.5.h),
               _buildLabel('Ride Name'),
               TextFormField(
                 controller: _nameController,
                 style: GoogleFonts.dmSans(fontSize: 13.sp),
                 decoration: InputDecoration(
-                  hintText: 'e.g. Sunday Mountain Run',
+                  hintText: _rideCommunity == 'bicycle'
+                      ? 'e.g. Friday Creek Loop'
+                      : 'e.g. Sunday Mountain Run',
                   hintStyle: GoogleFonts.dmSans(
                     fontSize: 13.sp,
                     color: theme.colorScheme.onSurfaceVariant,
@@ -291,7 +371,9 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
                 controller: _routeController,
                 style: GoogleFonts.dmSans(fontSize: 13.sp),
                 decoration: InputDecoration(
-                  hintText: 'e.g. Pacific Coast Highway',
+                  hintText: _rideCommunity == 'bicycle'
+                      ? 'e.g. Al Qudra Cycle Track'
+                      : 'e.g. Pacific Coast Highway',
                   hintStyle: GoogleFonts.dmSans(
                     fontSize: 13.sp,
                     color: theme.colorScheme.onSurfaceVariant,
@@ -419,7 +501,7 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
                 }),
               ),
               SizedBox(height: 1.5.h),
-              _buildLabel('Ride Type'),
+              _buildLabel('$_communityLabel Ride Type'),
               Wrap(
                 spacing: 2.w,
                 runSpacing: 1.h,
@@ -595,6 +677,47 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
     );
   }
 
+  Widget _communityOption(
+    ThemeData theme, {
+    required String value,
+    required String label,
+    required IconData icon,
+  }) {
+    final selected = _rideCommunity == value;
+
+    return GestureDetector(
+      onTap: () => _setRideCommunity(value),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.4.h),
+        decoration: BoxDecoration(
+          color: selected
+              ? theme.colorScheme.primary
+              : theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12.0),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: selected ? Colors.white : theme.colorScheme.onSurface,
+            ),
+            SizedBox(width: 2.w),
+            Text(
+              label,
+              style: GoogleFonts.dmSans(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w700,
+                color: selected ? Colors.white : theme.colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildInviteRidersSection(ThemeData theme) {
     if (_loadingRiders) {
       return Center(
@@ -626,7 +749,7 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
             Icon(Icons.people_outline, size: 18, color: Colors.grey[500]),
             SizedBox(width: 2.w),
             Text(
-              'No riders available to invite',
+              'No ${_communityLabel.toLowerCase()} riders available to invite',
               style: GoogleFonts.dmSans(
                 fontSize: 11.sp,
                 color: Colors.grey[500],
@@ -696,7 +819,7 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
                       ),
                       if (bikeModel.isNotEmpty)
                         Text(
-                          bikeModel,
+                          '$_vehicleLabel: $bikeModel',
                           style: GoogleFonts.dmSans(
                             fontSize: 10.sp,
                             color: Colors.grey[500],

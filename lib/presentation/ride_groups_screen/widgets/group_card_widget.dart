@@ -39,8 +39,7 @@ class GroupCardWidget extends StatelessWidget {
                 height: 14.h,
                 width: double.infinity,
                 fit: BoxFit.cover,
-                semanticLabel:
-                    'Scenic motorcycle route through mountain roads with winding curves',
+                semanticLabel: '${group.communityLabel} ride route preview',
                 errorBuilder: (_, __, ___) => Container(
                   height: 14.h,
                   color: theme.colorScheme.surfaceContainerHighest,
@@ -70,6 +69,9 @@ class GroupCardWidget extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      SizedBox(width: 2.w),
+                      _buildCommunityBadge(group, theme),
+                      SizedBox(width: 2.w),
                       _buildDifficultyBadge(group.difficulty, theme),
                     ],
                   ),
@@ -111,7 +113,7 @@ class GroupCardWidget extends StatelessWidget {
                       _buildAvatarStack(group.memberCount),
                       SizedBox(width: 2.w),
                       Text(
-                        '${group.memberCount}/6 riders',
+                        '${group.memberCount}/${group.maxRiders} riders',
                         style: GoogleFonts.dmSans(
                           fontSize: 11.sp,
                           color: theme.colorScheme.onSurfaceVariant,
@@ -124,6 +126,30 @@ class GroupCardWidget extends StatelessWidget {
                           fontSize: 11.sp,
                           fontWeight: FontWeight.w600,
                           color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 0.8.h),
+                  Row(
+                    children: [
+                      Icon(
+                        group.isBicycle
+                            ? Icons.directions_bike_rounded
+                            : Icons.motorcycle_rounded,
+                        size: 13,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      SizedBox(width: 1.w),
+                      Expanded(
+                        child: Text(
+                          group.rideType,
+                          style: GoogleFonts.dmSans(
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -165,6 +191,27 @@ class GroupCardWidget extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: color,
         ),
+      ),
+    );
+  }
+
+  Widget _buildCommunityBadge(RideGroup group, ThemeData theme) {
+    final color = group.isBicycle
+        ? const Color(0xFF2E7D32)
+        : theme.colorScheme.primary;
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 2.w, vertical: 0.4.h),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20.0),
+      ),
+      child: Icon(
+        group.isBicycle
+            ? Icons.directions_bike_rounded
+            : Icons.motorcycle_rounded,
+        size: 13,
+        color: color,
       ),
     );
   }
