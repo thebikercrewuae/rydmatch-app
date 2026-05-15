@@ -15,7 +15,7 @@ class BadgeProgressCardWidget extends StatefulWidget {
 class _BadgeProgressCardWidgetState extends State<BadgeProgressCardWidget>
     with SingleTickerProviderStateMixin {
   int _earnedCount = 0;
-  final int _totalCount = BadgeModel.allBadges().length;
+  int _totalCount = BadgeModel.allBadges().length;
   bool _loaded = false;
   late AnimationController _barController;
   late Animation<double> _barAnimation;
@@ -34,11 +34,14 @@ class _BadgeProgressCardWidgetState extends State<BadgeProgressCardWidget>
   }
 
   Future<void> _loadCount() async {
-    final count = await BadgeService.getEarnedBadgeCount();
+    final badges = await BadgeService.fetchUserBadges();
+    final count = badges.where((badge) => badge.isEarned).length;
     if (mounted) {
-      final progress = _totalCount > 0 ? count / _totalCount : 0.0;
+      final totalCount = badges.length;
+      final progress = totalCount > 0 ? count / totalCount : 0.0;
       setState(() {
         _earnedCount = count;
+        _totalCount = totalCount;
         _loaded = true;
         _barAnimation = Tween<double>(begin: 0, end: progress).animate(
           CurvedAnimation(parent: _barController, curve: Curves.easeOutCubic),

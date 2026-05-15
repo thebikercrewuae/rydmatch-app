@@ -32,7 +32,7 @@ class BikeTypesDisplayWidget extends StatelessWidget {
     final theme = Theme.of(context);
     if (bikeTypes.isEmpty) {
       return Text(
-        'No bike types selected',
+        'No ride types selected',
         style: theme.textTheme.bodyMedium?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
         ),

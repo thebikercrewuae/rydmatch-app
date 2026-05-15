@@ -464,7 +464,9 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   void _editBikeTypes() {
     List<String> tempBikes = List.from(_bikeTypes);
     _showEditSheet(
-      title: 'Edit Bike Types',
+      title: _rideMode == 'bicycle'
+          ? 'Edit Cycle Types'
+          : 'Edit Motorcycle Types',
       child: StatefulBuilder(
         builder: (ctx, setSheetState) => BikeTypeWidget(
           selectedBikes: tempBikes,
@@ -755,7 +757,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                         riderPhotoPath: _riderPhotoPath,
                         riderName: _riderName,
                         riderBio: _riderBio,
-                        isVerified: _isVerified,
+                        isVerified: _rideMode != 'bicycle' && _isVerified,
                       ),
                     ),
                     SizedBox(height: 3.h),
@@ -781,8 +783,12 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                       ),
                     ),
                     ProfileInfoCardWidget(
-                      title: 'Bike Types',
-                      icon: AppIcons.motorcycle,
+                      title: _rideMode == 'bicycle'
+                          ? 'Cycle Types'
+                          : 'Motorcycle Types',
+                      icon: _rideMode == 'bicycle'
+                          ? Icons.directions_bike_rounded
+                          : AppIcons.motorcycle,
                       onEdit: isOtherUser ? null : _editBikeTypes,
                       child: BikeTypesDisplayWidget(bikeTypes: _bikeTypes),
                     ),
@@ -819,7 +825,9 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                       ),
                     if (_bikePhotoPaths.isNotEmpty)
                       ProfileInfoCardWidget(
-                        title: 'Bike Photos',
+                        title: _rideMode == 'bicycle'
+                            ? 'Cycle Photos'
+                            : 'Motorcycle Photos',
                         icon: Icons.photo_library,
                         child: _buildBikePhotos(theme),
                       ),

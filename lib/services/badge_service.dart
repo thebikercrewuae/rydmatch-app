@@ -25,6 +25,7 @@ class BadgeService {
     final weekendRides = activity['weekendRides'] as int? ?? 0;
     final morningRides = activity['morningRides'] as int? ?? 0;
     final isVerified = activity['isVerified'] as bool? ?? false;
+    final rideMode = activity['rideMode'] as String? ?? 'motorcycle';
     final fiveStarRideCount = activity['fiveStarRideCount'] as int? ?? 0;
     final liveRideCount = activity['liveRideCount'] as int? ?? 0;
     final hasNightRide = activity['hasNightRide'] as bool? ?? false;
@@ -34,6 +35,7 @@ class BadgeService {
         activity['maxRideDurationHours'] as double? ?? 0.0;
     final maxRideParticipants = activity['maxRideParticipants'] as int? ?? 0;
     final hasLedRide = activity['hasLedRide'] as bool? ?? false;
+    final paceMilestoneKmh = rideMode == 'bicycle' ? 45.0 : 120.0;
 
     return {
       'first_ride': rideCount >= 1,
@@ -45,7 +47,7 @@ class BadgeService {
       'five_matches': matchCount >= 5,
       'first_group_ride': groupRideCount >= 1,
       'social_butterfly': matchCount >= 10,
-      'verified_rider': isVerified,
+      'verified_rider': rideMode != 'bicycle' && isVerified,
       'safe_rider': safetyTagCount >= 3,
       'reliable': averageRating >= 4.8 && fiveStarRideCount >= 5,
       'profile_complete': profileComplete,
@@ -58,7 +60,7 @@ class BadgeService {
       'ten_live_rides': liveRideCount >= 10,
       'century_live_ride': maxSingleRideKm >= 100,
       'night_rider': hasNightRide,
-      'speed_demon': maxSpeedKmh >= 120,
+      'speed_demon': maxSpeedKmh >= paceMilestoneKmh,
       'marathon_rider': maxRideDurationHours >= 3,
       'squad_leader': hasLedRide && maxRideParticipants >= 4,
     };
@@ -88,6 +90,7 @@ class BadgeService {
 
       final activity = await _fetchUserActivity(user.id);
       await _autoAwardBadges(user.id, activity, earnedMap);
+      final visibleBadges = _visibleBadgesForActivity(allBadges, activity);
 
       final updatedEarned = await _client
           .from('user_badges')
@@ -103,7 +106,7 @@ class BadgeService {
         updatedEarnedMap[badgeId] = earnedAt ?? DateTime.now();
       }
 
-      return allBadges.map((badge) {
+      return visibleBadges.map((badge) {
         final progress = _getProgressForBadge(badge.id, activity);
         if (updatedEarnedMap.containsKey(badge.id)) {
           return badge.copyWith(
@@ -124,6 +127,16 @@ class BadgeService {
     }
   }
 
+  static List<BadgeModel> _visibleBadgesForActivity(
+    List<BadgeModel> badges,
+    Map<String, dynamic> activity,
+  ) {
+    final rideMode = activity['rideMode'] as String? ?? 'motorcycle';
+    if (rideMode != 'bicycle') return badges;
+
+    return badges.where((badge) => badge.id != 'verified_rider').toList();
+  }
+
   /// Fetch user activity stats from Supabase
   static Future<Map<String, dynamic>> _fetchUserActivity(String userId) async {
     final activity = <String, dynamic>{
@@ -139,6 +152,7 @@ class BadgeService {
       'weekendRides': 0,
       'morningRides': 0,
       'isVerified': false,
+      'rideMode': 'motorcycle',
       'fiveStarRideCount': 0,
       'liveRideCount': 0,
       'hasNightRide': false,
@@ -251,18 +265,23 @@ class BadgeService {
       try {
         final profileResponse = await _client
             .from('user_profiles')
-            .select('is_profile_complete, is_premium')
+            .select('is_profile_complete, is_premium, ride_mode')
             .eq('id', userId)
             .maybeSingle();
         activity['profileComplete'] =
             profileResponse?['is_profile_complete'] as bool? ?? false;
         activity['isPremium'] =
             profileResponse?['is_premium'] as bool? ?? false;
+        activity['rideMode'] =
+            profileResponse?['ride_mode'] as String? ?? 'motorcycle';
       } catch (e) {
         try {
           activity['profileComplete'] =
               await ProfileService.isProfileComplete();
           activity['isPremium'] = PremiumService().isPremium;
+          final profile = await ProfileService.loadProfile();
+          activity['rideMode'] =
+              profile['rideMode'] as String? ?? 'motorcycle';
         } catch (_) {}
       }
 
