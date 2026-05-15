@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../widgets/custom_bottom_bar.dart';
 import '../../services/profile_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/premium_service.dart';
 import '../../widgets/notification_banner_overlay.dart';
 import '../../theme/app_theme.dart';
 import '../discovery_screen/discovery_screen.dart';
@@ -26,6 +27,7 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
     _notificationService.addListener(_onNotificationsChanged);
     _notificationService.initialize();
+    PremiumService().refresh();
   }
 
   void _onNotificationsChanged() {

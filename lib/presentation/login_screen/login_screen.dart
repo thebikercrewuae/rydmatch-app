@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../services/session_service.dart';
 import '../../services/profile_service.dart';
+import '../../services/premium_service.dart';
 import './widgets/forgot_password_modal_widget.dart';
 import '../../widgets/app_icons.dart';
 import '../../widgets/app_logo_widget.dart';
@@ -66,6 +67,12 @@ class _LoginScreenState extends State<LoginScreen> {
       await ProfileService.restoreProfileFromSupabase();
     } catch (e) {
       debugPrint('LoginScreen: restoreProfileFromSupabase failed: $e');
+    }
+
+    try {
+      await PremiumService().refresh();
+    } catch (e) {
+      debugPrint('LoginScreen: premium refresh failed: $e');
     }
 
     if (!mounted) return;

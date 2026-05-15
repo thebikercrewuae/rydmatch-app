@@ -57,7 +57,10 @@ class PremiumService extends ChangeNotifier {
       _isAdmin = profile?['is_admin'] == true;
 
       // Admins should have access to priority listings as part of full access.
-      _priorityListingsEnabled = _isAdmin ? true : _priorityListingsEnabled;
+      if (_isAdmin) {
+        _isPremiumAccount = true;
+        _priorityListingsEnabled = true;
+      }
 
       _isLoaded = true;
       notifyListeners();
