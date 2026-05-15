@@ -5,14 +5,16 @@ import 'package:sizer/sizer.dart';
 class RouteTypeSelectorWidget extends StatelessWidget {
   final String selectedType;
   final ValueChanged<String> onChanged;
+  final String rideMode;
 
   const RouteTypeSelectorWidget({
     super.key,
     required this.selectedType,
     required this.onChanged,
+    this.rideMode = 'motorcycle',
   });
 
-  static const List<Map<String, dynamic>> _routeTypes = [
+  static const List<Map<String, dynamic>> _motorcycleRouteTypes = [
     {
       'value': 'fastest',
       'label': 'Fastest',
@@ -33,14 +35,38 @@ class RouteTypeSelectorWidget extends StatelessWidget {
     },
   ];
 
+  static const List<Map<String, dynamic>> _bicycleRouteTypes = [
+    {
+      'value': 'fastest',
+      'label': 'Direct',
+      'icon': Icons.directions_bike_rounded,
+      'description': 'Shortest practical route',
+    },
+    {
+      'value': 'scenic',
+      'label': 'Scenic',
+      'icon': Icons.landscape,
+      'description': 'Calmer riding route',
+    },
+    {
+      'value': 'avoid_motorways',
+      'label': 'Low Traffic',
+      'icon': Icons.alt_route,
+      'description': 'Avoid major roads',
+    },
+  ];
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final routeTypes =
+        rideMode == 'bicycle' ? _bicycleRouteTypes : _motorcycleRouteTypes;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Route Type',
+          rideMode == 'bicycle' ? 'Cycle Route Type' : 'Route Type',
           style: GoogleFonts.dmSans(
             fontSize: 13.sp,
             fontWeight: FontWeight.w700,
@@ -49,7 +75,7 @@ class RouteTypeSelectorWidget extends StatelessWidget {
         ),
         SizedBox(height: 1.h),
         Row(
-          children: _routeTypes.map((type) {
+          children: routeTypes.map((type) {
             final isSelected = selectedType == type['value'];
             return Expanded(
               child: GestureDetector(

@@ -6,12 +6,14 @@ class RouteSummaryCardWidget extends StatelessWidget {
   final double distanceKm;
   final int estimatedMinutes;
   final bool isMetric;
+  final String rideMode;
 
   const RouteSummaryCardWidget({
     super.key,
     required this.distanceKm,
     required this.estimatedMinutes,
     required this.isMetric,
+    this.rideMode = 'motorcycle',
   });
 
   String get _formattedDistance {
@@ -35,6 +37,8 @@ class RouteSummaryCardWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isBicycle = rideMode == 'bicycle';
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
       decoration: BoxDecoration(
@@ -59,7 +63,9 @@ class RouteSummaryCardWidget extends StatelessWidget {
         children: [
           Expanded(
             child: _StatItem(
-              icon: Icons.route,
+              icon: isBicycle
+                  ? Icons.directions_bike_rounded
+                  : Icons.route_rounded,
               label: 'Distance',
               value: distanceKm > 0 ? _formattedDistance : '--',
             ),

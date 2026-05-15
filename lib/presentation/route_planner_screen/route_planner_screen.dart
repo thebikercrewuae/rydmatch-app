@@ -14,6 +14,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../routes/app_routes.dart';
 import '../../services/premium_service.dart';
+import '../../services/profile_service.dart';
 import '../../widgets/toast_widget.dart';
 import '../ride_groups_screen/widgets/create_group_modal_widget.dart';
 import './widgets/route_location_field_widget.dart';
@@ -72,6 +73,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   // Weather
   String? _weatherLocation;
   bool _isPremium = false;
+  String _rideMode = 'motorcycle';
 
   Set<Marker> _markers = {};
   Set<Polyline> _polylines = {};
@@ -79,6 +81,8 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   static const String _mapsApiKey = String.fromEnvironment(
     'GOOGLE_MAPS_API_KEY',
   );
+
+  bool get _isBicycleMode => _rideMode == 'bicycle';
 
   @override
   void initState() {
@@ -110,38 +114,46 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 20),
-              ListTile(
-                leading: const Icon(Icons.navigation, color: Colors.blue),
-                title: const Text('Open in Waze'),
-                subtitle: const Text('Real-time traffic & hazard alerts'),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final opened = await NavigationLauncher.launchWaze(
-                    destination: _endPoint,
-                  );
-                  if (!opened && mounted) {
+              if (!_isBicycleMode)
+                ListTile(
+                  leading: const Icon(Icons.navigation, color: Colors.blue),
+                  title: const Text('Open in Waze'),
+                  subtitle: const Text('Real-time traffic & hazard alerts'),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final opened = await NavigationLauncher.launchWaze(
+                      destination: _endPoint,
+                    );
                     if (!opened && mounted) {
                       AppToast.show(
                         context,
                         message: 'Could not open Waze on this device.',
                         type: ToastType.error,
                       );
-                    }
 
-                    await NavigationLauncher.launchGoogleMaps(
-                      destination: _endPoint,
-                      origin: _startPoint,
-                      waypoints: _waypointPoints.isNotEmpty
-                          ? _waypointPoints
-                          : null,
-                    );
-                  }
-                },
-              ),
+                      await NavigationLauncher.launchGoogleMaps(
+                        destination: _endPoint,
+                        origin: _startPoint,
+                        waypoints: _waypointPoints.isNotEmpty
+                            ? _waypointPoints
+                            : null,
+                      );
+                    }
+                  },
+                ),
               ListTile(
-                leading: const Icon(Icons.map, color: Colors.green),
+                leading: Icon(
+                  _isBicycleMode
+                      ? Icons.directions_bike_rounded
+                      : Icons.map,
+                  color: Colors.green,
+                ),
                 title: const Text('Open in Google Maps'),
-                subtitle: const Text('Full route with waypoints'),
+                subtitle: Text(
+                  _isBicycleMode
+                      ? 'Cycling route with waypoints'
+                      : 'Full route with waypoints',
+                ),
                 onTap: () async {
                   Navigator.pop(ctx);
                   await NavigationLauncher.launchGoogleMaps(
@@ -150,6 +162,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                     waypoints: _waypointPoints.isNotEmpty
                         ? _waypointPoints
                         : null,
+                    travelMode: _isBicycleMode ? 'bicycling' : 'driving',
                   );
                 },
               ),
@@ -173,8 +186,10 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   Future<void> _loadPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final profile = await ProfileService.loadProfile();
       setState(() {
         _isMetric = prefs.getBool('isMetric') ?? true;
+        _rideMode = profile['rideMode'] as String? ?? 'motorcycle';
       });
     } catch (_) {}
   }
@@ -291,7 +306,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       final queryParams = <String, String>{
         'origin': originText,
         'destination': destText,
-        'mode': 'driving',
+        'mode': _isBicycleMode ? 'bicycling' : 'driving',
         'alternatives': 'false',
         'key': _mapsApiKey,
       };
@@ -639,7 +654,10 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     setState(() {
       _routeSet = true;
       _distanceKm = approxKm * multiplier;
-      _estimatedMinutes = (_distanceKm / 60 * 60).round().clamp(5, 999);
+      final fallbackSpeedKmh = _isBicycleMode ? 22.0 : 60.0;
+      _estimatedMinutes = (_distanceKm / fallbackSpeedKmh * 60)
+          .round()
+          .clamp(5, 999);
       _weatherLocation = _destinationController.text.trim();
       _routePolylinePoints = [_startPoint, ..._waypointPoints, _endPoint];
     });
@@ -1422,11 +1440,17 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
         : 'TBD';
 
     final routeTypeLabel =
-        {
-          'fastest': 'Fastest Route',
-          'scenic': 'Scenic Route',
-          'avoid_motorways': 'Back Roads',
-        }[_routeType] ??
+        (_isBicycleMode
+            ? {
+                'fastest': 'Direct Cycle Route',
+                'scenic': 'Scenic Cycle Route',
+                'avoid_motorways': 'Low-Traffic Cycle Route',
+              }
+            : {
+                'fastest': 'Fastest Route',
+                'scenic': 'Scenic Route',
+                'avoid_motorways': 'Back Roads',
+              })[_routeType] ??
         'Route';
 
     final waypointText = _waypoints.isNotEmpty
@@ -1863,7 +1887,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                   AppLogoMark(size: 7.w),
                   SizedBox(width: 2.w),
                   Text(
-                    'Plan Route',
+                    _isBicycleMode ? 'Plan Cycle Route' : 'Plan Route',
                     style: GoogleFonts.dmSans(
                       fontSize: 16.sp,
                       fontWeight: FontWeight.w700,
@@ -2317,6 +2341,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                   distanceKm: _distanceKm,
                   estimatedMinutes: _estimatedMinutes,
                   isMetric: _isMetric,
+                  rideMode: _rideMode,
                 ),
                 SizedBox(height: 2.h),
                 // Start field
@@ -2398,6 +2423,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                 // Route type
                 RouteTypeSelectorWidget(
                   selectedType: _routeType,
+                  rideMode: _rideMode,
                   onChanged: (type) {
                     setState(() => _routeType = type);
                     _updateRoute();
@@ -2538,11 +2564,12 @@ class NavigationLauncher {
     required LatLng destination,
     LatLng? origin,
     List<LatLng>? waypoints,
+    String travelMode = 'driving',
   }) async {
     final params = <String, String>{
       'api': '1',
       'destination': '${destination.latitude},${destination.longitude}',
-      'travelmode': 'driving',
+      'travelmode': travelMode,
     };
 
     if (origin != null) {
