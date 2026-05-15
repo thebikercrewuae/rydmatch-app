@@ -1006,8 +1006,9 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     ),
   ),
 ],
-                      SizedBox(height: 1.5.h),
-                      SizedBox(
+                      if (_rideMode != 'bicycle') ...[
+                        SizedBox(height: 1.5.h),
+                        SizedBox(
                         width: double.infinity,
                         height: 6.h,
                         child: ElevatedButton.icon(
@@ -1042,6 +1043,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                           ),
                         ),
                       ),
+                      ],
                     ] else ...[
                       SizedBox(
                         width: double.infinity,
