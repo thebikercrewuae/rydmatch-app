@@ -24,6 +24,7 @@ import '../block_user_confirmation_screen/block_user_confirmation_screen.dart';
 import '../post_ride_rating_screen/widgets/trust_badges_widget.dart';
 import './widgets/badge_progress_card_widget.dart';
 import './widgets/referral_stats_card_widget.dart';
+import './widgets/strava_integration_card_widget.dart';
 import '../profile_setup_screen/widgets/skill_level_widget.dart';
 import '../profile_setup_screen/widgets/speed_selection_widget.dart';
 import '../profile_setup_screen/widgets/bike_type_widget.dart';
@@ -792,6 +793,14 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                       onEdit: isOtherUser ? null : _editBikeTypes,
                       child: BikeTypesDisplayWidget(bikeTypes: _bikeTypes),
                     ),
+                    if (!isOtherUser && _rideMode == 'bicycle')
+                      ProfileInfoCardWidget(
+                        title: 'Cycling Integrations',
+                        icon: Icons.link_rounded,
+                        child: StravaIntegrationCardWidget(
+                          isPremium: PremiumService().isPremium,
+                        ),
+                      ),
                     ProfileInfoCardWidget(
                       title: 'Preferred Roads',
                       icon: AppIcons.map,
