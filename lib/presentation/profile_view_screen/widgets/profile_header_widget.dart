@@ -31,6 +31,7 @@ class ProfileHeaderWidget extends StatelessWidget {
     return Column(
       children: [
         Stack(
+          clipBehavior: Clip.none,
           alignment: Alignment.center,
           children: [
             Container(
@@ -43,6 +44,26 @@ class ProfileHeaderWidget extends StatelessWidget {
               ),
               child: ClipOval(child: _buildPhotoWidget(theme)),
             ),
+            if (isVerified)
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.16),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const VerifiedBadgeWidget(size: 28),
+                ),
+              ),
           ],
         ),
         SizedBox(height: 2.h),
@@ -62,10 +83,6 @@ class ProfileHeaderWidget extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            if (isVerified) ...[
-              SizedBox(width: 1.5.w),
-              const VerifiedBadgeWidget(size: 22),
-            ],
           ],
         ),
         if (riderBio.isNotEmpty) ...[
