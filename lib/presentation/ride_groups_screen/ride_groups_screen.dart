@@ -1295,6 +1295,28 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
                         ),
                       ),
               ),
+              SizedBox(height: 0.8.h),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 14,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  SizedBox(width: 1.5.w),
+                  Expanded(
+                    child: Text(
+                      'Live voice uses mobile data when Wi-Fi is not available.',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 10.sp,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ],
         );
