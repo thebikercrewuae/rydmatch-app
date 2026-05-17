@@ -32,28 +32,24 @@ workflows:
           printf "keyAlias=%s\n" "$CM_KEY_ALIAS" >> "$CM_BUILD_DIR/android/key.properties"
           printf "storeFile=%s\n" "$CM_BUILD_DIR/rydmatch-release-key.jks" >> "$CM_BUILD_DIR/android/key.properties"
 
-      - name: Install clean Android NDK
+      - name: Install Android SDK components
         script: |
-          SDK_MANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-
-          if [ ! -x "$SDK_MANAGER" ]; then
-            SDK_MANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$ANDROID_HOME/tools/bin/sdkmanager"
+          fi
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(command -v sdkmanager || true)"
           fi
 
-          if [ ! -x "$SDK_MANAGER" ]; then
-            SDK_MANAGER="$(find "$ANDROID_HOME" -name sdkmanager -type f | head -n 1)"
+          if [ -z "$SDKMANAGER" ] || [ ! -x "$SDKMANAGER" ]; then
+            echo "sdkmanager not found; using preinstalled Android SDK components."
+            exit 0
           fi
-
-          echo "Using sdkmanager at: $SDK_MANAGER"
 
           rm -rf "$ANDROID_HOME/ndk/27.0.12077973"
-
-          for attempt in 1 2 3; do
-            echo "Installing Android NDK attempt $attempt..."
-            yes | "$SDK_MANAGER" --install "ndk;27.0.12077973" && break
-            rm -rf "$ANDROID_HOME/ndk/27.0.12077973"
-            sleep 20
-          done
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          yes | "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0" "ndk;27.0.12077973"
 
       - name: Get Flutter packages
         script: |
@@ -69,30 +65,43 @@ workflows:
             perl -0pi -e 's/minSdkVersion\s+flutter\.minSdkVersion/minSdk = 24/g' android/app/build.gradle.kts
             perl -0pi -e 's/minSdk\s*=\s*flutter\.minSdkVersion/minSdk = 24/g' android/app/build.gradle.kts
             perl -0pi -e 's/minSdk\s*=\s*21/minSdk = 24/g' android/app/build.gradle.kts
-            sed -n '20,35p' android/app/build.gradle.kts
+            sed -n '20,40p' android/app/build.gradle.kts
           }
+
+          encode_define() {
+            printf "%s" "$1" | base64 | tr -d '\n'
+          }
+
+          DART_DEFINES="$(encode_define "SUPABASE_URL=$SUPABASE_URL"),$(encode_define "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"),$(encode_define "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY"),$(encode_define "STRAVA_CLIENT_ID=$STRAVA_CLIENT_ID"),$(encode_define "STRAVA_REDIRECT_URI=$STRAVA_REDIRECT_URI")"
 
           patch_gradle_file
 
+          cd android
+
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            GRADLE_CMD="./gradlew"
+          else
+            GRADLE_CMD="gradle"
+          fi
+
           set +e
-          flutter build apk --release \
-            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
-            --dart-define=GOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY" \
-            2>&1 | tee gradle-build.log
+          $GRADLE_CMD assembleRelease \
+            -Pdart-defines="$DART_DEFINES" \
+            -Ptarget-platform=android-arm,android-arm64,android-x64 \
+            -Ptarget=lib/main.dart \
+            -Ptrack-widget-creation=false \
+            -Ptree-shake-icons=true \
+            --stacktrace 2>&1 | tee ../gradle-build.log
           BUILD_STATUS=${PIPESTATUS[0]}
           set -e
 
-          echo "APK files found:"
-          find "$CM_BUILD_DIR" -name "*.apk" -type f -print
-
-          echo "Last 200 lines of build log:"
-          tail -n 200 gradle-build.log
+          echo "Last 200 lines of Gradle log:"
+          tail -n 200 ../gradle-build.log
 
           exit $BUILD_STATUS
 
     artifacts:
-      - build/app/outputs/flutter-apk/*.apk
-      - android/app/build/outputs/apk/**/*.apk
+      - android/app/build/outputs/apk/release/*.apk
       - rydmatch-release-key.jks
       - gradle-build.log
