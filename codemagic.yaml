@@ -10,9 +10,27 @@ workflows:
         - rydmatch-prod
 
     scripts:
-      - name: Restore release keystore
+      - name: Restore and verify release keystore
         script: |
-          echo "$CM_KEYSTORE_BASE64" | base64 --decode > "$CM_BUILD_DIR/rydmatch-release-key.jks"
+          if [ -z "$CM_KEYSTORE_BASE64" ]; then
+            echo "CM_KEYSTORE_BASE64 is empty."
+            exit 1
+          fi
+
+          printf "%s" "$CM_KEYSTORE_BASE64" | tr -d '\n\r ' | base64 --decode > "$CM_BUILD_DIR/rydmatch-release-key.jks"
+
+          if [ ! -s "$CM_BUILD_DIR/rydmatch-release-key.jks" ]; then
+            echo "Keystore restore failed. File is empty."
+            exit 1
+          fi
+
+          keytool -list \
+            -keystore "$CM_BUILD_DIR/rydmatch-release-key.jks" \
+            -storepass "$CM_KEYSTORE_PASSWORD" \
+            -alias "$CM_KEY_ALIAS" \
+            >/dev/null
+
+          echo "Keystore restored and verified."
 
       - name: Create key.properties
         script: |
