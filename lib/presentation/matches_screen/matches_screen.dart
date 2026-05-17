@@ -504,6 +504,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
                     ),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
+                    softWrap: false,
                   ),
                   SizedBox(height: 0.4.h),
                   Row(
@@ -531,17 +532,21 @@ class _MatchesScreenState extends State<MatchesScreen> {
                 ],
               ),
             ),
-            Material(
-              color: const Color(0xFF1B365D).withValues(alpha: 0.08),
-              shape: const CircleBorder(),
-              child: IconButton(
-                onPressed: () => _navigateToChat(match),
-                icon: const Icon(
-                  Icons.chat_bubble_outline_rounded,
-                  color: Color(0xFF1B365D),
-                  size: 18,
+            SizedBox(
+              width: 44,
+              height: 44,
+              child: Material(
+                color: const Color(0xFF1B365D).withValues(alpha: 0.08),
+                shape: const CircleBorder(),
+                child: IconButton(
+                  onPressed: () => _navigateToChat(match),
+                  icon: const Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    color: Color(0xFF1B365D),
+                    size: 18,
+                  ),
+                  tooltip: 'Open chat',
                 ),
-                tooltip: 'Open chat',
               ),
             ),
           ],

@@ -122,7 +122,10 @@ class MatchCardWidget extends StatelessWidget {
                 _buildAvatar(theme, isOnline),
                 SizedBox(width: 3.w),
                 Expanded(child: _buildInfo(theme, unreadCount)),
-                _buildTrailing(theme, unreadCount),
+                SizedBox(
+                  width: 52,
+                  child: _buildTrailing(theme, unreadCount),
+                ),
               ],
             ),
           ),
@@ -168,7 +171,7 @@ class MatchCardWidget extends StatelessWidget {
       children: [
         Row(
           children: [
-            Flexible(
+            Expanded(
               child: Text(
                 '${match['name']}, ${match['age']}',
                 style: theme.textTheme.titleSmall?.copyWith(
@@ -178,6 +181,7 @@ class MatchCardWidget extends StatelessWidget {
                 ),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
+                softWrap: false,
               ),
             ),
             SizedBox(width: 1.w),
