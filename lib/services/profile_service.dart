@@ -22,6 +22,9 @@ class ProfileService {
   static const String _keySpeedUnit =
       'profile_speed_unit'; // 'metric' or 'imperial'
   static const String _keyGender = 'profile_gender';
+  static const String _keyDateOfBirth = 'profile_date_of_birth';
+  static const String _keyMinimumAgeConfirmed =
+      'profile_minimum_age_confirmed';
   static const String _keyRideMode = 'profile_ride_mode';
   static const String _keyMixedCommunityMatching =
       'profile_mixed_community_matching';
@@ -107,6 +110,8 @@ class ProfileService {
     String riderName = '',
     String riderBio = '',
     bool isMetric = false,
+    DateTime? dateOfBirth,
+    int? minimumAgeConfirmed,
     String? gender,
     String rideMode = 'motorcycle',
     bool mixedCommunityMatching = false,
@@ -173,6 +178,16 @@ class ProfileService {
     await prefs.setString(_keyRiderName, riderName);
     await prefs.setString(_keyRiderBio, riderBio);
     await prefs.setString(_keySpeedUnit, isMetric ? 'metric' : 'imperial');
+    if (dateOfBirth != null) {
+      await prefs.setString(
+        _keyDateOfBirth,
+        DateTime(dateOfBirth.year, dateOfBirth.month, dateOfBirth.day)
+            .toIso8601String(),
+      );
+    }
+    if (minimumAgeConfirmed != null) {
+      await prefs.setInt(_keyMinimumAgeConfirmed, minimumAgeConfirmed);
+    }
     await prefs.setString(_keyRideMode, rideMode);
     await prefs.setBool(_keyMixedCommunityMatching, mixedCommunityMatching);
     if (gender != null) {
@@ -190,6 +205,7 @@ class ProfileService {
         riderName: riderName,
         riderBio: riderBio,
         gender: gender,
+        minimumAgeConfirmed: minimumAgeConfirmed,
         rideMode: rideMode,
         mixedCommunityMatching: mixedCommunityMatching,
         avatarUrl: resolvedPhotoUrl,
@@ -210,6 +226,7 @@ class ProfileService {
     String riderName = '',
     String riderBio = '',
     String? gender,
+    int? minimumAgeConfirmed,
     String rideMode = 'motorcycle',
     bool mixedCommunityMatching = false,
     String? avatarUrl,
@@ -246,6 +263,10 @@ class ProfileService {
       if (gender != null) {
         updates['gender'] = gender;
       }
+      if (minimumAgeConfirmed != null) {
+        updates['minimum_age_confirmed'] = minimumAgeConfirmed;
+        updates['age_verified_at'] = DateTime.now().toIso8601String();
+      }
 
       await supabase.from('user_profiles').upsert(updates, onConflict: 'id');
       debugPrint('✅ Profile synced successfully');
@@ -275,6 +296,8 @@ class ProfileService {
       'riderName': prefs.getString(_keyRiderName) ?? '',
       'riderBio': prefs.getString(_keyRiderBio) ?? '',
       'isMetric': (prefs.getString(_keySpeedUnit) ?? 'imperial') == 'metric',
+      'dateOfBirth': prefs.getString(_keyDateOfBirth),
+      'minimumAgeConfirmed': prefs.getInt(_keyMinimumAgeConfirmed),
       'gender': prefs.getString(_keyGender),
       'rideMode': prefs.getString(_keyRideMode) ?? 'motorcycle',
       'mixedCommunityMatching':
@@ -294,6 +317,8 @@ class ProfileService {
     await prefs.remove(_keyBikePhotoPaths);
     await prefs.remove(_keyRiderName);
     await prefs.remove(_keyRiderBio);
+    await prefs.remove(_keyDateOfBirth);
+    await prefs.remove(_keyMinimumAgeConfirmed);
     await prefs.remove(_keyRideMode);
     await prefs.remove(_keyMixedCommunityMatching);
   }

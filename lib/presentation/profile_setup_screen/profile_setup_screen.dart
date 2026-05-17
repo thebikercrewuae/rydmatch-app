@@ -41,6 +41,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   double _ridingSpeed = 60.0;
   bool _isMetric = false;
+  DateTime? _dateOfBirth;
   String? _gender;
   String _rideMode = 'motorcycle';
   bool _mixedCommunityMatching = false;
@@ -57,7 +58,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   bool get _canContinue {
     switch (_currentPage) {
       case 0:
-        return _firstNameController.text.trim().isNotEmpty;
+        return _firstNameController.text.trim().isNotEmpty &&
+            _dateOfBirth != null &&
+            _meetsMinimumAge;
       case 1:
         return _ridingSpeed > 0;
       case 2:
@@ -97,6 +100,31 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     'Emergency SOS',
   ];
 
+  int get _minimumAge => _rideMode == 'motorcycle' || _mixedCommunityMatching
+      ? 18
+      : 16;
+
+  bool get _meetsMinimumAge {
+    final birthDate = _dateOfBirth;
+    if (birthDate == null) return false;
+    return _ageOn(DateTime.now(), birthDate) >= _minimumAge;
+  }
+
+  int _ageOn(DateTime date, DateTime birthDate) {
+    var age = date.year - birthDate.year;
+    if (date.month < birthDate.month ||
+        (date.month == birthDate.month && date.day < birthDate.day)) {
+      age--;
+    }
+    return age;
+  }
+
+  String _formatDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    return '$day/$month/${date.year}';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -131,6 +159,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
           _ridingSpeed = (data['ridingSpeed'] as num?)?.toDouble() ?? 60.0;
           _isMetric = data['isMetric'] as bool? ?? false;
+          final savedBirthDate = data['dateOfBirth'] as String?;
+          _dateOfBirth = savedBirthDate == null
+              ? null
+              : DateTime.tryParse(savedBirthDate);
           _gender = data['gender'] as String?;
           _rideMode = data['rideMode'] as String? ?? 'motorcycle';
           _mixedCommunityMatching =
@@ -348,6 +380,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     final lastName = _lastNameController.text.trim();
     final fullName = lastName.isNotEmpty ? '$firstName $lastName' : firstName;
 
+    if (!_meetsMinimumAge) {
+      AppToast.show(
+        context,
+        message: _minimumAge == 18
+            ? 'Motorcycle and mixed matching users must be at least 18.'
+            : 'Bicycle users must be at least 16.',
+        type: ToastType.error,
+      );
+      return;
+    }
+
     if (_riderPhoto != null && mounted) {
       AppToast.show(
         context,
@@ -367,6 +410,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       existingRiderPhotoUrl: _existingRiderPhotoUrl,
       bikePhotoPaths: _bikePhotos.map((f) => f.path).toList(),
       isMetric: _isMetric,
+      dateOfBirth: _dateOfBirth,
+      minimumAgeConfirmed: _minimumAge,
       gender: _gender,
       rideMode: _rideMode,
       mixedCommunityMatching: _mixedCommunityMatching,
@@ -555,15 +600,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             ),
           ],
         ),
-        TextButton(
-          onPressed: _skip,
-          child: Text(
-            _isEditMode ? 'Cancel' : 'Skip',
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: theme.colorScheme.primary,
-            ),
-          ),
-        ),
+        _isEditMode
+            ? TextButton(
+                onPressed: _skip,
+                child: Text(
+                  'Cancel',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              )
+            : SizedBox(width: 10.w),
       ],
     );
   }
@@ -648,6 +695,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             hintText: 'Enter your last name (optional)',
             textCapitalization: TextCapitalization.words,
           ),
+          SizedBox(height: 2.5.h),
+          _buildDateOfBirthField(theme),
           SizedBox(height: 2.5.h),
           _buildRideCommunitySection(theme),
           SizedBox(height: 2.5.h),
@@ -764,6 +813,102 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildDateOfBirthField(ThemeData theme) {
+    final hasError = _dateOfBirth != null && !_meetsMinimumAge;
+    final valueText = _dateOfBirth == null
+        ? 'Select your date of birth'
+        : _formatDate(_dateOfBirth!);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildTextLabel(theme, 'Date of Birth *'),
+        SizedBox(height: 1.h),
+        InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => _selectDateOfBirth(theme),
+          child: Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.8.h),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: hasError
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.outline,
+                width: hasError ? 2 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.calendar_today_rounded,
+                  color: hasError
+                      ? theme.colorScheme.error
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                  size: 20,
+                ),
+                SizedBox(width: 3.w),
+                Expanded(
+                  child: Text(
+                    valueText,
+                    style: GoogleFonts.dmSans(
+                      fontSize: 13.sp,
+                      fontWeight: _dateOfBirth == null
+                          ? FontWeight.w500
+                          : FontWeight.w600,
+                      color: _dateOfBirth == null
+                          ? theme.colorScheme.onSurface.withValues(alpha: 0.4)
+                          : theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        SizedBox(height: 0.8.h),
+        Text(
+          'Minimum age: $_minimumAge+ for your selected ride community.',
+          style: GoogleFonts.dmSans(
+            fontSize: 11.sp,
+            color: hasError
+                ? theme.colorScheme.error
+                : theme.colorScheme.onSurface.withValues(alpha: 0.55),
+            fontWeight: hasError ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _selectDateOfBirth(ThemeData theme) async {
+    final now = DateTime.now();
+    final initialDate =
+        _dateOfBirth ?? DateTime(now.year - _minimumAge, now.month, now.day);
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(now.year - 100),
+      lastDate: DateTime(now.year, now.month, now.day),
+      helpText: 'Select date of birth',
+      builder: (context, child) {
+        return Theme(
+          data: theme.copyWith(
+            colorScheme: theme.colorScheme.copyWith(
+              primary: theme.colorScheme.primary,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (selectedDate == null) return;
+    setState(() => _dateOfBirth = selectedDate);
   }
 
   Widget _buildRideModeButton({
