@@ -98,5 +98,4 @@ workflows:
       - build/app/outputs/flutter-apk/*.apk
       - android/app/build/outputs/apk/release/*.apk
       - android/app/build/outputs/apk/release/*.json
-      - rydmatch-release-key.jks
       - gradle-build.log
