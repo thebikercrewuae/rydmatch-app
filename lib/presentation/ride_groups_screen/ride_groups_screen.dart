@@ -1184,57 +1184,131 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
         final activeSession = snapshot.data;
         final hasActiveRide = activeSession != null;
 
-        return SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: isLoading
-                ? null
-                : () => hasActiveRide
-                      ? _joinLiveRide(activeSession['id'] as String)
-                      : _startLiveRide(group),
-            icon: isLoading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Icon(
-                    hasActiveRide
-                        ? Icons.gps_fixed_rounded
-                        : group.isBicycle
-                        ? Icons.directions_bike_rounded
-                        : Icons.motorcycle_rounded,
-                    size: 20,
+        return Column(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: isLoading
+                    ? null
+                    : () => hasActiveRide
+                          ? _joinLiveRide(activeSession['id'] as String)
+                          : _startLiveRide(group),
+                icon: isLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Icon(
+                        hasActiveRide
+                            ? Icons.gps_fixed_rounded
+                            : group.isBicycle
+                            ? Icons.directions_bike_rounded
+                            : Icons.motorcycle_rounded,
+                        size: 20,
+                        color: Colors.white,
+                      ),
+                label: Text(
+                  isLoading
+                      ? 'Checking...'
+                      : hasActiveRide
+                      ? 'Join Live Ride'
+                      : 'Start Live Ride',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w700,
                     color: Colors.white,
                   ),
-            label: Text(
-              isLoading
-                  ? 'Checking...'
-                  : hasActiveRide
-                  ? 'Join Live Ride'
-                  : 'Start Live Ride',
-              style: GoogleFonts.dmSans(
-                fontSize: 13.sp,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: hasActiveRide
+                      ? const Color(0xFF1976D2)
+                      : const Color(0xFF2E7D32),
+                  disabledBackgroundColor: const Color(0xFF546E7A),
+                  padding: EdgeInsets.symmetric(vertical: 1.8.h),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                ),
               ),
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: hasActiveRide
-                  ? const Color(0xFF1976D2)
-                  : const Color(0xFF2E7D32),
-              disabledBackgroundColor: const Color(0xFF546E7A),
-              padding: EdgeInsets.symmetric(vertical: 1.8.h),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.0),
+            if (hasActiveRide) ...[
+              SizedBox(height: 1.5.h),
+              SizedBox(
+                width: double.infinity,
+                child: PremiumService().isPremium
+                    ? ElevatedButton.icon(
+                        onPressed: () =>
+                            _openVoiceRoom(activeSession['id'] as String),
+                        icon: const Icon(
+                          Icons.mic_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        label: Text(
+                          'Join Voice',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6A1B9A),
+                          padding: EdgeInsets.symmetric(vertical: 1.8.h),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.0),
+                          ),
+                        ),
+                      )
+                    : OutlinedButton.icon(
+                        onPressed: () => Navigator.pushNamed(
+                          context,
+                          '/premium-subscription-screen',
+                        ),
+                        icon: const Icon(
+                          Icons.lock_rounded,
+                          color: Color(0xFFFFB347),
+                          size: 20,
+                        ),
+                        label: Text(
+                          'Voice Room (Premium)',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFFFFB347),
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(
+                            color: Color(0xFFFFB347),
+                            width: 1.4,
+                          ),
+                          padding: EdgeInsets.symmetric(vertical: 1.8.h),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.0),
+                          ),
+                        ),
+                      ),
               ),
-            ),
-          ),
+            ],
+          ],
         );
       },
+    );
+  }
+
+  void _openVoiceRoom(String sessionId) {
+    debugPrint('RideGroupsScreen: voice room requested for session $sessionId');
+    Navigator.of(context).pop();
+    AppToast.show(
+      context,
+      message: 'Voice room setup is ready for LiveKit integration.',
+      type: ToastType.info,
     );
   }
 
