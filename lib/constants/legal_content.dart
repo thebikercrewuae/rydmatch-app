@@ -1,5 +1,5 @@
 class RydMatchLegalContent {
-  // ─── TERMS OF SERVICE ────────────────────────────────────────────────────────
+  // TERMS OF SERVICE
 
   static const String termsLastUpdated = 'May 2026';
 
@@ -12,22 +12,22 @@ class RydMatchLegalContent {
     LegalSection(
       title: '1. Eligibility',
       content:
-          'You must be at least 18 years of age and hold a valid motorcycle licence (or be a licensed pillion passenger) to use RydMatch. By using our service, you represent and warrant that you meet these requirements. We reserve the right to verify your eligibility at any time.',
+          'You must be at least 18 years of age to use RydMatch. If you use RydMatch for motorcycle riding, you must hold any licence, permit, registration, insurance, or passenger eligibility required by local law. If you use RydMatch for bicycling, you must comply with local cycling laws, road rules, and safety requirements. By using our service, you represent and warrant that you meet these requirements. We reserve the right to verify your eligibility at any time.',
     ),
     LegalSection(
       title: '2. User Accounts',
       content:
-          'You are responsible for:\n\n• Maintaining the confidentiality of your account credentials\n• All activities that occur under your account\n• Providing accurate and truthful information in your profile\n• Notifying us immediately of any unauthorised use of your account\n\nWe reserve the right to suspend or terminate accounts that violate these terms.',
+          'You are responsible for:\n\n- Maintaining the confidentiality of your account credentials\n- All activities that occur under your account\n- Providing accurate and truthful information in your profile\n- Notifying us immediately of any unauthorised use of your account\n\nWe reserve the right to suspend or terminate accounts that violate these terms.',
     ),
     LegalSection(
       title: '3. Acceptable Use',
       content:
-          'You agree not to use RydMatch to:\n\n• Harass, abuse, or harm other users\n• Post false, misleading, or fraudulent information\n• Impersonate any person or entity\n• Engage in any unlawful activity\n• Transmit spam or unsolicited communications\n• Attempt to gain unauthorised access to our systems\n• Use the platform for commercial solicitation without our consent\n• Share content that is offensive, discriminatory, or violates the rights of others',
+          'You agree not to use RydMatch to:\n\n- Harass, abuse, or harm other users\n- Post false, misleading, or fraudulent information\n- Impersonate any person or entity\n- Engage in any unlawful activity\n- Transmit spam or unsolicited communications\n- Attempt to gain unauthorised access to our systems\n- Use the platform for commercial solicitation without our consent\n- Share content that is offensive, discriminatory, or violates the rights of others',
     ),
     LegalSection(
       title: '4. Rider Safety',
       content:
-          'RydMatch is a platform for connecting riders. We strongly encourage all users to:\n\n• Always wear appropriate safety gear including a certified helmet\n• Ride within your skill level and comply with local traffic laws\n• Meet new riding partners in public places first\n• Share your ride plans with someone you trust\n• Never ride under the influence of alcohol or drugs\n\nRydMatch is not responsible for any accidents, injuries, or incidents that occur during rides arranged through our platform. You ride at your own risk.',
+          'RydMatch is a platform for connecting motorcycle riders and bicyclists. We strongly encourage all users to:\n\n- Always wear appropriate safety gear, including a certified helmet where required or recommended\n- Use lights, reflectors, protective equipment, and visible clothing where appropriate\n- Ride within your skill level and comply with local traffic laws, cycling rules, trail rules, and road regulations\n- Meet new riding partners in public places first\n- Share your ride plans with someone you trust\n- Never ride under the influence of alcohol or drugs\n\nRydMatch is not responsible for any accidents, injuries, property damage, or incidents that occur during motorcycle rides, bicycle rides, group rides, or other activities arranged through our platform. You ride at your own risk.',
     ),
     LegalSection(
       title: '5. Content and Intellectual Property',
@@ -37,7 +37,7 @@ class RydMatchLegalContent {
     LegalSection(
       title: '6. Matching and Communication',
       content:
-          'RydMatch provides tools to help riders connect, but we do not guarantee the accuracy of compatibility scores or the quality of any riding partnership. We are not responsible for the conduct of users you meet through our platform.\n\nAll communication between users must comply with our community guidelines. We reserve the right to monitor and remove content that violates these guidelines.',
+          'RydMatch provides tools to help motorcycle riders and bicyclists connect, but we do not guarantee the accuracy of compatibility scores, suggested matches, route suggestions, cycling integrations, or the quality of any riding partnership. We are not responsible for the conduct of users you meet through our platform.\n\nAll communication between users must comply with our community guidelines. We reserve the right to monitor and remove content that violates these guidelines.',
     ),
     LegalSection(
       title: '7. Premium Services',
@@ -81,7 +81,7 @@ class RydMatchLegalContent {
     ),
   ];
 
-  // ─── PRIVACY POLICY ──────────────────────────────────────────────────────────
+  // PRIVACY POLICY
 
   static const String privacyLastUpdated = 'May 2026';
 
@@ -94,27 +94,27 @@ class RydMatchLegalContent {
     LegalSection(
       title: '1. Information We Collect',
       content:
-          'We collect information that you provide directly to us when you:\n\n• Create an account (name, email address, password)\n• Complete your rider profile (age, location, riding experience, bike details)\n• Upload photos of yourself and your motorcycle\n• Communicate with other riders through our messaging feature\n• Use our matching and discovery features\n• Submit support requests or feedback\n\nWe may also automatically collect certain information about your device, including your IP address, browser type, operating system, device identifiers, and usage data such as pages visited and features used.',
+          'We collect information that you provide directly to us when you:\n\n- Create an account (name, email address, password)\n- Complete your rider profile (age, location, riding experience, motorcycle or bicycle details, ride preferences, pace, and skill level)\n- Upload photos of yourself, your motorcycle, your bicycle, or your riding setup\n- Communicate with other riders through our messaging feature\n- Use our matching, discovery, route planning, ride group, ride feed, live ride, or safety features\n- Connect optional third-party services such as cycling activity integrations, where available\n- Submit support requests or feedback\n\nWe may also automatically collect certain information about your device, including your IP address, browser type, operating system, device identifiers, and usage data such as pages visited and features used.',
     ),
     LegalSection(
       title: '2. Location Data',
       content:
-          'RydMatch collects location data to enable core features including rider discovery, route planning, and Emergency SOS. We collect:\n\n• Approximate location for discovery and matching\n• Precise GPS location when using live ride tracking or Emergency SOS\n\nYou can control location permissions through your device settings. Disabling location access may limit certain features of the app.',
+          'RydMatch collects location data to enable core features including rider discovery, route planning, cycling routes, ride groups, live ride tracking, and Emergency SOS. We collect:\n\n- Approximate location for discovery and matching\n- Precise GPS location when using live ride tracking, route planning, group ride features, or Emergency SOS\n\nYou can control location permissions through your device settings. Disabling location access may limit certain features of the app.',
     ),
     LegalSection(
       title: '3. How We Use Your Information',
       content:
-          'We use the information we collect to:\n\n• Create and manage your account\n• Match you with compatible riding partners\n• Enable communication between matched riders\n• Improve and personalise your experience\n• Send you notifications about matches, messages, and rides\n• Ensure the safety and security of our platform\n• Process payments for premium subscriptions\n• Comply with legal obligations\n• Analyse usage patterns to improve our service',
+          'We use the information we collect to:\n\n- Create and manage your account\n- Match you with compatible motorcycle riding or bicycling partners\n- Enable communication between matched riders\n- Support route planning, ride groups, cycling integrations, ride history, and safety features\n- Improve and personalise your experience\n- Send you notifications about matches, messages, rides, groups, and safety updates\n- Ensure the safety and security of our platform\n- Process payments for premium subscriptions\n- Comply with legal obligations\n- Analyse usage patterns to improve our service',
     ),
     LegalSection(
       title: '4. Sharing Your Information',
       content:
-          'We do not sell, trade, or rent your personal information to third parties for marketing purposes. We may share your information with:\n\n• Other users as part of the matching and profile display features\n• Service providers who assist us in operating our platform (e.g., cloud hosting, payment processing, SMS services)\n• Law enforcement or regulatory authorities when required by law or to protect our rights\n• Successor entities in the event of a merger, acquisition, or sale of assets\n\nAll third-party service providers are contractually obligated to protect your data.',
+          'We do not sell, trade, or rent your personal information to third parties for marketing purposes. We may share your information with:\n\n- Other users as part of the matching, profile display, ride group, ride feed, and live ride features\n- Service providers who assist us in operating our platform (e.g., cloud hosting, payment processing, SMS services, analytics, mapping, or storage services)\n- Third-party integrations that you choose to connect, such as cycling activity services, subject to your consent and their own terms and privacy policies\n- Law enforcement or regulatory authorities when required by law or to protect our rights\n- Successor entities in the event of a merger, acquisition, or sale of assets\n\nAll third-party service providers are contractually obligated to protect your data.',
     ),
     LegalSection(
       title: '5. Profile Visibility',
       content:
-          'Your rider profile, including your name, photos, riding preferences, and bike details, will be visible to other RydMatch users as part of the core matching functionality. You can control certain visibility settings from your account settings, including:\n\n• Location visibility\n• Profile discoverability\n• Data sharing preferences',
+          'Your rider profile, including your name, photos, riding preferences, motorcycle or bicycle details, cycling preferences, skill level, and pace information, will be visible to other RydMatch users as part of the core matching functionality. Ride group, ride feed, live ride, and connected integration content may also be visible depending on the feature you use and the settings you choose. You can control certain visibility settings from your account settings, including:\n\n- Location visibility\n- Profile discoverability\n- Data sharing preferences',
     ),
     LegalSection(
       title: '6. Data Retention',
@@ -124,12 +124,12 @@ class RydMatchLegalContent {
     LegalSection(
       title: '7. Security',
       content:
-          'We implement appropriate technical and organisational measures to protect your personal information against unauthorised access, alteration, disclosure, or destruction. These measures include:\n\n• Encryption of data in transit and at rest\n• Secure authentication protocols\n• Regular security assessments\n• Access controls limiting who can access your data\n\nHowever, no method of transmission over the internet is 100% secure. We cannot guarantee absolute security of your data.',
+          'We implement appropriate technical and organisational measures to protect your personal information against unauthorised access, alteration, disclosure, or destruction. These measures include:\n\n- Encryption of data in transit and at rest\n- Secure authentication protocols\n- Regular security assessments\n- Access controls limiting who can access your data\n\nHowever, no method of transmission over the internet is 100% secure. We cannot guarantee absolute security of your data.',
     ),
     LegalSection(
       title: '8. Your Rights',
       content:
-          'Depending on your location, you may have the right to:\n\n• Access the personal information we hold about you\n• Correct inaccurate or incomplete information\n• Request deletion of your personal information\n• Object to or restrict our processing of your information\n• Data portability — receive your data in a structured, machine-readable format\n• Withdraw consent where processing is based on consent\n\nTo exercise these rights, please contact us at privacy@rydmatch.app. We will respond to your request within 30 days.',
+          'Depending on your location, you may have the right to:\n\n- Access the personal information we hold about you\n- Correct inaccurate or incomplete information\n- Request deletion of your personal information\n- Object to or restrict our processing of your information\n- Data portability - receive your data in a structured, machine-readable format\n- Withdraw consent where processing is based on consent\n\nTo exercise these rights, please contact us at privacy@rydmatch.app. We will respond to your request within 30 days.',
     ),
     LegalSection(
       title: '9. Cookies and Tracking',
