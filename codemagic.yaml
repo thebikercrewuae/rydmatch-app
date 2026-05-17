@@ -10,20 +10,9 @@ workflows:
         - rydmatch-prod
 
     scripts:
-      - name: Generate release keystore
+      - name: Restore release keystore
         script: |
-          if [ ! -f "$CM_BUILD_DIR/rydmatch-release-key.jks" ]; then
-            keytool -genkeypair \
-              -v \
-              -keystore "$CM_BUILD_DIR/rydmatch-release-key.jks" \
-              -storepass "$CM_KEYSTORE_PASSWORD" \
-              -keypass "$CM_KEY_PASSWORD" \
-              -alias "$CM_KEY_ALIAS" \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=RydMatch, OU=RydMatch, O=RydMatch, L=Dubai, ST=Dubai, C=AE"
-          fi
+          echo "$CM_KEYSTORE_BASE64" | base64 --decode > "$CM_BUILD_DIR/rydmatch-release-key.jks"
 
       - name: Create key.properties
         script: |
