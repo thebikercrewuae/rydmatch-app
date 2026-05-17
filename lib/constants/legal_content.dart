@@ -12,7 +12,7 @@ class RydMatchLegalContent {
     LegalSection(
       title: '1. Eligibility',
       content:
-          'You must be at least 18 years of age to use RydMatch. If you use RydMatch for motorcycle riding, you must hold any licence, permit, registration, insurance, or passenger eligibility required by local law. If you use RydMatch for bicycling, you must comply with local cycling laws, road rules, and safety requirements. By using our service, you represent and warrant that you meet these requirements. We reserve the right to verify your eligibility at any time.',
+          'You must be at least 16 years of age to use RydMatch for bicycling and at least 18 years of age to use RydMatch for motorcycle riding. If you use RydMatch for motorcycle riding, you must hold any licence, permit, registration, insurance, or passenger eligibility required by local law. If you use RydMatch for bicycling, you must comply with local cycling laws, road rules, and safety requirements. By using our service, you represent and warrant that you meet these requirements. We reserve the right to verify your eligibility at any time.',
     ),
     LegalSection(
       title: '2. User Accounts',
@@ -139,7 +139,7 @@ class RydMatchLegalContent {
     LegalSection(
       title: '10. Children\'s Privacy',
       content:
-          'RydMatch is not intended for users under the age of 18. We do not knowingly collect personal information from minors. If we become aware that a minor has provided us with personal information, we will take steps to delete such information promptly. If you believe a minor has used our service, please contact us immediately.',
+          'RydMatch is not intended for bicycling users under the age of 16 or motorcycle riding users under the age of 18. We do not knowingly collect personal information from anyone below the applicable minimum age. If we become aware that a person below the applicable minimum age has provided us with personal information, we will take steps to delete such information promptly. If you believe someone below the applicable minimum age has used our service, please contact us immediately.',
     ),
     LegalSection(
       title: '11. International Transfers',
