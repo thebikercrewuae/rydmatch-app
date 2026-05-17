@@ -46,3 +46,10 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 android/app/.cxx
+
+# Release signing keys - never commit these
+*.jks
+*.keystore
+*.jks.base64
+*.keystore.base64
+android/key.properties
