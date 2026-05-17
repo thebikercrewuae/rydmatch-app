@@ -47,7 +47,6 @@ workflows:
             exit 0
           fi
 
-          rm -rf "$ANDROID_HOME/ndk/27.0.12077973"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           yes | "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0" "ndk;27.0.12077973"
 
@@ -65,7 +64,7 @@ workflows:
             perl -0pi -e 's/minSdkVersion\s+flutter\.minSdkVersion/minSdk = 24/g' android/app/build.gradle.kts
             perl -0pi -e 's/minSdk\s*=\s*flutter\.minSdkVersion/minSdk = 24/g' android/app/build.gradle.kts
             perl -0pi -e 's/minSdk\s*=\s*21/minSdk = 24/g' android/app/build.gradle.kts
-            sed -n '20,40p' android/app/build.gradle.kts
+            sed -n '20,45p' android/app/build.gradle.kts
           }
 
           encode_define() {
@@ -96,12 +95,19 @@ workflows:
           BUILD_STATUS=${PIPESTATUS[0]}
           set -e
 
+          cd "$CM_BUILD_DIR"
+
+          echo "APK files found:"
+          find . -type f -name "*.apk" -print
+
           echo "Last 200 lines of Gradle log:"
-          tail -n 200 ../gradle-build.log
+          tail -n 200 gradle-build.log
 
           exit $BUILD_STATUS
 
     artifacts:
+      - build/app/outputs/flutter-apk/*.apk
       - android/app/build/outputs/apk/release/*.apk
+      - android/app/build/outputs/apk/release/*.json
       - rydmatch-release-key.jks
       - gradle-build.log
