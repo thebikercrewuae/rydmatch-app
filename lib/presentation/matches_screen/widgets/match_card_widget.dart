@@ -121,10 +121,17 @@ class MatchCardWidget extends StatelessWidget {
                     : const SizedBox.shrink(),
                 _buildAvatar(theme, isOnline),
                 SizedBox(width: 3.w),
-                Expanded(child: _buildInfo(theme, unreadCount)),
+                Expanded(
+                  flex: 1,
+                  child: _buildInfo(theme, unreadCount),
+                ),
+                const SizedBox(width: 8),
                 SizedBox(
-                  width: 52,
-                  child: _buildTrailing(theme, unreadCount),
+                  width: 56,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: _buildTrailing(theme, unreadCount),
+                  ),
                 ),
               ],
             ),
@@ -185,7 +192,7 @@ class MatchCardWidget extends StatelessWidget {
               ),
             ),
             SizedBox(width: 1.w),
-            _buildCategoryChip(theme),
+            Flexible(child: _buildCategoryChip(theme)),
           ],
         ),
         SizedBox(height: 0.4.h),
@@ -239,12 +246,16 @@ class MatchCardWidget extends StatelessWidget {
             size: 10,
           ),
           const SizedBox(width: 2),
-          Text(
-            match['category'] as String,
-            style: TextStyle(
-              fontSize: 9,
-              color: color,
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: Text(
+              match['category'] as String,
+              style: TextStyle(
+                fontSize: 9,
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ),
         ],

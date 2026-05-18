@@ -492,6 +492,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
             ),
             SizedBox(width: 3.w),
             Expanded(
+              flex: 1,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -532,6 +533,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             SizedBox(
               width: 44,
               height: 44,
