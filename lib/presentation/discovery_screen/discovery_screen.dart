@@ -252,24 +252,43 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     }
 
     List<Map<String, dynamic>> allProfiles = [];
+    var usedDiscoveryRpc = false;
 
     try {
-      final rawAll = await supabase
-          .from('user_profiles')
-          .select(
-            'id, full_name, email, skill_levels, bike_types, preferred_roads, riding_speed, gender, avatar_url, bio, latitude, longitude, ride_mode, mixed_community_matching',
-          );
+      final rawAll = await supabase.rpc(
+        'get_discovery_profiles',
+        params: {
+          'p_current_user_id': currentUser.id,
+          'p_excluded_ids': _swipedIds.toList(),
+        },
+      );
 
-      allProfiles = List<Map<String, dynamic>>.from(rawAll);
+      allProfiles = List<Map<String, dynamic>>.from(rawAll as List<dynamic>);
+      usedDiscoveryRpc = true;
     } catch (e) {
-      debugPrint('DiscoveryScreen: failed to fetch profiles: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _isEmpty = true;
-        });
+      debugPrint('DiscoveryScreen: RPC discovery failed, using fallback: $e');
+
+      try {
+        final rawAll = await supabase
+            .from('user_profiles')
+            .select(
+              'id, full_name, email, skill_levels, bike_types, preferred_roads, riding_speed, gender, avatar_url, bio, latitude, longitude, ride_mode, mixed_community_matching',
+            )
+            .limit(150);
+
+        allProfiles = List<Map<String, dynamic>>.from(rawAll);
+      } catch (fallbackError) {
+        debugPrint(
+          'DiscoveryScreen: failed to fetch fallback profiles: $fallbackError',
+        );
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _isEmpty = true;
+          });
+        }
+        return;
       }
-      return;
     }
 
     final afterExcludeSelf = allProfiles
@@ -284,16 +303,18 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
     List<String> blockedIds = [];
 
-    try {
-      final blockedData = await supabase
-          .from('user_blocks')
-          .select('blocked_id')
-          .eq('blocker_id', currentUser.id);
+    if (!usedDiscoveryRpc) {
+      try {
+        final blockedData = await supabase
+            .from('user_blocks')
+            .select('blocked_id')
+            .eq('blocker_id', currentUser.id);
 
-      blockedIds = List<Map<String, dynamic>>.from(
-        blockedData,
-      ).map((b) => b['blocked_id'] as String).toList();
-    } catch (_) {}
+        blockedIds = List<Map<String, dynamic>>.from(
+          blockedData,
+        ).map((b) => b['blocked_id'] as String).toList();
+      } catch (_) {}
+    }
 
     final afterExcludeBlocked = blockedIds.isEmpty
         ? List<Map<String, dynamic>>.from(afterExcludeSwiped)

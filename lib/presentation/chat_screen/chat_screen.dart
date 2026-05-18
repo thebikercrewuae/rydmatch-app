@@ -73,12 +73,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _subscribeToStatusUpdates();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadMessages();
       _scrollToBottom();
       _handlePrefillMessage();
       _subscribeToNewMessages();
+      _subscribeToStatusUpdates();
       _markMessagesAsRead();
     });
   }
@@ -313,12 +313,20 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   void _subscribeToStatusUpdates() {
     try {
       final supabase = Supabase.instance.client;
+      final conversationId = _getConversationId();
+      if (conversationId.isEmpty) return;
+
       _statusSubscription = supabase
-          .channel('chat_message_status')
+          .channel('chat_message_status_$conversationId')
           .onPostgresChanges(
             event: PostgresChangeEvent.update,
             schema: 'public',
             table: 'chat_messages',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'conversation_id',
+              value: conversationId,
+            ),
             callback: (payload) {
               if (!mounted) return;
               final updated = payload.newRecord;

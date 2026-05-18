@@ -112,19 +112,41 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       ).map((row) => _rowToGroup(row, leaderName: 'You')).toList();
 
       final seenGroupIds = myGroups.map((group) => group.id).toSet();
-
-      for (final invite in List<Map<String, dynamic>>.from(
+      final acceptedInvites = List<Map<String, dynamic>>.from(
         acceptedInviteData,
-      )) {
+      );
+      final pendingInvites = List<Map<String, dynamic>>.from(
+        pendingInviteData,
+      );
+      final inviteGroupIds = <String>{
+        for (final invite in acceptedInvites)
+          if ((invite['group_id'] as String?)?.isNotEmpty == true)
+            invite['group_id'] as String,
+        for (final invite in pendingInvites)
+          if ((invite['group_id'] as String?)?.isNotEmpty == true)
+            invite['group_id'] as String,
+      }.toList();
+      final inviterIds = <String>{
+        for (final invite in acceptedInvites)
+          if ((invite['inviter_id'] as String?)?.isNotEmpty == true)
+            invite['inviter_id'] as String,
+        for (final invite in pendingInvites)
+          if ((invite['inviter_id'] as String?)?.isNotEmpty == true)
+            invite['inviter_id'] as String,
+      }.toList();
+
+      final groupRowsById = await _fetchGroupRows(inviteGroupIds);
+      final leaderNamesById = await _fetchLeaderNames(inviterIds);
+
+      for (final invite in acceptedInvites) {
         final groupId = invite['group_id'] as String?;
         if (groupId == null || seenGroupIds.contains(groupId)) continue;
 
-        final groupRow = await _fetchGroupRow(groupId);
+        final groupRow = groupRowsById[groupId];
         if (groupRow == null) continue;
 
-        final leaderName = await _fetchLeaderName(
-          invite['inviter_id'] as String?,
-        );
+        final inviterId = invite['inviter_id'] as String?;
+        final leaderName = leaderNamesById[inviterId] ?? 'Rider';
 
         myGroups.add(_rowToGroup(groupRow, leaderName: leaderName));
         seenGroupIds.add(groupId);
@@ -132,16 +154,15 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
 
       final invitations = <RideGroup>[];
 
-      for (final invite in List<Map<String, dynamic>>.from(pendingInviteData)) {
+      for (final invite in pendingInvites) {
         final groupId = invite['group_id'] as String?;
         if (groupId == null) continue;
 
-        final groupRow = await _fetchGroupRow(groupId);
+        final groupRow = groupRowsById[groupId];
         if (groupRow == null) continue;
 
-        final leaderName = await _fetchLeaderName(
-          invite['inviter_id'] as String?,
-        );
+        final inviterId = invite['inviter_id'] as String?;
+        final leaderName = leaderNamesById[inviterId] ?? 'Rider';
 
         invitations.add(_rowToGroup(groupRow, leaderName: leaderName));
       }
@@ -164,48 +185,59 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
     }
   }
 
-  Future<Map<String, dynamic>?> _fetchGroupRow(String groupId) async {
+  Future<Map<String, Map<String, dynamic>>> _fetchGroupRows(
+    List<String> groupIds,
+  ) async {
+    if (groupIds.isEmpty) return {};
+
     try {
       final rows = await Supabase.instance.client
           .from('ride_groups')
           .select()
-          .eq('id', groupId)
-          .limit(1);
+          .inFilter('id', groupIds);
 
-      final groupRows = List<Map<String, dynamic>>.from(rows);
-      if (groupRows.isEmpty) return null;
-      return groupRows.first;
+      return {
+        for (final row in List<Map<String, dynamic>>.from(rows))
+          if ((row['id'] as String?)?.isNotEmpty == true)
+            row['id'] as String: row,
+      };
     } catch (e) {
-      debugPrint('RideGroupsScreen: group fetch failed: $e');
-      return null;
+      debugPrint('RideGroupsScreen: group batch fetch failed: $e');
+      return {};
     }
   }
 
-  Future<String> _fetchLeaderName(String? inviterId) async {
-    if (inviterId == null) return 'Rider';
+  Future<Map<String, String>> _fetchLeaderNames(List<String> inviterIds) async {
+    if (inviterIds.isEmpty) return {};
 
     try {
-      final profile = await Supabase.instance.client
+      final profiles = await Supabase.instance.client
           .from('user_profiles')
-          .select('full_name, email')
-          .eq('id', inviterId)
-          .maybeSingle();
+          .select('id, full_name, email')
+          .inFilter('id', inviterIds);
 
-      final fullName = profile?['full_name'] as String?;
-      final email = profile?['email'] as String?;
+      final names = <String, String>{};
 
-      if (fullName != null && fullName.trim().isNotEmpty) {
-        return fullName.trim();
+      for (final profile in List<Map<String, dynamic>>.from(profiles)) {
+        final id = profile['id'] as String?;
+        if (id == null || id.isEmpty) continue;
+
+        final fullName = profile['full_name'] as String?;
+        final email = profile['email'] as String?;
+
+        if (fullName != null && fullName.trim().isNotEmpty) {
+          names[id] = fullName.trim();
+        } else if (email != null && email.isNotEmpty) {
+          names[id] = email.split('@').first;
+        } else {
+          names[id] = 'Rider';
+        }
       }
 
-      if (email != null && email.isNotEmpty) {
-        return email.split('@').first;
-      }
-
-      return 'Rider';
+      return names;
     } catch (e) {
-      debugPrint('RideGroupsScreen: leader profile fetch failed: $e');
-      return 'Rider';
+      debugPrint('RideGroupsScreen: leader profiles batch fetch failed: $e');
+      return {};
     }
   }
 
