@@ -107,6 +107,7 @@ class ProfileService {
     String? riderPhotoPath,
     String? existingRiderPhotoUrl,
     List<String> bikePhotoPaths = const [],
+    List<XFile> bikePhotoFiles = const [],
     String riderName = '',
     String riderBio = '',
     bool isMetric = true,
@@ -146,6 +147,12 @@ class ProfileService {
     // Upload rider photo to Supabase Storage if a new file was provided
     // Keep the existing photo unless a new one is uploaded or the user removed it
     String? resolvedPhotoUrl = existingRiderPhotoUrl;
+    if ((resolvedPhotoUrl == null || resolvedPhotoUrl.isEmpty) &&
+        riderPhotoPath != null &&
+        (riderPhotoPath.startsWith('http://') ||
+            riderPhotoPath.startsWith('https://'))) {
+      resolvedPhotoUrl = riderPhotoPath;
+    }
 
     if (riderPhotoFile != null) {
       debugPrint('📸 saveProfile: Uploading rider photo...');
@@ -169,12 +176,30 @@ class ProfileService {
       resolvedPhotoUrl = null;
     }
 
+    final resolvedBikePhotoUrls = <String>[
+      ...bikePhotoPaths.where(
+        (path) =>
+            path.isNotEmpty &&
+            !path.startsWith('blob:') &&
+            (path.startsWith('http://') || path.startsWith('https://')),
+      ),
+    ];
+
+    for (final bikePhoto in bikePhotoFiles) {
+      final uploadedUrl = await uploadPhoto(bikePhoto, 'profile-bikes');
+      if (uploadedUrl != null &&
+          uploadedUrl.isNotEmpty &&
+          !uploadedUrl.startsWith('blob:')) {
+        resolvedBikePhotoUrls.add(uploadedUrl);
+      }
+    }
+
     if (resolvedPhotoUrl != null && resolvedPhotoUrl.isNotEmpty) {
       await prefs.setString(_keyRiderPhotoPath, resolvedPhotoUrl);
     } else {
       await prefs.remove(_keyRiderPhotoPath);
     }
-    await prefs.setStringList(_keyBikePhotoPaths, bikePhotoPaths);
+    await prefs.setStringList(_keyBikePhotoPaths, resolvedBikePhotoUrls);
     await prefs.setString(_keyRiderName, riderName);
     await prefs.setString(_keyRiderBio, riderBio);
     await prefs.setString(_keySpeedUnit, isMetric ? 'metric' : 'imperial');
@@ -211,6 +236,7 @@ class ProfileService {
         rideMode: rideMode,
         mixedCommunityMatching: mixedCommunityMatching,
         avatarUrl: resolvedPhotoUrl,
+        bikePhotoUrls: resolvedBikePhotoUrls,
       );
     } else {
       debugPrint('⚠️ Skipping Supabase sync — no auth. Profile saved locally.');
@@ -232,6 +258,7 @@ class ProfileService {
     String rideMode = 'motorcycle',
     bool mixedCommunityMatching = false,
     String? avatarUrl,
+    List<String> bikePhotoUrls = const [],
   }) async {
     try {
       final supabase = Supabase.instance.client;
@@ -256,6 +283,7 @@ class ProfileService {
         'bio': riderBio,
         'is_profile_complete': true,
         'avatar_url': avatarUrl,
+        'bike_photo_urls': bikePhotoUrls,
         'updated_at': DateTime.now().toIso8601String(),
       };
 
@@ -270,7 +298,17 @@ class ProfileService {
         updates['age_verified_at'] = DateTime.now().toIso8601String();
       }
 
-      await supabase.from('user_profiles').upsert(updates, onConflict: 'id');
+      try {
+        await supabase.from('user_profiles').upsert(updates, onConflict: 'id');
+      } catch (e) {
+        if (e is PostgrestException &&
+            e.message.contains('bike_photo_urls')) {
+          updates.remove('bike_photo_urls');
+          await supabase.from('user_profiles').upsert(updates, onConflict: 'id');
+        } else {
+          rethrow;
+        }
+      }
       debugPrint('✅ Profile synced successfully');
     } catch (e) {
       debugPrint('❌ SYNC FAILED: $e');
@@ -418,6 +456,17 @@ class ProfileService {
       final avatarUrl = response['avatar_url'] as String?;
       if (avatarUrl != null) {
         await prefs.setString(_keyRiderPhotoPath, avatarUrl);
+      }
+
+      final bikePhotoUrls = response['bike_photo_urls'];
+      if (bikePhotoUrls is List) {
+        await prefs.setStringList(
+          _keyBikePhotoPaths,
+          bikePhotoUrls
+              .map((url) => url.toString())
+              .where((url) => url.isNotEmpty && !url.startsWith('blob:'))
+              .toList(),
+        );
       }
 
       // Mark profile as complete locally

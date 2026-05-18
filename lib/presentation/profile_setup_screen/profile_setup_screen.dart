@@ -52,6 +52,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   XFile? _riderPhoto;
   List<XFile> _bikePhotos = [];
   String? _existingRiderPhotoUrl;
+  List<String> _existingBikePhotoUrls = [];
   String _emergencyContactName = '';
   String _emergencyContactPhone = '';
 
@@ -178,6 +179,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           );
 
           _existingRiderPhotoUrl = data['riderPhotoPath'] as String?;
+          _existingBikePhotoUrls = List<String>.from(
+            data['bikePhotoPaths'] as List? ?? [],
+          ).where((url) => url.startsWith('http')).toList();
 
           _emergencyContactName = prefs.getString(_contactNameKey) ?? '';
           _emergencyContactPhone = prefs.getString(_contactPhoneKey) ?? '';
@@ -413,7 +417,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       riderPhotoPath: _riderPhoto?.path,
       riderPhotoFile: _riderPhoto,
       existingRiderPhotoUrl: _existingRiderPhotoUrl,
-      bikePhotoPaths: _bikePhotos.map((f) => f.path).toList(),
+      bikePhotoPaths: _existingBikePhotoUrls,
+      bikePhotoFiles: _bikePhotos,
       isMetric: _isMetric,
       dateOfBirth: _dateOfBirth,
       minimumAgeConfirmed: _minimumAge,

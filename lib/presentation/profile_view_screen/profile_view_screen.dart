@@ -1333,20 +1333,39 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             onTap: () => _showPhotoExpanded(context, path),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12.0),
-              child: !kIsWeb
-                  ? Image.file(
-                      File(path),
-                      width: 30.w,
-                      height: 18.h,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _photoPlaceholder(theme),
-                    )
-                  : _photoPlaceholder(theme),
+              child: _buildBikePhotoImage(path, theme),
             ),
           );
         },
       ),
     );
+  }
+
+  Widget _buildBikePhotoImage(String path, ThemeData theme) {
+    final isNetworkUrl =
+        path.startsWith('http://') || path.startsWith('https://');
+
+    if (isNetworkUrl) {
+      return Image.network(
+        path,
+        width: 30.w,
+        height: 18.h,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _photoPlaceholder(theme),
+      );
+    }
+
+    if (!kIsWeb) {
+      return Image.file(
+        File(path),
+        width: 30.w,
+        height: 18.h,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _photoPlaceholder(theme),
+      );
+    }
+
+    return _photoPlaceholder(theme);
   }
 
   Widget _buildGenderDisplay(ThemeData theme) {
@@ -1406,7 +1425,13 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             child: InteractiveViewer(
               minScale: 0.5,
               maxScale: 4.0,
-              child: !kIsWeb
+              child: path.startsWith('http://') || path.startsWith('https://')
+                  ? Image.network(
+                      path,
+                      fit: BoxFit.contain,
+                      semanticLabel: 'Expanded bike photo',
+                    )
+                  : !kIsWeb
                   ? Image.file(
                       File(path),
                       fit: BoxFit.contain,
