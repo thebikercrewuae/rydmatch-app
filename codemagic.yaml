@@ -43,9 +43,10 @@ workflows:
       - name: Create key.properties
         script: |
           printf "storePassword=%s\n" "$CM_KEYSTORE_PASSWORD" > "$CM_BUILD_DIR/android/key.properties"
-          printf "keyPassword=%s\n" "$CM_KEY_PASSWORD" >> "$CM_BUILD_DIR/android/key.properties"
+          printf "keyPassword=%s\n" "$CM_KEYSTORE_PASSWORD" >> "$CM_BUILD_DIR/android/key.properties"
           printf "keyAlias=%s\n" "$CM_KEY_ALIAS" >> "$CM_BUILD_DIR/android/key.properties"
           printf "storeFile=%s\n" "$CM_BUILD_DIR/rydmatch-release-key.jks" >> "$CM_BUILD_DIR/android/key.properties"
+
 
       - name: Install Android SDK components
         script: |
