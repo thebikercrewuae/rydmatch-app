@@ -40,7 +40,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final TextEditingController _bioController = TextEditingController();
 
   double _ridingSpeed = 60.0;
-  bool _isMetric = false;
+  bool _isMetric = true;
   DateTime? _dateOfBirth;
   String? _gender;
   String _rideMode = 'motorcycle';
@@ -158,7 +158,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           _bioController.text = data['riderBio'] as String? ?? '';
 
           _ridingSpeed = (data['ridingSpeed'] as num?)?.toDouble() ?? 60.0;
-          _isMetric = data['isMetric'] as bool? ?? false;
+          _isMetric = data['isMetric'] as bool? ?? true;
           final savedBirthDate = data['dateOfBirth'] as String?;
           _dateOfBirth = savedBirthDate == null
               ? null
@@ -184,8 +184,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           _isLoading = false;
         });
       } else {
+        final data = await ProfileService.loadProfile();
+
         if (mounted) {
-          setState(() => _isLoading = false);
+          setState(() {
+            _isMetric = data['isMetric'] as bool? ?? true;
+            _isLoading = false;
+          });
         }
       }
     } catch (e) {

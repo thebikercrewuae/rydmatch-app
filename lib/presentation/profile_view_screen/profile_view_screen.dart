@@ -51,7 +51,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   List<String> _bikePhotoPaths = [];
   String _riderName = '';
   String _riderBio = '';
-  bool _isMetric = false;
+  bool _isMetric = true;
   String? _gender;
   String _rideMode = 'motorcycle';
   bool _mixedCommunityMatching = false;
@@ -227,6 +227,9 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     return <String>[];
   }
 
+  final preferredIsMetric =
+      (await ProfileService.loadProfile())['isMetric'] as bool? ?? true;
+
   if (isOtherUser && otherUserId != null && otherUserId.isNotEmpty) {
     try {
       final profile = await Supabase.instance.client
@@ -249,7 +252,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
           _preferredRoads = [];
           _rideTimes = {};
           _ridingSpeed = 60.0;
-          _isMetric = false;
+          _isMetric = preferredIsMetric;
           _gender = null;
           _rideMode = 'motorcycle';
           _mixedCommunityMatching = false;
@@ -281,7 +284,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
 
         _ridingSpeed =
             (profile['riding_speed'] as num?)?.toDouble() ?? 60.0;
-        _isMetric = false;
+        _isMetric = preferredIsMetric;
         _gender = profile['gender'] as String?;
         _rideMode = profile['ride_mode'] as String? ?? 'motorcycle';
         _mixedCommunityMatching =
@@ -307,7 +310,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         _preferredRoads = [];
         _rideTimes = {};
         _ridingSpeed = 60.0;
-        _isMetric = false;
+        _isMetric = preferredIsMetric;
         _gender = null;
         _rideMode = 'motorcycle';
         _mixedCommunityMatching = false;
@@ -331,7 +334,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       _bikePhotoPaths = List<String>.from(data['bikePhotoPaths'] as List);
       _riderName = data['riderName'] as String;
       _riderBio = data['riderBio'] as String;
-      _isMetric = data['isMetric'] as bool? ?? false;
+      _isMetric = data['isMetric'] as bool? ?? true;
       _gender = data['gender'] as String?;
       _rideMode = data['rideMode'] as String? ?? 'motorcycle';
       _mixedCommunityMatching =

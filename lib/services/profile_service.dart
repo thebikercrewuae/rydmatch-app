@@ -109,7 +109,7 @@ class ProfileService {
     List<String> bikePhotoPaths = const [],
     String riderName = '',
     String riderBio = '',
-    bool isMetric = false,
+    bool isMetric = true,
     DateTime? dateOfBirth,
     int? minimumAgeConfirmed,
     String? gender,
@@ -178,6 +178,8 @@ class ProfileService {
     await prefs.setString(_keyRiderName, riderName);
     await prefs.setString(_keyRiderBio, riderBio);
     await prefs.setString(_keySpeedUnit, isMetric ? 'metric' : 'imperial');
+    await prefs.setBool('unit_system_metric', isMetric);
+    await prefs.setBool('isMetric', isMetric);
     if (dateOfBirth != null) {
       await prefs.setString(
         _keyDateOfBirth,
@@ -285,6 +287,11 @@ class ProfileService {
         (k, v) => MapEntry(k, List<String>.from(v as List)),
       );
     }
+    final settingsMetric = prefs.getBool('unit_system_metric');
+    final legacyMetric = prefs.getBool('isMetric');
+    final speedUnit = prefs.getString(_keySpeedUnit);
+    final isMetric = settingsMetric ?? legacyMetric ?? (speedUnit != 'imperial');
+
     return {
       'ridingSpeed': prefs.getDouble(_keyRidingSpeed) ?? 60.0,
       'skillLevels': prefs.getStringList(_keySkillLevels) ?? [],
@@ -295,7 +302,7 @@ class ProfileService {
       'bikePhotoPaths': prefs.getStringList(_keyBikePhotoPaths) ?? [],
       'riderName': prefs.getString(_keyRiderName) ?? '',
       'riderBio': prefs.getString(_keyRiderBio) ?? '',
-      'isMetric': (prefs.getString(_keySpeedUnit) ?? 'imperial') == 'metric',
+      'isMetric': isMetric,
       'dateOfBirth': prefs.getString(_keyDateOfBirth),
       'minimumAgeConfirmed': prefs.getInt(_keyMinimumAgeConfirmed),
       'gender': prefs.getString(_keyGender),
