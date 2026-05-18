@@ -682,17 +682,26 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             ),
           ),
         ),
+        titleSpacing: 0,
         title: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            AppLogoMark(size: 7.w),
-            SizedBox(width: 2.w),
-            Text(
-              isOtherUser ? (otherUserName ?? 'Profile') : 'My Profile',
-              style: GoogleFonts.dmSans(
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
+            AppLogoMark(size: 28),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                isOtherUser
+                    ? (_riderName.isNotEmpty
+                          ? _riderName
+                          : otherUserName ?? 'Profile')
+                    : 'My Profile',
+                style: GoogleFonts.dmSans(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                softWrap: false,
               ),
             ),
           ],
