@@ -43,7 +43,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   int _currentCardIndex = 0;
   bool _isEmpty = true;
   bool _isLoading = true;
-  bool _isMetric = false;
+  bool _isMetric = true;
 
   double? _myLat;
   double? _myLng;
@@ -123,13 +123,19 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     });
   }
 
-  Future<void> _loadUnitPreference() async {
+  Future<bool> _loadUnitPreference() async {
     final prefs = await SharedPreferences.getInstance();
 
     final settingsMetric = prefs.getBool('unit_system_metric');
     final profileUnit = prefs.getString('profile_speed_unit');
+    final legacyMetric = prefs.getBool('isMetric');
 
-    _isMetric = settingsMetric ?? (profileUnit == 'metric');
+    final nextIsMetric =
+        settingsMetric ?? legacyMetric ?? (profileUnit != 'imperial');
+    final changed = _isMetric != nextIsMetric;
+    _isMetric = nextIsMetric;
+
+    return changed;
   }
 
   String _formatDistance(double miles) {
@@ -239,6 +245,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   }
 
   Future<void> _loadRiders() async {
+    await _loadUnitPreference();
+
     final supabase = Supabase.instance.client;
     final currentUser = supabase.auth.currentUser;
 
@@ -442,11 +450,15 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     return riders.where((rider) {
       final distanceMiles = rider['distanceMiles'] as double?;
 
+      final distanceLimitMiles = _isMetric
+          ? filters.distance / 1.609344
+          : filters.distance;
+
       if (filters.distance < 500 &&
           _myLat != null &&
           _myLng != null &&
           distanceMiles != null) {
-        if (distanceMiles > filters.distance) return false;
+        if (distanceMiles > distanceLimitMiles) return false;
       }
 
       if (filters.skillLevel != 'All') {

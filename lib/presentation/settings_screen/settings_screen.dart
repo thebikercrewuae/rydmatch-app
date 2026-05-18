@@ -96,6 +96,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _setUnitSystem(bool isMetric) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_unitPrefKey, isMetric);
+    await prefs.setBool('isMetric', isMetric);
+    await prefs.setString(
+      'profile_speed_unit',
+      isMetric ? 'metric' : 'imperial',
+    );
     if (mounted) {
       setState(() => _isMetric = isMetric);
       ScaffoldMessenger.of(context).showSnackBar(

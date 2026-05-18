@@ -145,9 +145,14 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
 
   Future<void> _loadUnitPreference() async {
     final prefs = await SharedPreferences.getInstance();
+    final settingsMetric = prefs.getBool('unit_system_metric');
+    final legacyMetric = prefs.getBool('isMetric');
+    final profileUnit = prefs.getString('profile_speed_unit');
+
     if (mounted) {
       setState(() {
-        _isMetric = prefs.getBool('unit_system_metric') ?? true;
+        _isMetric =
+            settingsMetric ?? legacyMetric ?? (profileUnit != 'imperial');
       });
     }
   }
