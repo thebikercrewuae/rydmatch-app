@@ -7,6 +7,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../services/live_ride_service.dart';
+import '../../services/live_ride_voice_service.dart';
 import '../../services/premium_service.dart';
 import '../../utils/marker_utils.dart';
 import './ride_chat_widget.dart';
@@ -42,6 +43,7 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
   bool _isSharingLocation = true;
   bool _isChatOpen = false;
   bool _isPremium = false;
+  final LiveRideVoiceService _voiceService = LiveRideVoiceService.instance;
   RealtimeChannel? _chatNotificationChannel;
   int _unreadChatCount = 0;
   final Set<String> _seenChatMessageIds = {};
@@ -192,6 +194,7 @@ void initState() {
   _initMyPosition();
   _startPositionUpdates();
   _subscribeToChatNotifications();
+  _voiceService.addListener(_onVoiceStateChanged);
   LiveRideService.riderLocations.addListener(_onRiderLocationsChanged);
   LiveRideService.participants.addListener(_onParticipantsChanged);
 }
@@ -200,10 +203,16 @@ void initState() {
 void dispose() {
   _positionTimer?.cancel();
   _chatNotificationChannel?.unsubscribe();
+  _voiceService.removeListener(_onVoiceStateChanged);
+  _voiceService.disconnect();
   LiveRideService.riderLocations.removeListener(_onRiderLocationsChanged);
   LiveRideService.participants.removeListener(_onParticipantsChanged);
   _mapController?.dispose();
   super.dispose();
+}
+
+void _onVoiceStateChanged() {
+  if (mounted) setState(() {});
 }
 
 Future<void> _loadPremiumAccess() async {
@@ -541,13 +550,55 @@ Future<void> _loadPremiumAccess() async {
     }
   }
 
-  void _openVoiceRoom() {
-    debugPrint('LiveRideMapScreen: voice room requested for ${widget.sessionId}');
+  Future<void> _handleVoiceButtonPressed() async {
+    if (_voiceService.isConnecting) return;
+
+    if (_voiceService.isConnected) {
+      await _voiceService.toggleMute();
+      if (!mounted) return;
+      AppToast.show(
+        context,
+        message: _voiceService.isMuted ? 'Voice muted' : 'Voice unmuted',
+        type: ToastType.info,
+      );
+      return;
+    }
+
+    final connected = await _voiceService.connect(widget.sessionId);
+    if (!mounted) return;
+
     AppToast.show(
       context,
-      message: 'Voice room setup is ready for LiveKit integration.',
-      type: ToastType.info,
+      message: connected
+          ? 'Voice connected'
+          : _voiceService.lastError ?? 'Could not connect voice',
+      type: connected ? ToastType.success : ToastType.error,
     );
+  }
+
+  Color get _voiceButtonColor {
+    if (_voiceService.isConnecting) return const Color(0xFF6A1B9A);
+    if (_voiceService.isConnected && _voiceService.isMuted) {
+      return const Color(0xFFD97706);
+    }
+    if (_voiceService.isConnected) return const Color(0xFF059669);
+    return const Color(0xFF6A1B9A);
+  }
+
+  IconData get _voiceButtonIcon {
+    if (_voiceService.isConnected && _voiceService.isMuted) {
+      return Icons.mic_off_rounded;
+    }
+    return Icons.mic_rounded;
+  }
+
+  String get _voiceButtonTooltip {
+    if (_voiceService.isConnecting) return 'Connecting voice';
+    if (_voiceService.isConnected && _voiceService.isMuted) {
+      return 'Unmute voice';
+    }
+    if (_voiceService.isConnected) return 'Mute voice';
+    return 'Join voice';
   }
 
   @override
@@ -927,14 +978,25 @@ if (!_isChatOpen)
           FloatingActionButton(
             heroTag: 'live_ride_voice',
             mini: true,
-            backgroundColor: const Color(0xFF6A1B9A),
-            tooltip: 'Join voice',
-            onPressed: _openVoiceRoom,
-            child: const Icon(
-              Icons.mic_rounded,
-              color: Colors.white,
-              size: 20,
-            ),
+            backgroundColor: _voiceButtonColor,
+            tooltip: _voiceButtonTooltip,
+            onPressed: _voiceService.isConnecting
+                ? null
+                : _handleVoiceButtonPressed,
+            child: _voiceService.isConnecting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Icon(
+                    _voiceButtonIcon,
+                    color: Colors.white,
+                    size: 20,
+                  ),
           ),
           const SizedBox(height: 12),
         ],

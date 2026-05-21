@@ -51,5 +51,7 @@
 	<string>RydMatch needs your location to show it on the map and help plan your rides.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>RydMatch needs your location to track your ride route in the background.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>RydMatch uses your microphone for live ride voice chat.</string>
 </dict>
 </plist>
