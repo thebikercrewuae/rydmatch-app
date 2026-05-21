@@ -7,6 +7,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../services/live_ride_service.dart';
+import '../../services/premium_service.dart';
 import '../../utils/marker_utils.dart';
 import './ride_chat_widget.dart';
 import './ride_summary_screen.dart';
@@ -40,6 +41,7 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
   Timer? _positionTimer;
   bool _isSharingLocation = true;
   bool _isChatOpen = false;
+  bool _isPremium = false;
   RealtimeChannel? _chatNotificationChannel;
   int _unreadChatCount = 0;
   final Set<String> _seenChatMessageIds = {};
@@ -185,6 +187,7 @@ List<LatLng> _parseRoutePolyline(dynamic value) {
   @override
 void initState() {
   super.initState();
+  _loadPremiumAccess();
   _loadPlannedRoute();
   _initMyPosition();
   _startPositionUpdates();
@@ -201,6 +204,12 @@ void dispose() {
   LiveRideService.participants.removeListener(_onParticipantsChanged);
   _mapController?.dispose();
   super.dispose();
+}
+
+Future<void> _loadPremiumAccess() async {
+  await PremiumService().refresh();
+  if (!mounted) return;
+  setState(() => _isPremium = PremiumService().isPremium);
 }
 
   Future<void> _initMyPosition() async {
@@ -530,6 +539,15 @@ void dispose() {
         );
       }
     }
+  }
+
+  void _openVoiceRoom() {
+    debugPrint('LiveRideMapScreen: voice room requested for ${widget.sessionId}');
+    AppToast.show(
+      context,
+      message: 'Voice room setup is ready for LiveKit integration.',
+      type: ToastType.info,
+    );
   }
 
   @override
@@ -902,50 +920,72 @@ if (!_isChatOpen)
   Positioned(
     right: 16,
     bottom: MediaQuery.of(context).padding.bottom + 200,
-    child: FloatingActionButton(
-      mini: true,
-      backgroundColor: const Color(0xFF2563EB),
-      onPressed: () {
-        setState(() {
-          _isChatOpen = true;
-          _unreadChatCount = 0;
-        });
-      },
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          const Icon(
-            Icons.chat_bubble_rounded,
-            color: Colors.white,
-            size: 20,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_isPremium) ...[
+          FloatingActionButton(
+            heroTag: 'live_ride_voice',
+            mini: true,
+            backgroundColor: const Color(0xFF6A1B9A),
+            tooltip: 'Join voice',
+            onPressed: _openVoiceRoom,
+            child: const Icon(
+              Icons.mic_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
-          if (_unreadChatCount > 0)
-            Positioned(
-              top: -12,
-              right: -12,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                ),
-                constraints: const BoxConstraints(
-                  minWidth: 18,
-                  minHeight: 18,
-                ),
-                child: Text(
-                  _unreadChatCount > 9 ? '9+' : '$_unreadChatCount',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
+          const SizedBox(height: 12),
+        ],
+        FloatingActionButton(
+          heroTag: 'live_ride_chat',
+          mini: true,
+          backgroundColor: const Color(0xFF2563EB),
+          tooltip: 'Open chat',
+          onPressed: () {
+            setState(() {
+              _isChatOpen = true;
+              _unreadChatCount = 0;
+            });
+          },
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Icon(
+                Icons.chat_bubble_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+              if (_unreadChatCount > 0)
+                Positioned(
+                  top: -12,
+                  right: -12,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    child: Text(
+                      _unreadChatCount > 9 ? '9+' : '$_unreadChatCount',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-        ],
-      ),
+            ],
+          ),
+        ),
+      ],
     ),
   ),
 
