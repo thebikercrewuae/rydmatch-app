@@ -1,4 +1,5 @@
 import 'package:intl/intl.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class RideGroup {
   final String id;
@@ -13,6 +14,8 @@ class RideGroup {
   final String difficulty;
   final String duration;
   final String routeImageUrl;
+  final List<LatLng> routePolyline;
+  final List<String> routeWaypoints;
 
   RideGroup({
     required this.id,
@@ -27,6 +30,8 @@ class RideGroup {
     required this.difficulty,
     required this.duration,
     required this.routeImageUrl,
+    this.routePolyline = const [],
+    this.routeWaypoints = const [],
   });
 
   String get formattedDate => DateFormat('EEE, MMM d - h:mm a').format(date);

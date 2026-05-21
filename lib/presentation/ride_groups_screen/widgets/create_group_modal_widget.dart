@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../../models/ride_group_model.dart';
@@ -14,6 +15,7 @@ class CreateGroupModalWidget extends StatefulWidget {
   final double? prefillDistanceKm;
   final String? prefillRouteType;
   final List<String>? prefillWaypoints;
+  final List<LatLng>? prefillRoutePolylinePoints;
 
   const CreateGroupModalWidget({
     super.key,
@@ -23,6 +25,7 @@ class CreateGroupModalWidget extends StatefulWidget {
     this.prefillDistanceKm,
     this.prefillRouteType,
     this.prefillWaypoints,
+    this.prefillRoutePolylinePoints,
   });
 
   @override
@@ -239,6 +242,8 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
           _rideCommunity == 'bicycle'
               ? 'https://images.pexels.com/photos/163491/bike-mountain-mountain-biking-trail-163491.jpeg'
               : 'https://images.pexels.com/photos/1119796/pexels-photo-1119796.jpeg',
+      routePolyline: widget.prefillRoutePolylinePoints ?? const [],
+      routeWaypoints: widget.prefillWaypoints ?? const [],
     );
 
     widget.onCreate(group, Set<String>.from(_selectedInvitees));

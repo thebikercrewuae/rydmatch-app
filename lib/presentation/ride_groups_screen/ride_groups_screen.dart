@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -262,7 +263,40 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       routeImageUrl:
           row['route_image_url'] as String? ??
           'https://images.pexels.com/photos/1119796/pexels-photo-1119796.jpeg',
+      routePolyline: _parseRoutePolyline(row['route_polyline']),
+      routeWaypoints: _parseRouteWaypoints(row['route_waypoints']),
     );
+  }
+
+  List<LatLng> _parseRoutePolyline(dynamic value) {
+    if (value is! List) return const [];
+
+    return value
+        .whereType<Map>()
+        .map((point) {
+          final lat = point['lat'];
+          final lng = point['lng'];
+          if (lat is! num || lng is! num) return null;
+          return LatLng(lat.toDouble(), lng.toDouble());
+        })
+        .whereType<LatLng>()
+        .toList();
+  }
+
+  List<String> _parseRouteWaypoints(dynamic value) {
+    if (value is! List) return const [];
+    return value.map((item) => item.toString()).toList();
+  }
+
+  List<Map<String, double>> _routePolylineToJson(List<LatLng> points) {
+    return points
+        .map(
+          (point) => {
+            'lat': point.latitude,
+            'lng': point.longitude,
+          },
+        )
+        .toList();
   }
 
   Future<void> _deleteSelectedRides() async {
@@ -379,6 +413,8 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
                   'difficulty': group.difficulty,
                   'duration': group.duration,
                   'route_image_url': group.routeImageUrl,
+                  'route_polyline': _routePolylineToJson(group.routePolyline),
+                  'route_waypoints': group.routeWaypoints,
                 })
                 .select()
                 .single();

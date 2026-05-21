@@ -1492,6 +1492,9 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       prefillWaypoints: _waypoints.isNotEmpty
           ? List<String>.from(_waypoints)
           : null,
+      prefillRoutePolylinePoints: _routePolylinePoints.isNotEmpty
+          ? List<LatLng>.from(_routePolylinePoints)
+          : null,
       onCreate: (group, invitees) async {
         try {
           final supabase = Supabase.instance.client;
@@ -1523,6 +1526,8 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                 'difficulty': group.difficulty,
                 'duration': group.duration,
                 'route_image_url': group.routeImageUrl,
+                'route_polyline': _routePolylineToJson(group.routePolyline),
+                'route_waypoints': group.routeWaypoints,
               })
               .select()
               .single();
@@ -1577,6 +1582,17 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     ),
   );
 }
+
+  List<Map<String, double>> _routePolylineToJson(List<LatLng> points) {
+    return points
+        .map(
+          (point) => {
+            'lat': point.latitude,
+            'lng': point.longitude,
+          },
+        )
+        .toList();
+  }
 
   Future<void> _showRiderPickerSheet(String routeMessage) async {
     List<Map<String, dynamic>> matches = [];

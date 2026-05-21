@@ -33,6 +33,9 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
   final Map<String, List<LatLng>> _riderTrails = {};
+  List<LatLng> _plannedRoutePoints = [];
+  String _plannedRouteName = '';
+  bool _hasFittedInitialView = false;
   LatLng? _myPosition;
   Timer? _positionTimer;
   bool _isSharingLocation = true;
@@ -130,9 +133,59 @@ String _participantName(Map<String, dynamic> participant) {
   return 'Rider';
 }
 
+Future<void> _loadPlannedRoute() async {
+  try {
+    final session = await Supabase.instance.client
+        .from('live_ride_sessions')
+        .select('ride_group_id')
+        .eq('id', widget.sessionId)
+        .maybeSingle();
+
+    final rideGroupId = session?['ride_group_id'] as String?;
+    if (rideGroupId == null || rideGroupId.isEmpty) return;
+
+    final group = await Supabase.instance.client
+        .from('ride_groups')
+        .select('route, route_polyline')
+        .eq('id', rideGroupId)
+        .maybeSingle();
+
+    if (group == null) return;
+
+    final routePoints = _parseRoutePolyline(group['route_polyline']);
+    if (routePoints.length < 2) return;
+
+    if (!mounted) return;
+    setState(() {
+      _plannedRouteName = group['route'] as String? ?? '';
+      _plannedRoutePoints = routePoints;
+    });
+    _rebuildMarkers();
+    _fitInitialView();
+  } catch (e) {
+    debugPrint('LiveRideMapScreen._loadPlannedRoute error: $e');
+  }
+}
+
+List<LatLng> _parseRoutePolyline(dynamic value) {
+  if (value is! List) return const [];
+
+  return value
+      .whereType<Map>()
+      .map((point) {
+        final lat = point['lat'];
+        final lng = point['lng'];
+        if (lat is! num || lng is! num) return null;
+        return LatLng(lat.toDouble(), lng.toDouble());
+      })
+      .whereType<LatLng>()
+      .toList();
+}
+
   @override
 void initState() {
   super.initState();
+  _loadPlannedRoute();
   _initMyPosition();
   _startPositionUpdates();
   _subscribeToChatNotifications();
@@ -174,6 +227,7 @@ void dispose() {
         setState(() {
           _myPosition = LatLng(position.latitude, position.longitude);
         });
+        _fitInitialView();
       }
     } catch (e) {
       debugPrint('LiveRideMapScreen._initMyPosition error: $e');
@@ -205,8 +259,20 @@ void dispose() {
 
   Future<void> _rebuildMarkers() async {
     final locations = LiveRideService.riderLocations.value;
-    final newMarkers = <Marker>{};
+    final newMarkers = <Marker>{..._plannedRouteMarkers()};
     final newPolylines = <Polyline>{};
+
+    if (_plannedRoutePoints.length >= 2) {
+      newPolylines.add(
+        Polyline(
+          polylineId: const PolylineId('planned_route'),
+          points: _plannedRoutePoints,
+          color: const Color(0xFF1D4ED8),
+          width: 6,
+          zIndex: 1,
+        ),
+      );
+    }
 
     final trailColors = [
       const Color(0xFF2563EB),
@@ -243,6 +309,7 @@ void dispose() {
             points: List.from(_riderTrails[trailKey]!),
             color: color,
             width: 4,
+            zIndex: 2,
             patterns: [],
           ),
         );
@@ -299,14 +366,60 @@ void dispose() {
     if (mounted) setState(() {});
   }
 
+  Set<Marker> _plannedRouteMarkers() {
+    if (_plannedRoutePoints.length < 2) return const {};
+
+    return {
+      Marker(
+        markerId: const MarkerId('planned_route_start'),
+        position: _plannedRoutePoints.first,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        infoWindow: const InfoWindow(title: 'Route start'),
+      ),
+      Marker(
+        markerId: const MarkerId('planned_route_end'),
+        position: _plannedRoutePoints.last,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        infoWindow: const InfoWindow(title: 'Route finish'),
+      ),
+    };
+  }
+
+  Future<void> _fitInitialView() async {
+    if (_hasFittedInitialView || _mapController == null) return;
+
+    final positions = <LatLng>[
+      ..._plannedRoutePoints,
+      if (_myPosition != null) _myPosition!,
+    ];
+
+    if (positions.isEmpty) return;
+    _hasFittedInitialView = true;
+    await _fitPositions(positions, padding: 90);
+  }
+
   Future<void> _fitAllMarkers() async {
     final locations = LiveRideService.riderLocations.value;
-    if (locations.isEmpty && _myPosition == null) return;
+    if (locations.isEmpty &&
+        _myPosition == null &&
+        _plannedRoutePoints.isEmpty) {
+      return;
+    }
 
     final allPositions = <LatLng>[
+      ..._plannedRoutePoints,
       if (_myPosition != null) _myPosition!,
       ...locations.values.map((r) => LatLng(r.latitude, r.longitude)),
     ];
+
+    await _fitPositions(allPositions, padding: 80);
+  }
+
+  Future<void> _fitPositions(
+    List<LatLng> allPositions, {
+    double padding = 80,
+  }) async {
+    if (allPositions.isEmpty) return;
 
     if (allPositions.length == 1) {
       _mapController?.animateCamera(
@@ -332,7 +445,7 @@ void dispose() {
       northeast: LatLng(maxLat, maxLng),
     );
 
-    _mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80.0));
+    _mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, padding));
   }
 
   Future<void> _handleEndOrLeave() async {
@@ -440,7 +553,9 @@ void dispose() {
             mapType: MapType.normal,
             onMapCreated: (controller) {
               _mapController = controller;
-              if (_myPosition != null) {
+              if (_plannedRoutePoints.isNotEmpty) {
+                _fitInitialView();
+              } else if (_myPosition != null) {
                 controller.animateCamera(
                   CameraUpdate.newLatLngZoom(_myPosition!, 15),
                 );
@@ -488,12 +603,16 @@ void dispose() {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Live Ride',
+                      _plannedRouteName.isNotEmpty
+                          ? _plannedRouteName
+                          : 'Live Ride',
                       style: GoogleFonts.inter(
                         color: Colors.white,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   Container(
