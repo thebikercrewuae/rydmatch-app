@@ -114,11 +114,9 @@ void main() async {
     launchApp();
   } else {
     try {
-      await SystemChrome.setPreferredOrientations([
-        DeviceOrientation.portraitUp,
-      ]);
+      await SystemChrome.setPreferredOrientations([]);
     } catch (e) {
-      debugPrint('Orientation lock failed: $e');
+      debugPrint('Orientation preference failed: $e');
     }
 
     launchApp();
