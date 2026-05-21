@@ -43,6 +43,38 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
 
   DateTime? _sentAt;
 
+  String _normalizePhoneNumber(String value) {
+    final trimmed = value.trim();
+    if (trimmed.startsWith('+')) {
+      return '+${trimmed.substring(1).replaceAll(RegExp(r'[^0-9]'), '')}';
+    }
+
+    final digits = trimmed.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.startsWith('00') && digits.length > 2) {
+      return '+${digits.substring(2)}';
+    }
+
+    return digits;
+  }
+
+  bool _looksLikeInternationalPhone(String value) {
+    return RegExp(r'^\+[1-9]\d{7,14}$').hasMatch(value);
+  }
+
+  String _functionErrorMessage(FunctionException error) {
+    final details = error.details;
+    if (details is Map) {
+      final twilioError = details['twilioError'] ?? details['error'];
+      final twilioCode = details['twilioCode'];
+      if (twilioError != null) {
+        return twilioCode != null
+            ? '$twilioError (Twilio code: $twilioCode)'
+            : twilioError.toString();
+      }
+    }
+    return 'HTTP ${error.status}';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -181,6 +213,11 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
       _showNoLocationDialog();
       return;
     }
+    final contactPhone = _normalizePhoneNumber(_contactPhone);
+    if (!_looksLikeInternationalPhone(contactPhone)) {
+      _showInvalidPhoneDialog();
+      return;
+    }
     setState(() {
       _isCountingDown = false;
       _isSending = true;
@@ -191,9 +228,10 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
         'emergency-sos',
         body: {
           'riderName': _riderName.isNotEmpty ? _riderName : 'RydMatch Rider',
-          'contactPhone': _contactPhone,
+          'contactPhone': contactPhone,
           'latitude': _latitude,
           'longitude': _longitude,
+          'isTest': false,
         },
       );
 
@@ -224,7 +262,7 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Failed to send SOS (${e.status}). Please call emergency services directly.',
+              'Failed to send SOS: ${_functionErrorMessage(e)}. Please call emergency services directly.',
               style: GoogleFonts.dmSans(fontSize: 12.sp),
             ),
             backgroundColor: const Color(0xFFE53935),
@@ -255,6 +293,11 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
       _showNoContactDialog();
       return;
     }
+    final contactPhone = _normalizePhoneNumber(_contactPhone);
+    if (!_looksLikeInternationalPhone(contactPhone)) {
+      _showInvalidPhoneDialog();
+      return;
+    }
     setState(() => _isSendingTest = true);
     HapticService.instance.medium();
 
@@ -269,9 +312,10 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
         body: {
           'riderName':
               '${_riderName.isNotEmpty ? _riderName : 'RydMatch Rider'} [TEST]',
-          'contactPhone': _contactPhone,
+          'contactPhone': contactPhone,
           'latitude': lat,
           'longitude': lng,
+          'isTest': true,
         },
       );
 
@@ -301,8 +345,7 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
         setState(() => _isSendingTest = false);
         _showTestResultDialog(
           success: false,
-          message:
-              'Failed to send test SMS (HTTP ${e.status}).\n\nCheck that your Twilio credentials are correctly set in Supabase secrets.',
+          message: 'Failed to send test SMS.\n\n${_functionErrorMessage(e)}',
         );
       }
     } catch (e) {
@@ -494,6 +537,40 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
     );
   }
 
+  void _showInvalidPhoneDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.0),
+        ),
+        title: Text(
+          'Invalid Phone Number',
+          style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'Please enter the emergency contact number in international format, for example +971501234567.',
+          style: GoogleFonts.dmSans(),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _showEditContactSheet();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE85A4F),
+            ),
+            child: Text(
+              'Edit Contact',
+              style: GoogleFonts.dmSans(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showEditContactSheet() {
     final nameController = TextEditingController(text: _contactName);
     final phoneController = TextEditingController(text: _contactPhone);
@@ -557,14 +634,13 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
                     _contactNameKey,
                     nameController.text.trim(),
                   );
-                  await prefs.setString(
-                    _contactPhoneKey,
-                    phoneController.text.trim(),
-                  );
+                  final normalizedPhone =
+                      _normalizePhoneNumber(phoneController.text);
+                  await prefs.setString(_contactPhoneKey, normalizedPhone);
                   if (mounted) {
                     setState(() {
                       _contactName = nameController.text.trim();
-                      _contactPhone = phoneController.text.trim();
+                      _contactPhone = normalizedPhone;
                     });
                     Navigator.of(ctx).pop();
                   }
