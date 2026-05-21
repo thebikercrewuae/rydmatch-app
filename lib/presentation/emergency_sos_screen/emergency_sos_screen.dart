@@ -64,12 +64,13 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
   String _functionErrorMessage(FunctionException error) {
     final details = error.details;
     if (details is Map) {
-      final twilioError = details['twilioError'] ?? details['error'];
-      final twilioCode = details['twilioCode'];
-      if (twilioError != null) {
-        return twilioCode != null
-            ? '$twilioError (Twilio code: $twilioCode)'
-            : twilioError.toString();
+      final providerError =
+          details['infobipError'] ?? details['twilioError'] ?? details['error'];
+      final providerCode = details['twilioCode'];
+      if (providerError != null) {
+        return providerCode != null
+            ? '$providerError (code: $providerCode)'
+            : providerError.toString();
       }
     }
     return 'HTTP ${error.status}';

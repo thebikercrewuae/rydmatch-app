@@ -1,6 +1,6 @@
-const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
-const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
-const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER');
+const INFOBIP_BASE_URL = Deno.env.get('INFOBIP_BASE_URL');
+const INFOBIP_API_KEY = Deno.env.get('INFOBIP_API_KEY');
+const INFOBIP_SENDER = Deno.env.get('INFOBIP_SENDER') ?? 'RydMatch';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,18 +32,22 @@ function isE164(value: string): boolean {
   return /^\+[1-9]\d{7,14}$/.test(value);
 }
 
+function normalizedBaseUrl(value: string): string {
+  const trimmed = value.trim().replace(/\/+$/, '');
+  return trimmed.startsWith('http') ? trimmed : `https://${trimmed}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
-      console.error('Missing Twilio environment variables');
+    if (!INFOBIP_BASE_URL || !INFOBIP_API_KEY) {
       return jsonResponse(
         {
           error:
-            'Twilio credentials not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in Supabase secrets.',
+            'Infobip credentials not configured. Set INFOBIP_BASE_URL and INFOBIP_API_KEY in Supabase secrets.',
         },
         500,
       );
@@ -60,8 +64,6 @@ Deno.serve(async (req) => {
     }
 
     const normalizedContactPhone = normalizePhoneNumber(contactPhone);
-    const normalizedFromPhone = normalizePhoneNumber(TWILIO_PHONE_NUMBER);
-
     if (!isE164(normalizedContactPhone)) {
       return jsonResponse(
         {
@@ -69,16 +71,6 @@ Deno.serve(async (req) => {
             'Emergency contact phone number must be in international E.164 format, for example +971501234567.',
         },
         400,
-      );
-    }
-
-    if (!isE164(normalizedFromPhone)) {
-      return jsonResponse(
-        {
-          error:
-            'TWILIO_PHONE_NUMBER must be in international E.164 format, for example +15551234567.',
-        },
-        500,
       );
     }
 
@@ -111,61 +103,66 @@ Deno.serve(async (req) => {
       `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}\n\n` +
       'Sent via RydMatch Emergency SOS';
 
-    const twilioUrl =
-      `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
-    const credentials = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
+    const endpoint = `${normalizedBaseUrl(INFOBIP_BASE_URL)}/sms/2/text/advanced`;
 
-    const formData = new URLSearchParams({
-      To: normalizedContactPhone,
-      From: normalizedFromPhone,
-      Body: message,
-    });
-
-    console.log(
-      `Sending SOS SMS to ${normalizedContactPhone} from ${normalizedFromPhone}`,
-    );
-
-    const response = await fetch(twilioUrl, {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        Authorization: `Basic ${credentials}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `App ${INFOBIP_API_KEY}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
       },
-      body: formData,
+      body: JSON.stringify({
+        messages: [
+          {
+            from: INFOBIP_SENDER,
+            destinations: [{ to: normalizedContactPhone }],
+            text: message,
+          },
+        ],
+      }),
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Twilio API error:', JSON.stringify(data));
-      const twilioMessage =
-        data?.message || data?.error_message || 'Unknown Twilio error';
-      const twilioCode = data?.code || data?.error_code || response.status;
+      const requestError =
+        data?.requestError?.serviceException?.text ||
+        data?.requestError?.serviceException?.messageId ||
+        data?.message ||
+        'Unknown Infobip error';
 
       return jsonResponse(
         {
           error: 'Failed to send SOS SMS',
-          twilioError: twilioMessage,
-          twilioCode,
+          infobipError: requestError,
           details: data,
         },
         response.status,
       );
     }
 
-    console.log(
-      'Emergency SOS SMS sent successfully:',
-      data.sid,
-      'Status:',
-      data.status,
-    );
+    const firstMessage = data?.messages?.[0];
+    const status = firstMessage?.status;
+
+    if (status?.groupName === 'REJECTED') {
+      return jsonResponse(
+        {
+          error: 'Failed to send SOS SMS',
+          infobipError: status?.description ?? 'Infobip rejected the message',
+          details: data,
+        },
+        400,
+      );
+    }
+
     return jsonResponse({
       success: true,
-      messageSid: data.sid,
-      status: data.status,
+      messageSid: firstMessage?.messageId,
+      status: status?.description ?? status?.name ?? 'Accepted by Infobip',
+      provider: 'infobip',
     });
   } catch (error) {
-    console.error('Error sending SOS SMS:', error);
     return jsonResponse(
       { error: 'Internal server error', details: String(error) },
       500,
