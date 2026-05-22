@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../models/badge_model.dart';
 import './premium_service.dart';
 import './profile_service.dart';
+import './verification_service.dart';
 
 class BadgeService {
   static final _client = Supabase.instance.client;
@@ -251,21 +252,16 @@ class BadgeService {
       } catch (_) {}
 
       // Verification
-      try {
-        final verificationResponse = await _client
-            .from('rider_verifications')
-            .select('status')
-            .eq('user_id', userId)
-            .eq('status', 'approved')
-            .maybeSingle();
-        activity['isVerified'] = verificationResponse != null;
-      } catch (_) {}
+      activity['isVerified'] = await VerificationService.instance
+          .isUserVerified(userId);
 
       // Profile and premium
       try {
         final profileResponse = await _client
             .from('user_profiles')
-            .select('is_profile_complete, is_premium, ride_mode')
+            .select(
+              'is_profile_complete, is_premium, ride_mode, is_verified, verification_status',
+            )
             .eq('id', userId)
             .maybeSingle();
         activity['profileComplete'] =
@@ -274,6 +270,10 @@ class BadgeService {
             profileResponse?['is_premium'] as bool? ?? false;
         activity['rideMode'] =
             profileResponse?['ride_mode'] as String? ?? 'motorcycle';
+        activity['isVerified'] =
+            activity['isVerified'] == true ||
+            profileResponse?['is_verified'] == true ||
+            profileResponse?['verification_status'] == 'approved';
       } catch (e) {
         try {
           activity['profileComplete'] =
@@ -585,6 +585,12 @@ class BadgeService {
       'fiveStarRideCount': fiveStarRideCount,
       'liveRideCount': liveRideCount,
     };
+
+    final user = _client.auth.currentUser;
+    if (user != null && activity['isVerified'] != true) {
+      activity['isVerified'] = await VerificationService.instance
+          .isUserVerified(user.id);
+    }
 
     final criteria = _buildCriteria(activity);
 
