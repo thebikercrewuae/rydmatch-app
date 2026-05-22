@@ -28,16 +28,41 @@ class VerificationService {
   /// Check if a specific user is verified (approved)
   Future<bool> isUserVerified(String userId) async {
     try {
+      final profile = await _client
+          .from('user_profiles')
+          .select('is_verified, verification_status')
+          .eq('id', userId)
+          .maybeSingle();
+      if (profile != null &&
+          (profile['is_verified'] == true ||
+              profile['verification_status'] == 'approved')) {
+        return true;
+      }
+    } catch (_) {}
+
+    try {
       final response = await _client
           .from('rider_verifications')
           .select('id')
           .eq('user_id', userId)
           .eq('status', 'approved')
           .maybeSingle();
-      return response != null;
+      if (response != null) return true;
+    } catch (_) {}
+
+    try {
+      final response = await _client
+          .from('verification_requests')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('status', 'approved')
+          .maybeSingle();
+      if (response != null) return true;
     } catch (_) {
-      return false;
+      // Some projects may not expose verification_requests publicly.
     }
+
+    return false;
   }
 
   /// Submit a verification request with optional document upload

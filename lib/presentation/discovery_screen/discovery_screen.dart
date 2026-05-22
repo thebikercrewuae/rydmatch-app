@@ -244,6 +244,42 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     return meters / 1609.344;
   }
 
+  bool _profileIsVerified(Map<String, dynamic> profile) {
+    return profile['is_verified'] == true ||
+        profile['verification_status'] == 'approved';
+  }
+
+  Future<void> _hydrateVerificationStatus(
+    List<Map<String, dynamic>> profiles,
+  ) async {
+    final ids = profiles
+        .map((profile) => profile['id']?.toString())
+        .whereType<String>()
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+
+    if (ids.isEmpty) return;
+
+    try {
+      final rows = await Supabase.instance.client
+          .from('user_profiles')
+          .select('id, is_verified, verification_status')
+          .inFilter('id', ids);
+      final byId = {
+        for (final row in List<Map<String, dynamic>>.from(rows))
+          row['id']?.toString(): row,
+      };
+
+      for (final profile in profiles) {
+        final row = byId[profile['id']?.toString()];
+        if (row == null) continue;
+        profile['is_verified'] = row['is_verified'];
+        profile['verification_status'] = row['verification_status'];
+      }
+    } catch (_) {}
+  }
+
   Future<void> _loadRiders() async {
     await _loadUnitPreference();
 
@@ -298,6 +334,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         return;
       }
     }
+
+    await _hydrateVerificationStatus(allProfiles);
 
     final afterExcludeSelf = allProfiles
         .where((p) => p['id'] != currentUser.id)
@@ -382,7 +420,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         'rideMode': rideMode,
         'rideModeLabel': rideModeLabel,
         'age': p['age'] as int? ?? '',
-        'isVerified': false,
+        'isVerified': _profileIsVerified(p),
         'bikeModel': bikeType,
         'bikeName': bikeType,
         'bikeType': bikeType,

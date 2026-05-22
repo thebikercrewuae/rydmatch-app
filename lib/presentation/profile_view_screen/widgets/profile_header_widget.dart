@@ -83,6 +83,10 @@ class ProfileHeaderWidget extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            if (isVerified) ...[
+              SizedBox(width: 1.5.w),
+              const VerifiedBadgeWidget(size: 24),
+            ],
           ],
         ),
         if (riderBio.isNotEmpty) ...[

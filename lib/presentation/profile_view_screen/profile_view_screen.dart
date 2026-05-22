@@ -67,6 +67,11 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   Duration _cooldownRemaining = Duration.zero;
   Timer? _boostTimer;
 
+  bool _profileIsVerified(Map<String, dynamic> profile) {
+    return profile['is_verified'] == true ||
+        profile['verification_status'] == 'approved';
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -235,7 +240,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       final profile = await Supabase.instance.client
           .from('user_profiles')
           .select(
-            'id, full_name, email, avatar_url, bio, skill_levels, bike_types, preferred_roads, riding_speed, gender, is_verified, ride_mode, mixed_community_matching',
+            'id, full_name, email, avatar_url, bio, skill_levels, bike_types, preferred_roads, riding_speed, gender, is_verified, verification_status, ride_mode, mixed_community_matching',
           )
           .eq('id', otherUserId)
           .maybeSingle();
@@ -290,10 +295,13 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         _mixedCommunityMatching =
             (profile['mixed_community_matching'] as bool?) ?? false;
         _bikePhotoPaths = [];
-        _isVerified = profile['is_verified'] == true;
+        _isVerified = _profileIsVerified(profile);
         _isLoading = false;
       });
 
+      if (!_isVerified) {
+        await _loadOtherUserVerification(otherUserId);
+      }
       await _loadRatings(otherUserId);
       return;
     } catch (e) {
