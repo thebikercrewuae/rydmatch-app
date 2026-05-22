@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import '../../../models/ride_feed_post_model.dart';
+import '../../../services/haptic_service.dart';
 import '../../../services/ride_feed_service.dart';
 
 class PostCardWidget extends StatefulWidget {
@@ -49,7 +49,7 @@ class _PostCardWidgetState extends State<PostCardWidget>
   Future<void> _handleLike() async {
     if (_isLiking) return;
     setState(() => _isLiking = true);
-    HapticFeedback.lightImpact();
+    HapticService.instance.light();
     _heartController.forward(from: 0);
     final newLiked = await RideFeedService.instance.toggleLike(
       widget.post.id,

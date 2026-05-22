@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
 
+import '../../../services/haptic_service.dart';
 import '../../../widgets/app_icons.dart';
 
 class RideTimesWidget extends StatelessWidget {
@@ -57,7 +57,7 @@ class RideTimesWidget extends StatelessWidget {
                           final isSelected = dayTimes.contains(slot);
                           return GestureDetector(
                             onTap: () {
-                              HapticFeedback.selectionClick();
+                              HapticService.instance.selection();
                               final updated = Map<String, List<String>>.from(
                                 rideTimes,
                               );

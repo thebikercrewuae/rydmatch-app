@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../../services/haptic_service.dart';
@@ -105,35 +104,23 @@ class _ActionButtonsWidgetState extends State<ActionButtonsWidget>
 
   void _onLightningTap() {
     HapticService.instance.medium();
-    try {
-      HapticFeedback.mediumImpact();
-    } catch (_) {}
     _tapController.forward(from: 0.0);
     widget.onSwipeRight();
   }
 
   void _onRejectTap() {
     HapticService.instance.light();
-    try {
-      HapticFeedback.lightImpact();
-    } catch (_) {}
     widget.onSwipeLeft();
   }
 
   void _onStarTap() {
     HapticService.instance.medium();
-    try {
-      HapticFeedback.selectionClick();
-    } catch (_) {}
     widget.onSuperLike();
   }
 
   void _onRewindTap() {
     if (!widget.canUndo) return;
     HapticService.instance.light();
-    try {
-      HapticFeedback.lightImpact();
-    } catch (_) {}
     widget.onUndo?.call();
   }
 

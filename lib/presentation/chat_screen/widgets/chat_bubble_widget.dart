@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
+import '../../../services/haptic_service.dart';
 
 class ChatBubbleWidget extends StatelessWidget {
   final String message;
@@ -29,7 +29,7 @@ class ChatBubbleWidget extends StatelessWidget {
       alignment: isSender ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
         onLongPress: () {
-          HapticFeedback.mediumImpact();
+          HapticService.instance.medium();
           onLongPress?.call();
         },
         child: Container(

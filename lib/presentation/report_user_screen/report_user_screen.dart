@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/haptic_service.dart';
 import './widgets/report_reason_card_widget.dart';
 
 class ReportUserScreen extends StatefulWidget {
@@ -128,7 +128,7 @@ class _ReportUserScreenState extends State<ReportUserScreen>
 
   Future<void> _submitReport() async {
     if (_selectedReason == null) return;
-    HapticFeedback.mediumImpact();
+    HapticService.instance.medium();
     setState(() => _isSubmitting = true);
 
     try {
@@ -155,7 +155,7 @@ class _ReportUserScreenState extends State<ReportUserScreen>
         _isSuccess = true;
       });
       _successAnimController.forward();
-      HapticFeedback.heavyImpact();
+      HapticService.instance.heavy();
       await Future.delayed(const Duration(milliseconds: 2200));
       if (mounted) {
         if (widget.isModal) {

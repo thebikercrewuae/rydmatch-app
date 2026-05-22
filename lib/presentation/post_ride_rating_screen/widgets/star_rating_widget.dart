@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../../../services/haptic_service.dart';
 
 class StarRatingWidget extends StatefulWidget {
   final int rating;
@@ -55,7 +55,7 @@ class _StarRatingWidgetState extends State<StarRatingWidget>
   }
 
   void _onTap(int index) {
-    HapticFeedback.lightImpact();
+    HapticService.instance.light();
     _controllers[index].forward().then((_) => _controllers[index].reverse());
     widget.onRatingChanged(index + 1);
   }

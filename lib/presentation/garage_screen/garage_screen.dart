@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -12,6 +11,7 @@ import '../../widgets/app_icons.dart';
 import '../../widgets/app_logo_widget.dart';
 import '../../widgets/toast_widget.dart';
 import '../../widgets/skeleton_loader_widget.dart';
+import '../../services/haptic_service.dart';
 import '../../services/profile_service.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -221,7 +221,7 @@ class _GarageScreenState extends State<GarageScreen> {
   }
 
   void _openAddBike() {
-    if (!kIsWeb) HapticFeedback.lightImpact();
+    HapticService.instance.light();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,

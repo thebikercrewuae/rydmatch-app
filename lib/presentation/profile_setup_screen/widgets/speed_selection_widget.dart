@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
+import '../../../services/haptic_service.dart';
 import '../../../widgets/custom_icon_widget.dart';
 
 class SpeedSelectionWidget extends StatelessWidget {
@@ -189,7 +189,7 @@ class SpeedSelectionWidget extends StatelessWidget {
               max: _maxSpeed,
               divisions: _divisions,
               onChanged: (val) {
-                HapticFeedback.selectionClick();
+                HapticService.instance.selection();
                 onSpeedChanged(val);
               },
             ),

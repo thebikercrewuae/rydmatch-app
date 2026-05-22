@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -26,24 +27,33 @@ class HapticService {
   /// Light tap — button presses, toggles
   void light() {
     if (!_enabled) return;
-    HapticFeedback.lightImpact();
+    _run(HapticFeedback.lightImpact);
   }
 
   /// Medium impact — likes, matches
   void medium() {
     if (!_enabled) return;
-    HapticFeedback.mediumImpact();
+    _run(HapticFeedback.mediumImpact);
   }
 
   /// Heavy impact — SOS, destructive actions
   void heavy() {
     if (!_enabled) return;
-    HapticFeedback.heavyImpact();
+    _run(HapticFeedback.heavyImpact);
   }
 
   /// Selection click — swipes, navigation
   void selection() {
     if (!_enabled) return;
-    HapticFeedback.selectionClick();
+    _run(HapticFeedback.selectionClick);
+  }
+
+  void _run(Future<void> Function() feedback) {
+    if (kIsWeb) return;
+    try {
+      feedback();
+    } catch (_) {
+      // Haptics are best-effort and unsupported on some devices.
+    }
   }
 }

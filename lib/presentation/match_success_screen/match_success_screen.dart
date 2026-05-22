@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
+import '../../services/haptic_service.dart';
 
 class MatchSuccessScreen extends StatefulWidget {
   final String currentUserName;
@@ -291,7 +291,7 @@ class _MatchSuccessScreenState extends State<MatchSuccessScreen>
     // Haptic feedback
     if (!_hapticDone) {
       _hapticDone = true;
-      HapticFeedback.mediumImpact();
+      HapticService.instance.medium();
     }
 
     await Future.delayed(const Duration(milliseconds: 200));

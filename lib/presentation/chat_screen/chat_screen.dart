@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_export.dart';
 import '../../services/analytics_service.dart';
+import '../../services/haptic_service.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/app_icons.dart';
 import '../../widgets/skeleton_loader_widget.dart';
@@ -381,7 +381,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   void _sendMessage() {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
-    if (!kIsWeb) HapticFeedback.lightImpact();
+    HapticService.instance.light();
 
     final supabase = Supabase.instance.client;
     final currentUser = supabase.auth.currentUser;

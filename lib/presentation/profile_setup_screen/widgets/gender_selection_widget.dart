@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
 
+import '../../../services/haptic_service.dart';
 import '../../../widgets/custom_icon_widget.dart';
 
 class GenderSelectionWidget extends StatelessWidget {
@@ -57,7 +57,7 @@ class GenderSelectionWidget extends StatelessWidget {
             final color = gender['color'] as Color;
             return GestureDetector(
               onTap: () {
-                HapticFeedback.selectionClick();
+                HapticService.instance.selection();
                 onGenderChanged(gender['id'] as String);
               },
               child: AnimatedContainer(

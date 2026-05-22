@@ -1,9 +1,9 @@
 import 'dart:io' if (dart.library.io) 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
+import '../../../services/haptic_service.dart';
 import '../../../widgets/app_icons.dart';
 
 class BikeCardWidget extends StatelessWidget {
@@ -23,7 +23,7 @@ class BikeCardWidget extends StatelessWidget {
   });
 
   void _showQuickActions(BuildContext context) {
-    HapticFeedback.mediumImpact();
+    HapticService.instance.medium();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
+import '../../../services/haptic_service.dart';
 import '../../../widgets/custom_icon_widget.dart';
 
 class PreferredRoadsWidget extends StatelessWidget {
@@ -115,7 +115,7 @@ class PreferredRoadsWidget extends StatelessWidget {
             final isSelected = selectedRoads.contains(road['id']);
             return GestureDetector(
               onTap: () {
-                HapticFeedback.selectionClick();
+                HapticService.instance.selection();
                 final updated = List<String>.from(selectedRoads);
                 isSelected
                     ? updated.remove(road['id'])

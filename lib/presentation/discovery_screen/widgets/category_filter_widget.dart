@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
+import '../../../services/haptic_service.dart';
 
 class CategoryFilterWidget extends StatelessWidget {
   final List<String> categories;
@@ -28,7 +28,7 @@ class CategoryFilterWidget extends StatelessWidget {
           final isSelected = selectedCategory == cat;
           return GestureDetector(
             onTap: () {
-              HapticFeedback.selectionClick();
+              HapticService.instance.selection();
               onCategorySelected(cat);
             },
             child: AnimatedContainer(

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/haptic_service.dart';
 import './widgets/block_consequence_item_widget.dart';
 
 class BlockUserConfirmationScreen extends StatefulWidget {
@@ -48,7 +48,7 @@ class _BlockUserConfirmationScreenState
   static const Color _orangeColor = Color(0xFFE85A4F);
 
   Future<void> _blockUser() async {
-    HapticFeedback.mediumImpact();
+    HapticService.instance.medium();
     setState(() => _isBlocking = true);
 
     try {

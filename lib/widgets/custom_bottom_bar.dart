@@ -1,6 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+
+import '../services/haptic_service.dart';
 
 class CustomBottomBar extends StatelessWidget {
   final int currentIndex;
@@ -95,7 +95,7 @@ class CustomBottomBar extends StatelessWidget {
     return Expanded(
       child: GestureDetector(
         onTap: () {
-          if (!kIsWeb) HapticFeedback.lightImpact();
+          HapticService.instance.light();
           onTap(index);
         },
         behavior: HitTestBehavior.opaque,

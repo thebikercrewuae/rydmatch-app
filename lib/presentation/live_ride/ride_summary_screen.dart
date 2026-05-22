@@ -348,9 +348,10 @@ class _RideSummaryScreenState extends State<RideSummaryScreen>
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: () {
-                            Navigator.of(
-                              context,
-                            ).popUntil((route) => route.isFirst);
+                            Navigator.of(context).pushNamedAndRemoveUntil(
+                              '/main-screen',
+                              (route) => false,
+                            );
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF2563EB),

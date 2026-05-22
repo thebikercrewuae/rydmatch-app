@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
+import '../../../services/haptic_service.dart';
 import '../../../widgets/custom_icon_widget.dart';
 
 class SkillLevelWidget extends StatelessWidget {
@@ -107,7 +107,7 @@ class SkillLevelWidget extends StatelessWidget {
             final color = level['color'] as Color;
             return GestureDetector(
               onTap: () {
-                HapticFeedback.selectionClick();
+                HapticService.instance.selection();
                 final updated = List<String>.from(selectedLevels);
                 isSelected
                     ? updated.remove(level['id'])
