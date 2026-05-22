@@ -351,13 +351,16 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     });
   }
 
-  final v = await VerificationService.instance.getMyVerification();
+  final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+  final isVerified = currentUserId == null
+      ? false
+      : await VerificationService.instance.isUserVerified(currentUserId);
   
   await PremiumService().refresh();
   
   if (mounted) {
     setState(() {
-      _isVerified = v?['status'] == 'approved';
+      _isVerified = isVerified;
     });
   }
 }
