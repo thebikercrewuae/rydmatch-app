@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:sizer/sizer.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../services/premium_service.dart';
@@ -20,6 +23,8 @@ class PremiumSubscriptionScreen extends StatefulWidget {
 
 class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
     with SingleTickerProviderStateMixin {
+  static const String _premiumProductId = 'rydmatch_premium_monthly';
+
   bool _isProcessing = false;
   bool _showSuccess = false;
   bool _priorityListings = false;
@@ -28,6 +33,11 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
   String? _referralCode;
   bool _loadingReferral = true;
   String _userName = '';
+  final InAppPurchase _inAppPurchase = InAppPurchase.instance;
+  StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
+  ProductDetails? _premiumProduct;
+  bool _storeAvailable = false;
+  bool _loadingStoreProduct = true;
 
   static const Color _orange = Color(0xFFE85A4F);
   static const Color _gold = Color(0xFFFFB347);
@@ -44,8 +54,16 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
       parent: _successController,
       curve: Curves.elasticOut,
     );
+    _purchaseSubscription = _inAppPurchase.purchaseStream.listen(
+      _handlePurchaseUpdates,
+      onError: (_) {
+        if (mounted) setState(() => _isProcessing = false);
+        _showStoreMessage('Purchase could not be completed.');
+      },
+    );
     _priorityListings = PremiumService().priorityListingsEnabled;
     _loadReferralCode();
+    _loadStoreProduct();
   }
 
   Future<void> _loadReferralCode() async {
@@ -63,35 +81,126 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
 
   @override
   void dispose() {
+    _purchaseSubscription?.cancel();
     _successController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleSubscribe() async {
-    setState(() => _isProcessing = true);
-    await Future.delayed(const Duration(seconds: 2));
+  Future<void> _loadStoreProduct() async {
+    try {
+      final available = await _inAppPurchase.isAvailable();
+      if (!mounted) return;
+
+      if (!available) {
+        setState(() {
+          _storeAvailable = false;
+          _loadingStoreProduct = false;
+        });
+        return;
+      }
+
+      final response = await _inAppPurchase.queryProductDetails({
+        _premiumProductId,
+      });
+
+      if (!mounted) return;
+      setState(() {
+        _storeAvailable = true;
+        _premiumProduct = response.productDetails.isNotEmpty
+            ? response.productDetails.first
+            : null;
+        _loadingStoreProduct = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _storeAvailable = false;
+        _loadingStoreProduct = false;
+      });
+    }
+  }
+
+  Future<void> _handlePurchaseUpdates(
+    List<PurchaseDetails> purchaseDetailsList,
+  ) async {
+    for (final purchase in purchaseDetailsList) {
+      if (purchase.productID != _premiumProductId) continue;
+
+      if (purchase.status == PurchaseStatus.pending) {
+        if (mounted) setState(() => _isProcessing = true);
+        continue;
+      }
+
+      if (purchase.status == PurchaseStatus.error) {
+        if (mounted) setState(() => _isProcessing = false);
+        _showStoreMessage('Purchase failed. Please try again.');
+      }
+
+      if (purchase.status == PurchaseStatus.purchased ||
+          purchase.status == PurchaseStatus.restored) {
+        await _activatePremiumAfterStorePurchase();
+      }
+
+      if (purchase.pendingCompletePurchase) {
+        await _inAppPurchase.completePurchase(purchase);
+      }
+    }
+  }
+
+  Future<void> _activatePremiumAfterStorePurchase() async {
     await PremiumService().activatePremium();
     if (_priorityListings) {
       await PremiumService().setPriorityListings(true);
     }
-    // Log premium conversion analytics
     await AnalyticsService.instance.logPremiumConverted(plan: 'premium');
-    if (mounted) {
-      setState(() {
-        _isProcessing = false;
-        _showSuccess = true;
-      });
-      _successController.forward();
-      await Future.delayed(const Duration(seconds: 2));
-      if (mounted) Navigator.of(context).pop(true);
+
+    if (!mounted) return;
+    setState(() {
+      _isProcessing = false;
+      _showSuccess = true;
+    });
+    _successController.forward();
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) Navigator.of(context).pop(true);
+  }
+
+  Future<void> _handleSubscribe() async {
+    final product = _premiumProduct;
+
+    if (!_storeAvailable || product == null) {
+      _showStoreMessage(
+        'Subscription is not available yet. Please try again later.',
+      );
+      return;
+    }
+
+    setState(() => _isProcessing = true);
+    final started = await _inAppPurchase.buyNonConsumable(
+      purchaseParam: PurchaseParam(productDetails: product),
+    );
+
+    if (!started && mounted) {
+      setState(() => _isProcessing = false);
+      _showStoreMessage('Purchase could not be started.');
     }
   }
 
   Future<void> _handleRestorePurchase() async {
+    if (!_storeAvailable) {
+      _showStoreMessage('Store purchases are not available on this device.');
+      return;
+    }
+
+    setState(() => _isProcessing = true);
+    await _inAppPurchase.restorePurchases();
+  }
+
+  void _showStoreMessage(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'No previous purchases found.',
+          message,
           style: GoogleFonts.dmSans(fontSize: 13.sp),
         ),
         behavior: SnackBarBehavior.floating,
@@ -428,6 +537,14 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
   }
 
   Widget _buildPricingSection() {
+    final priceText = _premiumProduct?.price;
+    final hasStorePrice = priceText != null && priceText.isNotEmpty;
+    final displayPrice = hasStorePrice
+        ? priceText
+        : _loadingStoreProduct
+        ? 'Loading price'
+        : 'See store price';
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.symmetric(vertical: 2.5.h, horizontal: 4.w),
@@ -446,9 +563,9 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '30 AED',
+                displayPrice,
                 style: GoogleFonts.dmSans(
-                  fontSize: 28.sp,
+                  fontSize: hasStorePrice ? 28.sp : 20.sp,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
                   height: 1.0,
@@ -468,7 +585,7 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
           ),
           SizedBox(height: 0.8.h),
           Text(
-            'Billed monthly · Cancel anytime',
+            'Billed monthly via your app store · Cancel anytime',
             style: GoogleFonts.dmSans(
               fontSize: 11.sp,
               color: Colors.white.withValues(alpha: 0.75),
