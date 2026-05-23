@@ -1,6 +1,6 @@
 workflows:
-  android-release-apk:
-    name: Android Release APK
+  android-release-aab:
+    name: Android Release AAB
     max_build_duration: 60
     instance_type: mac_mini_m2
 
@@ -30,15 +30,7 @@ workflows:
             -alias "$CM_KEY_ALIAS" \
             >/dev/null
 
-          keytool -keypasswd \
-            -keystore "$CM_BUILD_DIR/rydmatch-release-key.jks" \
-            -storepass "$CM_KEYSTORE_PASSWORD" \
-            -alias "$CM_KEY_ALIAS" \
-            -keypass "$CM_KEY_PASSWORD" \
-            -new "$CM_KEY_PASSWORD" \
-            >/dev/null
-
-          echo "Keystore and key password verified."
+          echo "Keystore verified."
 
       - name: Create key.properties
         script: |
@@ -46,7 +38,6 @@ workflows:
           printf "keyPassword=%s\n" "$CM_KEYSTORE_PASSWORD" >> "$CM_BUILD_DIR/android/key.properties"
           printf "keyAlias=%s\n" "$CM_KEY_ALIAS" >> "$CM_BUILD_DIR/android/key.properties"
           printf "storeFile=%s\n" "$CM_BUILD_DIR/rydmatch-release-key.jks" >> "$CM_BUILD_DIR/android/key.properties"
-
 
       - name: Install Android SDK components
         script: |
@@ -74,7 +65,7 @@ workflows:
         script: |
           dart run flutter_launcher_icons
 
-      - name: Build Android APK
+      - name: Build Android App Bundle
         script: |
           patch_gradle_file() {
             perl -0pi -e 's/minSdkVersion\s+flutter\.minSdkVersion/minSdk = 24/g' android/app/build.gradle.kts
@@ -101,7 +92,7 @@ workflows:
           fi
 
           set +e
-          $GRADLE_CMD assembleRelease \
+          $GRADLE_CMD bundleRelease \
             -Pdart-defines="$DART_DEFINES" \
             -Ptarget-platform=android-arm,android-arm64,android-x64 \
             -Ptarget=lib/main.dart \
@@ -113,8 +104,8 @@ workflows:
 
           cd "$CM_BUILD_DIR"
 
-          echo "APK files found:"
-          find . -type f -name "*.apk" -print
+          echo "AAB files found:"
+          find . -type f -name "*.aab" -print
 
           echo "Last 200 lines of Gradle log:"
           tail -n 200 gradle-build.log
@@ -122,7 +113,7 @@ workflows:
           exit $BUILD_STATUS
 
     artifacts:
-      - build/app/outputs/flutter-apk/*.apk
-      - android/app/build/outputs/apk/release/*.apk
-      - android/app/build/outputs/apk/release/*.json
+      - build/app/outputs/bundle/release/*.aab
+      - android/app/build/outputs/bundle/release/*.aab
+      - android/app/build/outputs/bundle/release/*.json
       - gradle-build.log
