@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+import 'dart:ui' show ImageByteFormat;
 import 'dart:io' if (dart.library.io) 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sizer/sizer.dart';
@@ -170,7 +173,10 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
         source: ImageSource.camera,
         imageQuality: 85,
       );
-      if (photo != null) widget.onRiderPhotoChanged(photo);
+      if (photo != null) {
+        final adjustedPhoto = await _adjustRiderPhoto(photo);
+        if (adjustedPhoto != null) widget.onRiderPhotoChanged(adjustedPhoto);
+      }
     } catch (_) {
       // Silent fail
     }
@@ -182,10 +188,24 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
         source: ImageSource.gallery,
         imageQuality: 85,
       );
-      if (photo != null) widget.onRiderPhotoChanged(photo);
+      if (photo != null) {
+        final adjustedPhoto = await _adjustRiderPhoto(photo);
+        if (adjustedPhoto != null) widget.onRiderPhotoChanged(adjustedPhoto);
+      }
     } catch (_) {
       // Silent fail
     }
+  }
+
+  Future<XFile?> _adjustRiderPhoto(XFile photo) async {
+    if (!mounted) return null;
+
+    return Navigator.of(context).push<XFile>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _RiderPhotoAdjustScreen(photo: photo),
+      ),
+    );
   }
 
   Future<void> _captureBikeFromCamera(ImagePicker picker) async {
@@ -583,6 +603,166 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
           ],
         );
       },
+    );
+  }
+}
+
+class _RiderPhotoAdjustScreen extends StatefulWidget {
+  final XFile photo;
+
+  const _RiderPhotoAdjustScreen({required this.photo});
+
+  @override
+  State<_RiderPhotoAdjustScreen> createState() =>
+      _RiderPhotoAdjustScreenState();
+}
+
+class _RiderPhotoAdjustScreenState extends State<_RiderPhotoAdjustScreen> {
+  final GlobalKey _previewKey = GlobalKey();
+  final TransformationController _controller = TransformationController();
+  bool _isSaving = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveAdjustedPhoto() async {
+    if (_isSaving) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final boundary = _previewKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) {
+        if (mounted) Navigator.of(context).pop(widget.photo);
+        return;
+      }
+
+      final image = await boundary.toImage(pixelRatio: 3);
+      final byteData = await image.toByteData(format: ImageByteFormat.png);
+      final Uint8List? bytes = byteData?.buffer.asUint8List();
+
+      if (bytes == null || bytes.isEmpty) {
+        if (mounted) Navigator.of(context).pop(widget.photo);
+        return;
+      }
+
+      if (kIsWeb) {
+        if (mounted) {
+          Navigator.of(context).pop(
+            XFile.fromData(
+              bytes,
+              name: 'rider-profile-photo.png',
+              mimeType: 'image/png',
+            ),
+          );
+        }
+        return;
+      }
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final filePath = '${Directory.systemTemp.path}/'
+          'rydmatch_profile_$timestamp.png';
+      final file = await File(filePath).writeAsBytes(bytes, flush: true);
+
+      if (mounted) Navigator.of(context).pop(XFile(file.path));
+    } catch (_) {
+      if (mounted) Navigator.of(context).pop(widget.photo);
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  void _resetAdjustment() {
+    _controller.value = Matrix4.identity();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final previewSize = MediaQuery.of(context).size.width * 0.86;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: const Text('Adjust Profile Photo'),
+        actions: [
+          TextButton(
+            onPressed: _isSaving ? null : _saveAdjustedPhoto,
+            child: _isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Use Photo'),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            const Spacer(),
+            Center(
+              child: RepaintBoundary(
+                key: _previewKey,
+                child: ClipOval(
+                  child: Container(
+                    width: previewSize,
+                    height: previewSize,
+                    color: theme.colorScheme.surface,
+                    child: InteractiveViewer(
+                      transformationController: _controller,
+                      minScale: 1,
+                      maxScale: 4,
+                      boundaryMargin: EdgeInsets.zero,
+                      child: SizedBox(
+                        width: previewSize,
+                        height: previewSize,
+                        child: kIsWeb
+                            ? Image.network(
+                                widget.photo.path,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    const ColoredBox(color: Colors.black),
+                              )
+                            : Image.file(
+                                File(widget.photo.path),
+                                fit: BoxFit.cover,
+                              ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: 3.h),
+            Text(
+              'Pinch to zoom and drag to position',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.white.withValues(alpha: 0.8),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 2.h),
+            OutlinedButton.icon(
+              onPressed: _isSaving ? null : _resetAdjustment,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Reset'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.5)),
+              ),
+            ),
+            const Spacer(),
+          ],
+        ),
+      ),
     );
   }
 }
