@@ -249,7 +249,26 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         profile['verification_status'] == 'approved';
   }
 
-  Future<void> _hydrateVerificationStatus(
+  String? _usableAvatarUrl(dynamic value) {
+    if (value is! String) return null;
+
+    final url = value.trim();
+    if (url.isEmpty || url.startsWith('blob:') || url.startsWith('file:')) {
+      return null;
+    }
+
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      return null;
+    }
+
+    return url;
+  }
+
+  bool _isBlank(dynamic value) {
+    return value is! String || value.trim().isEmpty;
+  }
+
+  Future<void> _hydrateDiscoveryProfileFields(
     List<Map<String, dynamic>> profiles,
   ) async {
     final ids = profiles
@@ -264,7 +283,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     try {
       final rows = await Supabase.instance.client
           .from('user_profiles')
-          .select('id, is_verified, verification_status')
+          .select(
+            'id, full_name, avatar_url, bio, is_verified, verification_status',
+          )
           .inFilter('id', ids);
       final byId = {
         for (final row in List<Map<String, dynamic>>.from(rows))
@@ -274,6 +295,20 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       for (final profile in profiles) {
         final row = byId[profile['id']?.toString()];
         if (row == null) continue;
+
+        final avatarUrl = _usableAvatarUrl(row['avatar_url']);
+        if (avatarUrl != null) {
+          profile['avatar_url'] = avatarUrl;
+        }
+
+        if (_isBlank(profile['full_name']) && !_isBlank(row['full_name'])) {
+          profile['full_name'] = (row['full_name'] as String).trim();
+        }
+
+        if (_isBlank(profile['bio']) && !_isBlank(row['bio'])) {
+          profile['bio'] = (row['bio'] as String).trim();
+        }
+
         profile['is_verified'] = row['is_verified'];
         profile['verification_status'] = row['verification_status'];
       }
@@ -335,7 +370,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       }
     }
 
-    await _hydrateVerificationStatus(allProfiles);
+    await _hydrateDiscoveryProfileFields(allProfiles);
 
     final afterExcludeSelf = allProfiles
         .where((p) => p['id'] != currentUser.id)
@@ -383,13 +418,13 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         p['preferred_roads'] as List? ?? [],
       );
 
-      final avatarUrl = p['avatar_url'] as String?;
+      final avatarUrl = _usableAvatarUrl(p['avatar_url']);
       final bikeType = bikeTypes.isNotEmpty ? bikeTypes.first : 'All';
       final skillLevel = skillLevels.isNotEmpty
           ? skillLevels.first
           : 'Intermediate';
 
-      final imageUrl = (avatarUrl != null && avatarUrl.isNotEmpty)
+      final imageUrl = avatarUrl != null
           ? avatarUrl
           : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400';
 
