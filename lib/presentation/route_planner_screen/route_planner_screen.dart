@@ -1511,26 +1511,22 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
             return;
           }
 
-          final inserted = await supabase
-              .from('ride_groups')
-              .insert({
-                'creator_id': currentUser.id,
-                'name': group.name,
-                'route': group.route,
-                'ride_date': group.date.toIso8601String(),
-                'max_riders': group.maxRiders,
-                'member_count': 1,
-                'leader_name': 'You',
-                'ride_community': group.rideCommunity,
-                'ride_type': group.rideType,
-                'difficulty': group.difficulty,
-                'duration': group.duration,
-                'route_image_url': group.routeImageUrl,
-                'route_polyline': _routePolylineToJson(group.routePolyline),
-                'route_waypoints': group.routeWaypoints,
-              })
-              .select()
-              .single();
+          final inserted = await _insertRideGroup(supabase, {
+            'creator_id': currentUser.id,
+            'name': group.name,
+            'route': group.route,
+            'ride_date': group.date.toIso8601String(),
+            'max_riders': group.maxRiders,
+            'member_count': 1,
+            'leader_name': 'You',
+            'ride_community': group.rideCommunity,
+            'ride_type': group.rideType,
+            'difficulty': group.difficulty,
+            'duration': group.duration,
+            'route_image_url': group.routeImageUrl,
+            'route_polyline': _routePolylineToJson(group.routePolyline),
+            'route_waypoints': group.routeWaypoints,
+          });
 
           final groupId = inserted['id'] as String?;
 
@@ -1592,6 +1588,59 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
           },
         )
         .toList();
+  }
+
+  bool _postgrestErrorMentions(PostgrestException error, String value) {
+    final text = '${error.message} ${error.details} ${error.hint} ${error.code}'
+        .toLowerCase();
+    return text.contains(value.toLowerCase());
+  }
+
+  Future<Map<String, dynamic>> _insertRideGroup(
+    SupabaseClient supabase,
+    Map<String, dynamic> payload,
+  ) async {
+    final insertPayload = Map<String, dynamic>.from(payload);
+
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final inserted = await supabase
+            .from('ride_groups')
+            .insert(insertPayload)
+            .select()
+            .single();
+
+        return Map<String, dynamic>.from(inserted);
+      } on PostgrestException catch (e) {
+        final missingRouteColumns =
+            _postgrestErrorMentions(e, 'route_polyline') ||
+            _postgrestErrorMentions(e, 'route_waypoints');
+
+        if (missingRouteColumns &&
+            (insertPayload.containsKey('route_polyline') ||
+                insertPayload.containsKey('route_waypoints'))) {
+          debugPrint(
+            'RoutePlannerScreen: route columns missing, retrying basic group insert: $e',
+          );
+          insertPayload.remove('route_polyline');
+          insertPayload.remove('route_waypoints');
+          continue;
+        }
+
+        if (_postgrestErrorMentions(e, 'ride_community') &&
+            insertPayload.containsKey('ride_community')) {
+          debugPrint(
+            'RoutePlannerScreen: ride_community column missing, retrying basic group insert: $e',
+          );
+          insertPayload.remove('ride_community');
+          continue;
+        }
+
+        rethrow;
+      }
+    }
+
+    throw Exception('Unable to create ride group');
   }
 
   Future<void> _showRiderPickerSheet(String routeMessage) async {
