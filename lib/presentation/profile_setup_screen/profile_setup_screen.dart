@@ -152,6 +152,34 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             : '';
 
         final rawRideTimes = data['rideTimes'] as Map? ?? {};
+        var existingRiderPhotoUrl = data['riderPhotoPath'] as String?;
+        var existingBikePhotoUrls = List<String>.from(
+          data['bikePhotoPaths'] as List? ?? [],
+        ).where((url) => url.startsWith('http')).toList();
+
+        try {
+          final currentUser = Supabase.instance.client.auth.currentUser;
+          if (currentUser != null) {
+            final remoteProfile = await Supabase.instance.client
+                .from('user_profiles')
+                .select('avatar_url, bike_photo_urls')
+                .eq('id', currentUser.id)
+                .maybeSingle();
+
+            final remoteAvatar = remoteProfile?['avatar_url'] as String?;
+            if (remoteAvatar != null && remoteAvatar.startsWith('http')) {
+              existingRiderPhotoUrl = remoteAvatar;
+            }
+
+            final remoteBikePhotos = remoteProfile?['bike_photo_urls'];
+            if (remoteBikePhotos is List) {
+              existingBikePhotoUrls = remoteBikePhotos
+                  .map((url) => url.toString())
+                  .where((url) => url.startsWith('http'))
+                  .toList();
+            }
+          }
+        } catch (_) {}
 
         setState(() {
           _firstNameController.text = firstName;
@@ -178,10 +206,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 MapEntry(key.toString(), List<String>.from(value ?? [])),
           );
 
-          _existingRiderPhotoUrl = data['riderPhotoPath'] as String?;
-          _existingBikePhotoUrls = List<String>.from(
-            data['bikePhotoPaths'] as List? ?? [],
-          ).where((url) => url.startsWith('http')).toList();
+          _existingRiderPhotoUrl = existingRiderPhotoUrl;
+          _existingBikePhotoUrls = existingBikePhotoUrls;
 
           _emergencyContactName = prefs.getString(_contactNameKey) ?? '';
           _emergencyContactPhone = prefs.getString(_contactPhoneKey) ?? '';
@@ -545,9 +571,18 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     ),
                     PhotoUploadWidget(
                       riderPhoto: _riderPhoto,
+                      existingRiderPhotoUrl: _existingRiderPhotoUrl,
+                      existingBikePhotoUrls: _existingBikePhotoUrls,
                       bikePhotos: _bikePhotos,
                       onRiderPhotoChanged: (val) =>
-                          setState(() => _riderPhoto = val),
+                          setState(() {
+                            _riderPhoto = val;
+                            if (val != null || _existingRiderPhotoUrl != null) {
+                              _existingRiderPhotoUrl = null;
+                            }
+                          }),
+                      onExistingBikePhotoUrlsChanged: (val) =>
+                          setState(() => _existingBikePhotoUrls = val),
                       onBikePhotosChanged: (val) =>
                           setState(() => _bikePhotos = val),
                     ),

@@ -16,8 +16,10 @@ import '../../../widgets/custom_image_widget.dart';
 class PhotoUploadWidget extends StatefulWidget {
   final XFile? riderPhoto;
   final String? existingRiderPhotoUrl;
+  final List<String> existingBikePhotoUrls;
   final List<XFile> bikePhotos;
   final ValueChanged<XFile?> onRiderPhotoChanged;
+  final ValueChanged<List<String>> onExistingBikePhotoUrlsChanged;
   final ValueChanged<List<XFile>> onBikePhotosChanged;
 
   static const int maxBikePhotos = 6;
@@ -26,8 +28,10 @@ class PhotoUploadWidget extends StatefulWidget {
     super.key,
     required this.riderPhoto,
     this.existingRiderPhotoUrl,
+    this.existingBikePhotoUrls = const [],
     required this.bikePhotos,
     required this.onRiderPhotoChanged,
+    required this.onExistingBikePhotoUrlsChanged,
     required this.onBikePhotosChanged,
   });
 
@@ -44,6 +48,9 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
       widget.riderPhoto != null ||
       (widget.existingRiderPhotoUrl != null &&
           widget.existingRiderPhotoUrl!.isNotEmpty);
+
+  int get _totalBikePhotoCount =>
+      widget.existingBikePhotoUrls.length + widget.bikePhotos.length;
 
   Future<void> _pickRiderPhoto(BuildContext context) async {
     final picker = ImagePicker();
@@ -246,6 +253,12 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
     final updated = List<XFile>.from(widget.bikePhotos);
     updated.removeAt(index);
     widget.onBikePhotosChanged(updated);
+  }
+
+  void _removeExistingBikePhoto(int index) {
+    final updated = List<String>.from(widget.existingBikePhotoUrls);
+    updated.removeAt(index);
+    widget.onExistingBikePhotoUrlsChanged(updated);
   }
 
   void _reorderBikePhotos(int oldIndex, int newIndex) {
@@ -492,8 +505,7 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
     required BuildContext context,
     required ThemeData theme,
   }) {
-    final canAddMore =
-        widget.bikePhotos.length < PhotoUploadWidget.maxBikePhotos;
+    final canAddMore = _totalBikePhotoCount < PhotoUploadWidget.maxBikePhotos;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -507,7 +519,7 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
               ),
             ),
             Text(
-              '${widget.bikePhotos.length}/${PhotoUploadWidget.maxBikePhotos}',
+              '$_totalBikePhotoCount/${PhotoUploadWidget.maxBikePhotos}',
               style: theme.textTheme.labelMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -545,10 +557,13 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
     required ThemeData theme,
     required bool canAddMore,
   }) {
+    final existingCount = widget.existingBikePhotoUrls.length;
+    final itemCount = _totalBikePhotoCount + (canAddMore ? 1 : 0);
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: widget.bikePhotos.length + (canAddMore ? 1 : 0),
+      itemCount: itemCount,
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         crossAxisSpacing: 2.w,
@@ -556,7 +571,7 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
         childAspectRatio: 1,
       ),
       itemBuilder: (context, index) {
-        if (index == widget.bikePhotos.length && canAddMore) {
+        if (index == _totalBikePhotoCount && canAddMore) {
           return GestureDetector(
             onTap: () => _pickBikePhotos(context),
             child: Container(
@@ -574,7 +589,15 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
           );
         }
 
-        final photo = widget.bikePhotos[index];
+        if (index < existingCount) {
+          return _buildExistingBikePhotoTile(
+            widget.existingBikePhotoUrls[index],
+            index,
+          );
+        }
+
+        final newPhotoIndex = index - existingCount;
+        final photo = widget.bikePhotos[newPhotoIndex];
 
         return Stack(
           fit: StackFit.expand,
@@ -589,7 +612,7 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
               top: 4,
               right: 4,
               child: GestureDetector(
-                onTap: () => _removeBikePhoto(index),
+                onTap: () => _removeBikePhoto(newPhotoIndex),
                 child: Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
@@ -603,6 +626,37 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildExistingBikePhotoTile(String url, int index) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: CustomImageWidget(
+            imageUrl: url,
+            fit: BoxFit.cover,
+            semanticLabel: 'Existing bike photo',
+          ),
+        ),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: GestureDetector(
+            onTap: () => _removeExistingBikePhoto(index),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(AppIcons.close, color: Colors.white, size: 14),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
