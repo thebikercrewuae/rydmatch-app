@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class PremiumService extends ChangeNotifier {
@@ -12,6 +13,8 @@ class PremiumService extends ChangeNotifier {
   bool _isAdmin = false;
   bool _priorityListingsEnabled = false;
   bool _isLoaded = false;
+
+  static const String _localPremiumKey = 'premium_entitlement_active';
 
   /// Existing app code mostly checks isPremium.
   /// Admin users should receive full access too, so this returns true for either.
@@ -36,9 +39,11 @@ class PremiumService extends ChangeNotifier {
   Future<void> refresh() async {
     final supabase = Supabase.instance.client;
     final currentUser = supabase.auth.currentUser;
+    final prefs = await SharedPreferences.getInstance();
+    final localPremium = prefs.getBool(_localPremiumKey) ?? false;
 
     if (currentUser == null) {
-      _isPremiumAccount = false;
+      _isPremiumAccount = localPremium;
       _isAdmin = false;
       _priorityListingsEnabled = false;
       _isLoaded = true;
@@ -53,7 +58,7 @@ class PremiumService extends ChangeNotifier {
           .eq('id', currentUser.id)
           .maybeSingle();
 
-      _isPremiumAccount = profile?['is_premium'] == true;
+      _isPremiumAccount = profile?['is_premium'] == true || localPremium;
       _isAdmin = profile?['is_admin'] == true;
 
       // Admins should have access to priority listings as part of full access.
@@ -66,7 +71,7 @@ class PremiumService extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('PremiumService.refresh error: $e');
-      _isPremiumAccount = false;
+      _isPremiumAccount = localPremium;
       _isAdmin = false;
       _priorityListingsEnabled = false;
       _isLoaded = true;
@@ -80,13 +85,20 @@ class PremiumService extends ChangeNotifier {
 
     if (currentUser == null) return;
 
-    await supabase.from('user_profiles').update({
-      'is_premium': true,
-      'updated_at': DateTime.now().toIso8601String(),
-    }).eq('id', currentUser.id);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_localPremiumKey, true);
 
     _isPremiumAccount = true;
     notifyListeners();
+
+    try {
+      await supabase.from('user_profiles').update({
+        'is_premium': true,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', currentUser.id);
+    } catch (e) {
+      debugPrint('PremiumService.activatePremium sync error: $e');
+    }
   }
 
   Future<void> setPriorityListings(bool enabled) async {
@@ -105,12 +117,17 @@ class PremiumService extends ChangeNotifier {
     final currentUser = supabase.auth.currentUser;
 
     if (currentUser == null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_localPremiumKey);
       _isPremiumAccount = false;
       _isAdmin = false;
       _priorityListingsEnabled = false;
       notifyListeners();
       return;
     }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_localPremiumKey);
 
     await supabase.from('user_profiles').update({
       'is_premium': false,
@@ -127,7 +144,9 @@ class PremiumService extends ChangeNotifier {
     notifyListeners();
   }
 
-  void clearLocalState() {
+  Future<void> clearLocalState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_localPremiumKey);
     _isPremiumAccount = false;
     _isAdmin = false;
     _priorityListingsEnabled = false;

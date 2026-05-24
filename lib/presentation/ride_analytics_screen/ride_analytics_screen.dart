@@ -62,8 +62,32 @@ class _RideAnalyticsScreenState extends State<RideAnalyticsScreen> {
   @override
   void initState() {
     super.initState();
+    PremiumService().addListener(_handlePremiumChanged);
     _isPremium = PremiumService().isPremium;
     if (_isPremium) _loadAnalytics();
+  }
+
+  @override
+  void dispose() {
+    PremiumService().removeListener(_handlePremiumChanged);
+    super.dispose();
+  }
+
+  void _handlePremiumChanged() {
+    if (!mounted) return;
+
+    final wasPremium = _isPremium;
+    final isPremium = PremiumService().isPremium;
+    setState(() {
+      _isPremium = isPremium;
+      if (!isPremium) {
+        _isLoading = false;
+      }
+    });
+
+    if (isPremium && !wasPremium) {
+      _loadAnalytics();
+    }
   }
 
   Future<void> _loadAnalytics() async {

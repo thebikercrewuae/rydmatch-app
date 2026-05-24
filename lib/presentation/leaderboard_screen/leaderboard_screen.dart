@@ -33,7 +33,29 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    PremiumService().addListener(_handlePremiumChanged);
     _checkPremium();
+  }
+
+  @override
+  void dispose() {
+    PremiumService().removeListener(_handlePremiumChanged);
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _handlePremiumChanged() {
+    if (!mounted) return;
+
+    final isPremium = PremiumService().isPremium;
+    setState(() {
+      _isPremium = isPremium;
+      _isLoading = false;
+    });
+
+    if (isPremium && !_isDataLoading) {
+      _loadLeaderboardData();
+    }
   }
 
   Future<void> _checkPremium() async {
@@ -207,12 +229,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         'isMe': isMe,
       };
     }).toList();
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   @override

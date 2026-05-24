@@ -38,13 +38,20 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    PremiumService().addListener(_handlePremiumChanged);
     _loadGroups();
   }
 
   @override
   void dispose() {
+    PremiumService().removeListener(_handlePremiumChanged);
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _handlePremiumChanged() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   bool _isPastRide(RideGroup group) {

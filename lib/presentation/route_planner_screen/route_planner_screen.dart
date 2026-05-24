@@ -87,17 +87,26 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   @override
   void initState() {
     super.initState();
+    PremiumService().addListener(_handlePremiumChanged);
     _loadPreferences();
     _checkPremium();
   }
 
   @override
   void dispose() {
+    PremiumService().removeListener(_handlePremiumChanged);
     _startController.dispose();
     _destinationController.dispose();
     _mapController?.dispose();
     _positionStream?.cancel();
     super.dispose();
+  }
+
+  void _handlePremiumChanged() {
+    if (!mounted) return;
+    setState(() {
+      _isPremium = PremiumService().isPremium;
+    });
   }
 
   void _showNavigationOptions() {

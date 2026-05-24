@@ -29,7 +29,22 @@ class _RideFeedScreenState extends State<RideFeedScreen> {
   @override
   void initState() {
     super.initState();
+    PremiumService().addListener(_handlePremiumChanged);
     _loadPosts();
+  }
+
+  @override
+  void dispose() {
+    PremiumService().removeListener(_handlePremiumChanged);
+    super.dispose();
+  }
+
+  void _handlePremiumChanged() {
+    if (!mounted) return;
+    setState(() {});
+    if (PremiumService().isPremium && !_isLoading && _posts.isEmpty) {
+      _loadPosts();
+    }
   }
 
   Future<void> _loadPosts() async {
