@@ -175,7 +175,19 @@ class _MatchesScreenState extends State<MatchesScreen> {
 
   String _avatarUrl(Map<String, dynamic> match) {
     final url = match['avatar_url'] as String?;
-    if (url != null && url.trim().isNotEmpty) return url.trim();
+    if (url == null) return '';
+
+    final trimmed = url.trim();
+    if (trimmed.isEmpty ||
+        trimmed.startsWith('blob:') ||
+        trimmed.startsWith('file:')) {
+      return '';
+    }
+
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+
     return '';
   }
 

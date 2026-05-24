@@ -164,7 +164,8 @@ class SwipeService {
       final profileResponse = await _supabase
           .from('user_profiles')
           .select(
-            'id, full_name, email, avatar_url, bike_types, bio, ride_mode',
+            'id, full_name, email, avatar_url, bike_types, bio, ride_mode, '
+            'updated_at',
           )
           .inFilter('id', uniqueIds);
 
@@ -186,7 +187,7 @@ class SwipeService {
           'id': otherId,
           'full_name': (profile?['full_name'] as String?) ?? '',
           'email': (profile?['email'] as String?) ?? '',
-          'avatar_url': profile?['avatar_url'] as String?,
+          'avatar_url': _versionedAvatarUrl(profile),
           'bike_types': profile?['bike_types'],
           'ride_mode': profile?['ride_mode'] as String? ?? 'motorcycle',
           'matched_at': matchedAtMap[otherId] ?? '',
@@ -196,5 +197,31 @@ class SwipeService {
       debugPrint('SwipeService._profilesForIds error: $e\n$stack');
       return [];
     }
+  }
+
+  String? _usableAvatarUrl(dynamic value) {
+    if (value is! String) return null;
+
+    final url = value.trim();
+    if (url.isEmpty || url.startsWith('blob:') || url.startsWith('file:')) {
+      return null;
+    }
+
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      return null;
+    }
+
+    return url;
+  }
+
+  String? _versionedAvatarUrl(Map<String, dynamic>? profile) {
+    final avatarUrl = _usableAvatarUrl(profile?['avatar_url']);
+    if (avatarUrl == null) return null;
+
+    final updatedAt = profile?['updated_at']?.toString();
+    if (updatedAt == null || updatedAt.isEmpty) return avatarUrl;
+
+    final separator = avatarUrl.contains('?') ? '&' : '?';
+    return '$avatarUrl${separator}v=${Uri.encodeComponent(updatedAt)}';
   }
 }
