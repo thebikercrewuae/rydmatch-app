@@ -11,6 +11,7 @@ class ProfileHeaderWidget extends StatelessWidget {
   final String riderName;
   final String riderBio;
   final bool isVerified;
+  final VoidCallback? onPhotoTap;
 
   const ProfileHeaderWidget({
     super.key,
@@ -18,6 +19,7 @@ class ProfileHeaderWidget extends StatelessWidget {
     required this.riderName,
     required this.riderBio,
     this.isVerified = false,
+    this.onPhotoTap,
   });
 
   bool get _isNetworkUrl =>
@@ -30,41 +32,47 @@ class ProfileHeaderWidget extends StatelessWidget {
     final theme = Theme.of(context);
     return Column(
       children: [
-        Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.center,
-          children: [
-            Container(
-              width: 28.w,
-              height: 28.w,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                border: Border.all(color: theme.colorScheme.primary, width: 3),
-              ),
-              child: ClipOval(child: _buildPhotoWidget(theme)),
-            ),
-            if (isVerified)
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.16),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+        GestureDetector(
+          onTap: onPhotoTap,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 28.w,
+                height: 28.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                  border: Border.all(
+                    color: theme.colorScheme.primary,
+                    width: 3,
                   ),
-                  child: const VerifiedBadgeWidget(size: 28),
                 ),
+                child: ClipOval(child: _buildPhotoWidget(theme)),
               ),
-          ],
+              if (isVerified)
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.16),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const VerifiedBadgeWidget(size: 28),
+                  ),
+                ),
+            ],
+          ),
         ),
         SizedBox(height: 2.h),
         Row(

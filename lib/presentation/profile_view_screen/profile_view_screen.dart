@@ -240,7 +240,10 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       final profile = await Supabase.instance.client
           .from('user_profiles')
           .select(
-            'id, full_name, email, avatar_url, bio, skill_levels, bike_types, preferred_roads, riding_speed, gender, is_verified, verification_status, ride_mode, mixed_community_matching',
+            'id, full_name, email, avatar_url, bio, skill_levels, bike_types, '
+            'preferred_roads, riding_speed, gender, is_verified, '
+            'verification_status, ride_mode, mixed_community_matching, '
+            'bike_photo_urls',
           )
           .eq('id', otherUserId)
           .maybeSingle();
@@ -294,7 +297,9 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         _rideMode = profile['ride_mode'] as String? ?? 'motorcycle';
         _mixedCommunityMatching =
             (profile['mixed_community_matching'] as bool?) ?? false;
-        _bikePhotoPaths = [];
+        _bikePhotoPaths = stringList(profile['bike_photo_urls'])
+            .where(_canOpenPhoto)
+            .toList();
         _isVerified = _profileIsVerified(profile);
         _isLoading = false;
       });
@@ -782,6 +787,13 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                         riderName: _riderName,
                         riderBio: _riderBio,
                         isVerified: _rideMode != 'bicycle' && _isVerified,
+                        onPhotoTap: _canOpenPhoto(_riderPhotoPath)
+                            ? () => _showPhotoExpanded(
+                                  context,
+                                  _riderPhotoPath!,
+                                  gallery: _profileGalleryPhotos,
+                                )
+                            : null,
                       ),
                     ),
                     SizedBox(height: 3.h),
@@ -1341,6 +1353,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   }
 
   Widget _buildBikePhotos(ThemeData theme) {
+    final gallery = _profileGalleryPhotos;
+
     return SizedBox(
       height: 18.h,
       child: ListView.separated(
@@ -1350,7 +1364,12 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         itemBuilder: (context, index) {
           final path = _bikePhotoPaths[index];
           return GestureDetector(
-            onTap: () => _showPhotoExpanded(context, path),
+            onTap: () => _showPhotoExpanded(
+              context,
+              path,
+              gallery: gallery,
+              initialIndex: gallery.indexOf(path),
+            ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12.0),
               child: _buildBikePhotoImage(path, theme),
@@ -1386,6 +1405,36 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     }
 
     return _photoPlaceholder(theme);
+  }
+
+  bool _canOpenPhoto(String? path) {
+    if (path == null) return false;
+
+    final value = path.trim();
+    if (value.isEmpty || value.startsWith('blob:')) return false;
+
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return true;
+    }
+
+    return !kIsWeb;
+  }
+
+  List<String> get _profileGalleryPhotos {
+    final photos = <String>[];
+
+    if (_canOpenPhoto(_riderPhotoPath)) {
+      photos.add(_riderPhotoPath!.trim());
+    }
+
+    for (final path in _bikePhotoPaths) {
+      final value = path.trim();
+      if (_canOpenPhoto(value) && !photos.contains(value)) {
+        photos.add(value);
+      }
+    }
+
+    return photos;
   }
 
   Widget _buildGenderDisplay(ThemeData theme) {
@@ -1431,7 +1480,16 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     );
   }
 
-  void _showPhotoExpanded(BuildContext context, String path) {
+  void _showPhotoExpanded(
+    BuildContext context,
+    String path, {
+    List<String>? gallery,
+    int initialIndex = 0,
+  }) {
+    final photos = (gallery == null || gallery.isEmpty) ? [path] : gallery;
+    final safeInitialIndex =
+        initialIndex >= 0 && initialIndex < photos.length ? initialIndex : 0;
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => Scaffold(
@@ -1442,26 +1500,41 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             elevation: 0,
           ),
           body: Center(
-            child: InteractiveViewer(
-              minScale: 0.5,
-              maxScale: 4.0,
-              child: path.startsWith('http://') || path.startsWith('https://')
-                  ? Image.network(
-                      path,
-                      fit: BoxFit.contain,
-                      semanticLabel: 'Expanded bike photo',
-                    )
-                  : !kIsWeb
-                  ? Image.file(
-                      File(path),
-                      fit: BoxFit.contain,
-                      semanticLabel: 'Expanded bike photo',
-                    )
-                  : const SizedBox.shrink(),
+            child: PageView.builder(
+              controller: PageController(initialPage: safeInitialIndex),
+              itemCount: photos.length,
+              itemBuilder: (_, index) {
+                final photo = photos[index];
+                return InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: Center(child: _buildExpandedPhoto(photo)),
+                );
+              },
             ),
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildExpandedPhoto(String path) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Image.network(
+        path,
+        fit: BoxFit.contain,
+        semanticLabel: 'Expanded profile photo',
+      );
+    }
+
+    if (!kIsWeb) {
+      return Image.file(
+        File(path),
+        fit: BoxFit.contain,
+        semanticLabel: 'Expanded profile photo',
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 }
