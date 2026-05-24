@@ -210,6 +210,16 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     }
   }
 
+  Future<void> _loadAdminVerificationCount() async {
+    if (!PremiumService().isAdmin) return;
+
+    final count =
+        await VerificationService.instance.pendingVerificationRequestCount();
+    if (!mounted) return;
+
+    setState(() => _pendingVerificationRequests = count);
+  }
+
   Future<void> _loadProfile() async {
   setState(() => _isLoading = true);
 
@@ -232,16 +242,6 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       return value.map((item) => item.toString()).toList();
     }
     return <String>[];
-  }
-
-  Future<void> _loadAdminVerificationCount() async {
-    if (!PremiumService().isAdmin) return;
-
-    final count =
-        await VerificationService.instance.pendingVerificationRequestCount();
-    if (!mounted) return;
-
-    setState(() => _pendingVerificationRequests = count);
   }
 
   final preferredIsMetric =

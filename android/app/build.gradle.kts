@@ -26,8 +26,8 @@ android {
         applicationId = "com.rydmatch.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.0.10"
+        versionCode = 11
+        versionName = "1.0.11"
         manifestPlaceholders["GOOGLE_MAPS_API_KEY"] =
             System.getenv("GOOGLE_MAPS_API_KEY") ?: ""
     }
