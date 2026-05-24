@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'profile_service.dart';
 
 class SwipeResult {
   final bool isMatch;
@@ -180,19 +181,25 @@ class SwipeService {
         }
       }
 
-      return uniqueIds.map((otherId) {
+      final matches = <Map<String, dynamic>>[];
+      for (final otherId in uniqueIds) {
         final profile = profileMap[otherId];
+        final avatarUrl = await ProfileService.resolvePhotoUrl(
+          profile?['avatar_url'] as String?,
+        );
 
-        return {
+        matches.add({
           'id': otherId,
           'full_name': (profile?['full_name'] as String?) ?? '',
           'email': (profile?['email'] as String?) ?? '',
-          'avatar_url': _versionedAvatarUrl(profile),
+          'avatar_url': avatarUrl ?? _versionedAvatarUrl(profile),
           'bike_types': profile?['bike_types'],
           'ride_mode': profile?['ride_mode'] as String? ?? 'motorcycle',
           'matched_at': matchedAtMap[otherId] ?? '',
-        };
-      }).toList();
+        });
+      }
+
+      return matches;
     } catch (e, stack) {
       debugPrint('SwipeService._profilesForIds error: $e\n$stack');
       return [];

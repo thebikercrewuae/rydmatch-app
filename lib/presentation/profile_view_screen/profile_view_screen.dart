@@ -284,7 +284,12 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
 
       final fullName = profile['full_name'] as String?;
       final email = profile['email'] as String?;
-      final avatarUrl = profile['avatar_url'] as String?;
+      final avatarUrl = await ProfileService.resolvePhotoUrl(
+        profile['avatar_url'] as String?,
+      );
+      final fallbackAvatarUrl = await ProfileService.resolvePhotoUrl(
+        otherUserImage,
+      );
 
       setState(() {
         _riderName = fullName?.trim().isNotEmpty == true
@@ -295,7 +300,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         _riderBio = profile['bio'] as String? ?? '';
         _riderPhotoPath = avatarUrl?.trim().isNotEmpty == true
             ? avatarUrl
-            : otherUserImage;
+            : fallbackAvatarUrl;
 
         _skillLevels = stringList(profile['skill_levels']);
         _bikeTypes = stringList(profile['bike_types']);

@@ -98,6 +98,51 @@ class ProfileService {
     }
   }
 
+  static Future<String?> resolvePhotoUrl(String? url) async {
+    if (url == null) return null;
+
+    final trimmed = url.trim();
+    if (trimmed.isEmpty ||
+        trimmed.startsWith('blob:') ||
+        trimmed.startsWith('file:')) {
+      return null;
+    }
+
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+      return null;
+    }
+
+    final storagePath = _storagePathFromUserPhotosUrl(trimmed);
+    if (storagePath == null) return trimmed;
+
+    try {
+      return await Supabase.instance.client.storage
+          .from('user-photos')
+          .createSignedUrl(storagePath, 3600);
+    } catch (e) {
+      debugPrint('resolvePhotoUrl: failed to sign photo URL: $e');
+      return trimmed;
+    }
+  }
+
+  static String? _storagePathFromUserPhotosUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return null;
+
+    const publicMarker = '/storage/v1/object/public/user-photos/';
+    const signedMarker = '/storage/v1/object/sign/user-photos/';
+    final path = uri.path;
+    final marker = path.contains(publicMarker)
+        ? publicMarker
+        : path.contains(signedMarker)
+            ? signedMarker
+            : null;
+    if (marker == null) return null;
+
+    final storagePath = Uri.decodeComponent(path.split(marker).last);
+    return storagePath.isEmpty ? null : storagePath;
+  }
+
   static Future<void> saveProfile({
     required double ridingSpeed,
     required List<String> skillLevels,
