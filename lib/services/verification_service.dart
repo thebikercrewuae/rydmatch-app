@@ -65,6 +65,37 @@ class VerificationService {
     return false;
   }
 
+  Future<int> pendingVerificationRequestCount() async {
+    try {
+      final response = await _client.rpc('list_verification_requests');
+      final requests = response is List ? response : const [];
+
+      return requests.where((item) {
+        if (item is! Map) return false;
+        final status = item['status']?.toString();
+        return status == null || status == 'pending';
+      }).length;
+    } catch (_) {}
+
+    try {
+      final response = await _client
+          .from('rider_verifications')
+          .select('id')
+          .eq('status', 'pending');
+      return response is List ? response.length : 0;
+    } catch (_) {}
+
+    try {
+      final response = await _client
+          .from('verification_requests')
+          .select('id')
+          .eq('status', 'pending');
+      return response is List ? response.length : 0;
+    } catch (_) {}
+
+    return 0;
+  }
+
   /// Submit a verification request with optional document upload
   Future<({bool success, String? error})> submitVerification({
     required String documentType,

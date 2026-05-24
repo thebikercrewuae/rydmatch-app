@@ -59,6 +59,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   int _totalRatings = 0;
   List<String> _allSafetyTags = [];
   bool _isVerified = false;
+  int _pendingVerificationRequests = 0;
 
   // Boost state
   bool _isBoostActive = false;
@@ -79,6 +80,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       _initialized = true;
       _loadProfile();
       _loadBoostState();
+      _loadAdminVerificationCount();
     }
   }
 
@@ -230,6 +232,16 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       return value.map((item) => item.toString()).toList();
     }
     return <String>[];
+  }
+
+  Future<void> _loadAdminVerificationCount() async {
+    if (!PremiumService().isAdmin) return;
+
+    final count =
+        await VerificationService.instance.pendingVerificationRequestCount();
+    if (!mounted) return;
+
+    setState(() => _pendingVerificationRequests = count);
   }
 
   final preferredIsMetric =
@@ -1028,36 +1040,9 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                         ),
                       ),
                       if (PremiumService().isAdmin) ...[
-  SizedBox(height: 1.5.h),
-  SizedBox(
-    width: double.infinity,
-    height: 6.h,
-    child: ElevatedButton.icon(
-      onPressed: () => Navigator.pushNamed(
-        context,
-        '/admin-verification-screen',
-      ),
-      icon: const Icon(
-        Icons.admin_panel_settings_rounded,
-        color: Colors.white,
-      ),
-      label: Text(
-        'Admin Verification Review',
-        style: GoogleFonts.dmSans(
-          fontSize: 14.sp,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
-        ),
-      ),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF1B365D),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12.0),
-        ),
-      ),
-    ),
-  ),
-],
+                        SizedBox(height: 1.5.h),
+                        _buildAdminVerificationButton(),
+                      ],
                       if (_rideMode != 'bicycle') ...[
                         SizedBox(height: 1.5.h),
                         SizedBox(
@@ -1171,6 +1156,74 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildAdminVerificationButton() {
+    final count = _pendingVerificationRequests;
+
+    return SizedBox(
+      width: double.infinity,
+      height: 6.h,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                await Navigator.pushNamed(
+                  context,
+                  '/admin-verification-screen',
+                );
+                await _loadAdminVerificationCount();
+              },
+              icon: const Icon(
+                Icons.admin_panel_settings_rounded,
+                color: Colors.white,
+              ),
+              label: Text(
+                count > 0
+                    ? 'Admin Verification Review ($count)'
+                    : 'Admin Verification Review',
+                style: GoogleFonts.dmSans(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1B365D),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+              ),
+            ),
+          ),
+          if (count > 0)
+            Positioned(
+              top: -7,
+              right: -7,
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                padding: const EdgeInsets.symmetric(horizontal: 7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE85A4F),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  count > 99 ? '99+' : '$count',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
