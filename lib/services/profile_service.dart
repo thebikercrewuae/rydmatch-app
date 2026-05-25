@@ -50,7 +50,9 @@ class ProfileService {
       final safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].contains(ext)
           ? ext
           : 'jpg';
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$safeExt';
+      final fileName = folder == 'profile'
+          ? 'avatar.$safeExt'
+          : '${DateTime.now().millisecondsSinceEpoch}.$safeExt';
       final filePath = '${currentUser.id}/$folder/$fileName';
 
       // Read bytes from the XFile — works on both web and mobile
@@ -135,6 +137,15 @@ class ProfileService {
     if (userId.trim().isEmpty) return null;
 
     try {
+      for (final extension in const ['jpg', 'jpeg', 'png', 'webp']) {
+        final storagePath = '${userId.trim()}/profile/avatar.$extension';
+        try {
+          return await Supabase.instance.client.storage
+              .from('user-photos')
+              .createSignedUrl(storagePath, 3600);
+        } catch (_) {}
+      }
+
       final files = await Supabase.instance.client.storage
           .from('user-photos')
           .list(path: '${userId.trim()}/profile');
