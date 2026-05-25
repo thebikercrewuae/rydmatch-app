@@ -125,6 +125,49 @@ class ProfileService {
     }
   }
 
+  static Future<String?> resolveUserProfilePhotoUrl({
+    required String userId,
+    String? avatarUrl,
+  }) async {
+    final resolvedAvatarUrl = await resolvePhotoUrl(avatarUrl);
+    if (resolvedAvatarUrl != null) return resolvedAvatarUrl;
+
+    if (userId.trim().isEmpty) return null;
+
+    try {
+      final files = await Supabase.instance.client.storage
+          .from('user-photos')
+          .list(path: '${userId.trim()}/profile');
+      final imageFiles = files
+          .where(
+            (file) =>
+                !file.name.startsWith('.') &&
+                RegExp(
+                  r'\.(jpe?g|png|webp|gif)$',
+                  caseSensitive: false,
+                ).hasMatch(file.name),
+          )
+          .toList()
+        ..sort((a, b) => b.name.compareTo(a.name));
+
+      if (imageFiles.isEmpty) return null;
+
+      final storagePath = '${userId.trim()}/profile/${imageFiles.first.name}';
+      try {
+        return await Supabase.instance.client.storage
+            .from('user-photos')
+            .createSignedUrl(storagePath, 3600);
+      } catch (_) {
+        return Supabase.instance.client.storage
+            .from('user-photos')
+            .getPublicUrl(storagePath);
+      }
+    } catch (e) {
+      debugPrint('resolveUserProfilePhotoUrl: failed to find photo: $e');
+      return null;
+    }
+  }
+
   static String? _storagePathFromUserPhotosUrl(String url) {
     final uri = Uri.tryParse(url);
     if (uri == null) return null;

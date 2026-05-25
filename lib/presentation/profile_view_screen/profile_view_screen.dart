@@ -284,8 +284,9 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
 
       final fullName = profile['full_name'] as String?;
       final email = profile['email'] as String?;
-      final avatarUrl = await ProfileService.resolvePhotoUrl(
-        profile['avatar_url'] as String?,
+      final avatarUrl = await ProfileService.resolveUserProfilePhotoUrl(
+        userId: otherUserId,
+        avatarUrl: profile['avatar_url'] as String?,
       );
       final fallbackAvatarUrl = await ProfileService.resolvePhotoUrl(
         otherUserImage,

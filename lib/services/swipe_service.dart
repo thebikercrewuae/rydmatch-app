@@ -184,8 +184,9 @@ class SwipeService {
       final matches = <Map<String, dynamic>>[];
       for (final otherId in uniqueIds) {
         final profile = profileMap[otherId];
-        final avatarUrl = await ProfileService.resolvePhotoUrl(
-          profile?['avatar_url'] as String?,
+        final avatarUrl = await ProfileService.resolveUserProfilePhotoUrl(
+          userId: otherId,
+          avatarUrl: profile?['avatar_url'] as String?,
         );
 
         matches.add({
