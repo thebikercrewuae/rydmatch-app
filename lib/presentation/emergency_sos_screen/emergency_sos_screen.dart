@@ -859,7 +859,7 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
                 SizedBox(width: 2.w),
                 Expanded(
                   child: Text(
-                    'Tapping SOS sends your name and GPS location to your emergency contact via SMS after a 3-second countdown.',
+                    'Tapping SOS sends your name and GPS location to your emergency contact via SMS after a 3-second countdown.\n\nRydMatch emergency alerts are not a replacement for contacting local emergency services.',
                     style: GoogleFonts.dmSans(
                       fontSize: 10.sp,
                       color: Colors.white.withValues(alpha: 0.45),

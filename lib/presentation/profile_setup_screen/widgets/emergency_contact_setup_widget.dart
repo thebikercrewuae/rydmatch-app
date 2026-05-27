@@ -222,7 +222,7 @@ class _EmergencyContactSetupWidgetState
                 SizedBox(width: 2.w),
                 Expanded(
                   child: Text(
-                    'You can skip this step and set it up later from your Profile. SOS is free for all riders.',
+                    'You can skip this step and set it up later from your Profile. SOS is free for all riders.\n\nRydMatch emergency alerts are not a replacement for contacting local emergency services.',
                     style: GoogleFonts.dmSans(
                       fontSize: 11.sp,
                       color: const Color(0xFFE53935).withValues(alpha: 0.85),
