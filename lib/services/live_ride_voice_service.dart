@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'premium_service.dart';
 
 class LiveRideVoiceService extends ChangeNotifier {
   static LiveRideVoiceService? _instance;
@@ -33,11 +34,22 @@ class LiveRideVoiceService extends ChangeNotifier {
     _sessionId = sessionId;
     notifyListeners();
 
+    Room? pendingRoom;
     try {
+      await PremiumService().refresh();
+      if (!PremiumService().isPremium) {
+        _lastError = 'Premium subscription required for voice chat';
+        _isConnecting = false;
+        _sessionId = null;
+        notifyListeners();
+        return false;
+      }
+
       final micPermission = await Permission.microphone.request();
       if (!micPermission.isGranted) {
         _lastError = 'Microphone permission is required for voice chat';
         _isConnecting = false;
+        _sessionId = null;
         notifyListeners();
         return false;
       }
@@ -51,6 +63,7 @@ class LiveRideVoiceService extends ChangeNotifier {
       if (data is! Map) {
         _lastError = 'Could not start voice chat';
         _isConnecting = false;
+        _sessionId = null;
         notifyListeners();
         return false;
       }
@@ -61,13 +74,16 @@ class LiveRideVoiceService extends ChangeNotifier {
       if (livekitUrl == null || token == null) {
         _lastError = data['error'] as String? ?? 'Could not start voice chat';
         _isConnecting = false;
+        _sessionId = null;
         notifyListeners();
         return false;
       }
 
       final room = Room();
+      pendingRoom = room;
       await room.connect(livekitUrl, token);
       await room.localParticipant?.setMicrophoneEnabled(true);
+      room.addListener(() => _syncRoomState(room));
 
       _room = room;
       _isConnected = true;
@@ -78,21 +94,48 @@ class LiveRideVoiceService extends ChangeNotifier {
     } catch (e, stack) {
       debugPrint('LiveRideVoiceService.connect error: $e');
       debugPrintStack(stackTrace: stack);
+      try {
+        await pendingRoom?.localParticipant?.setMicrophoneEnabled(false);
+        await pendingRoom?.disconnect();
+        await pendingRoom?.dispose();
+      } catch (_) {}
       _lastError = e.toString();
       _isConnecting = false;
       _isConnected = false;
+      _sessionId = null;
       notifyListeners();
       return false;
     }
+  }
+
+  void _syncRoomState(Room room) {
+    if (_room != room) return;
+
+    final isConnected = room.connectionState == ConnectionState.connected ||
+        room.connectionState == ConnectionState.reconnecting;
+    if (_isConnected == isConnected) return;
+
+    _isConnected = isConnected;
+    if (!isConnected) {
+      _isMuted = false;
+      _sessionId = null;
+    }
+    notifyListeners();
   }
 
   Future<void> toggleMute() async {
     if (!_isConnected || _room == null) return;
 
     final nextMuted = !_isMuted;
-    await _room!.localParticipant?.setMicrophoneEnabled(!nextMuted);
-    _isMuted = nextMuted;
-    notifyListeners();
+    try {
+      await _room!.localParticipant?.setMicrophoneEnabled(!nextMuted);
+      _isMuted = nextMuted;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('LiveRideVoiceService.toggleMute error: $e');
+      _lastError = 'Could not update microphone state';
+      notifyListeners();
+    }
   }
 
   Future<void> disconnect() async {
@@ -102,7 +145,7 @@ class LiveRideVoiceService extends ChangeNotifier {
     try {
       await room?.localParticipant?.setMicrophoneEnabled(false);
       await room?.disconnect();
-      room?.dispose();
+      await room?.dispose();
     } catch (e) {
       debugPrint('LiveRideVoiceService.disconnect error: $e');
     }

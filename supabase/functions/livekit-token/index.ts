@@ -16,10 +16,20 @@ Deno.serve(async (req) => {
     const livekitUrl = Deno.env.get('LIVEKIT_URL');
     const livekitApiKey = Deno.env.get('LIVEKIT_API_KEY');
     const livekitApiSecret = Deno.env.get('LIVEKIT_API_SECRET');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (!livekitUrl || !livekitApiKey || !livekitApiSecret) {
+    if (
+      !livekitUrl ||
+      !livekitApiKey ||
+      !livekitApiSecret ||
+      !supabaseUrl ||
+      !anonKey ||
+      !serviceRoleKey
+    ) {
       return jsonResponse(
-        { error: 'LiveKit secrets are not configured' },
+        { error: 'LiveKit voice service is not configured' },
         500,
       );
     }
@@ -29,14 +39,19 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Missing authorization header' }, 401);
     }
 
-    const { sessionId } = await req.json();
+    let requestBody: { sessionId?: unknown };
+    try {
+      requestBody = await req.json();
+    } catch (_) {
+      return jsonResponse({ error: 'Invalid request body' }, 400);
+    }
+
+    const sessionId = typeof requestBody.sessionId === 'string'
+      ? requestBody.sessionId.trim()
+      : '';
     if (!sessionId) {
       return jsonResponse({ error: 'Missing sessionId' }, 400);
     }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
     const userClient = createClient(supabaseUrl, anonKey, {
       global: {
@@ -57,11 +72,16 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    const { data: profile } = await adminClient
+    const { data: profile, error: profileError } = await adminClient
       .from('user_profiles')
       .select('full_name, email, is_premium, is_admin')
       .eq('id', user.id)
       .maybeSingle();
+
+    if (profileError) {
+      console.error('livekit-token profile lookup error:', profileError);
+      return jsonResponse({ error: 'Could not verify premium status' }, 500);
+    }
 
     const isPremium = profile?.is_premium === true || profile?.is_admin === true;
     if (!isPremium) {
@@ -102,7 +122,7 @@ Deno.serve(async (req) => {
     const token = new AccessToken(livekitApiKey, livekitApiSecret, {
       identity: user.id,
       name: displayName,
-      ttl: '2h',
+      ttl: '8h',
     });
 
     token.addGrant({
