@@ -6,12 +6,16 @@ import '../../../widgets/custom_icon_widget.dart';
 
 class GenderSelectionWidget extends StatelessWidget {
   final String? selectedGender;
+  final bool sameGenderMatching;
   final ValueChanged<String?> onGenderChanged;
+  final ValueChanged<bool> onSameGenderMatchingChanged;
 
   const GenderSelectionWidget({
     super.key,
     required this.selectedGender,
+    required this.sameGenderMatching,
     required this.onGenderChanged,
+    required this.onSameGenderMatchingChanged,
   });
 
   @override
@@ -123,6 +127,51 @@ class GenderSelectionWidget extends StatelessWidget {
               ),
             );
           }),
+          if (selectedGender != null &&
+              selectedGender != 'prefer_not_to_say') ...[
+            SizedBox(height: 1.h),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.2.h),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: theme.colorScheme.outline),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Ride with the same gender only',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        SizedBox(height: 0.5.h),
+                        Text(
+                          'Only show riders who selected the same gender.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: sameGenderMatching,
+                    activeColor: theme.colorScheme.primary,
+                    onChanged: (value) {
+                      HapticService.instance.selection();
+                      onSameGenderMatchingChanged(value);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

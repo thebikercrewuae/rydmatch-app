@@ -43,6 +43,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   bool _isMetric = true;
   DateTime? _dateOfBirth;
   String? _gender;
+  bool _sameGenderMatching = false;
   String _rideMode = 'motorcycle';
   bool _mixedCommunityMatching = false;
   List<String> _skillLevels = [];
@@ -193,6 +194,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ? null
               : DateTime.tryParse(savedBirthDate);
           _gender = data['gender'] as String?;
+          _sameGenderMatching =
+              (data['sameGenderMatching'] as bool?) ?? false;
           _rideMode = data['rideMode'] as String? ?? 'motorcycle';
           _mixedCommunityMatching =
               (data['mixedCommunityMatching'] as bool?) ?? false;
@@ -449,6 +452,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       dateOfBirth: _dateOfBirth,
       minimumAgeConfirmed: _minimumAge,
       gender: _gender,
+      sameGenderMatching: _sameGenderMatching,
       rideMode: _rideMode,
       mixedCommunityMatching: _mixedCommunityMatching,
       riderName: fullName,
@@ -548,7 +552,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     ),
                     GenderSelectionWidget(
                       selectedGender: _gender,
-                      onGenderChanged: (val) => setState(() => _gender = val),
+                      sameGenderMatching: _sameGenderMatching,
+                      onGenderChanged: (val) => setState(() {
+                        _gender = val;
+                        if (val == 'prefer_not_to_say') {
+                          _sameGenderMatching = false;
+                        }
+                      }),
+                      onSameGenderMatchingChanged: (val) =>
+                          setState(() => _sameGenderMatching = val),
                     ),
                     SkillLevelWidget(
                       selectedLevels: _skillLevels,

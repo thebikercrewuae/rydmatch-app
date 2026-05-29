@@ -22,6 +22,7 @@ class ProfileService {
   static const String _keySpeedUnit =
       'profile_speed_unit'; // 'metric' or 'imperial'
   static const String _keyGender = 'profile_gender';
+  static const String _keySameGenderMatching = 'profile_same_gender_matching';
   static const String _keyDateOfBirth = 'profile_date_of_birth';
   static const String _keyMinimumAgeConfirmed =
       'profile_minimum_age_confirmed';
@@ -213,6 +214,7 @@ class ProfileService {
     DateTime? dateOfBirth,
     int? minimumAgeConfirmed,
     String? gender,
+    bool sameGenderMatching = false,
     String rideMode = 'motorcycle',
     bool mixedCommunityMatching = false,
     XFile? riderPhotoFile,
@@ -304,6 +306,8 @@ class ProfileService {
     await prefs.setString(_keySpeedUnit, isMetric ? 'metric' : 'imperial');
     await prefs.setBool('unit_system_metric', isMetric);
     await prefs.setBool('isMetric', isMetric);
+    final effectiveSameGenderMatching =
+        gender == 'prefer_not_to_say' ? false : sameGenderMatching;
     if (dateOfBirth != null) {
       await prefs.setString(
         _keyDateOfBirth,
@@ -319,6 +323,7 @@ class ProfileService {
     if (gender != null) {
       await prefs.setString(_keyGender, gender);
     }
+    await prefs.setBool(_keySameGenderMatching, effectiveSameGenderMatching);
     await prefs.setBool(_keyIsProfileComplete, true);
 
     // Sync to Supabase (only if authenticated)
@@ -331,6 +336,7 @@ class ProfileService {
         riderName: riderName,
         riderBio: riderBio,
         gender: gender,
+        sameGenderMatching: effectiveSameGenderMatching,
         minimumAgeConfirmed: minimumAgeConfirmed,
         rideMode: rideMode,
         mixedCommunityMatching: mixedCommunityMatching,
@@ -353,6 +359,7 @@ class ProfileService {
     String riderName = '',
     String riderBio = '',
     String? gender,
+    bool sameGenderMatching = false,
     int? minimumAgeConfirmed,
     String rideMode = 'motorcycle',
     bool mixedCommunityMatching = false,
@@ -379,6 +386,7 @@ class ProfileService {
         'riding_speed': ridingSpeed,
         'ride_mode': rideMode,
         'mixed_community_matching': mixedCommunityMatching,
+        'same_gender_matching': sameGenderMatching,
         'bio': riderBio,
         'is_profile_complete': true,
         'avatar_url': avatarUrl,
@@ -400,13 +408,20 @@ class ProfileService {
       try {
         await supabase.from('user_profiles').upsert(updates, onConflict: 'id');
       } catch (e) {
-        if (e is PostgrestException &&
-            e.message.contains('bike_photo_urls')) {
+        if (e is! PostgrestException) rethrow;
+
+        var shouldRetry = false;
+        if (e.message.contains('bike_photo_urls')) {
           updates.remove('bike_photo_urls');
-          await supabase.from('user_profiles').upsert(updates, onConflict: 'id');
-        } else {
-          rethrow;
+          shouldRetry = true;
         }
+        if (e.message.contains('same_gender_matching')) {
+          updates.remove('same_gender_matching');
+          shouldRetry = true;
+        }
+
+        if (!shouldRetry) rethrow;
+        await supabase.from('user_profiles').upsert(updates, onConflict: 'id');
       }
       debugPrint('✅ Profile synced successfully');
     } catch (e) {
@@ -443,6 +458,7 @@ class ProfileService {
       'dateOfBirth': prefs.getString(_keyDateOfBirth),
       'minimumAgeConfirmed': prefs.getInt(_keyMinimumAgeConfirmed),
       'gender': prefs.getString(_keyGender),
+      'sameGenderMatching': prefs.getBool(_keySameGenderMatching) ?? false,
       'rideMode': prefs.getString(_keyRideMode) ?? 'motorcycle',
       'mixedCommunityMatching':
           prefs.getBool(_keyMixedCommunityMatching) ?? false,
@@ -463,6 +479,8 @@ class ProfileService {
     await prefs.remove(_keyRiderBio);
     await prefs.remove(_keyDateOfBirth);
     await prefs.remove(_keyMinimumAgeConfirmed);
+    await prefs.remove(_keyGender);
+    await prefs.remove(_keySameGenderMatching);
     await prefs.remove(_keyRideMode);
     await prefs.remove(_keyMixedCommunityMatching);
   }
@@ -535,6 +553,11 @@ class ProfileService {
       final gender = response['gender'] as String?;
       if (gender != null) {
         await prefs.setString(_keyGender, gender);
+      }
+
+      final sameGenderMatching = response['same_gender_matching'] as bool?;
+      if (sameGenderMatching != null) {
+        await prefs.setBool(_keySameGenderMatching, sameGenderMatching);
       }
 
       final rideMode = response['ride_mode'] as String?;

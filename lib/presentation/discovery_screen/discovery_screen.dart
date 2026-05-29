@@ -56,6 +56,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
   String _myName = 'You';
   String? _myPhoto;
+  String? _myGender;
+  bool _sameGenderMatching = false;
   String _myRideMode = 'motorcycle';
   bool _mixedCommunityMatching = false;
 
@@ -177,7 +179,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       final data = await supabase
           .from('user_profiles')
           .select(
-            'full_name, email, avatar_url, ride_mode, mixed_community_matching',
+            'full_name, email, avatar_url, gender, same_gender_matching, ride_mode, mixed_community_matching',
           )
           .eq('id', currentUser.id)
           .single();
@@ -192,6 +194,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         setState(() {
           _myName = name;
           _myPhoto = (photo != null && photo.isNotEmpty) ? photo : null;
+          _myGender = data['gender'] as String?;
+          _sameGenderMatching =
+              (data['same_gender_matching'] as bool?) ?? false;
           _myRideMode = data['ride_mode'] as String? ?? 'motorcycle';
           _mixedCommunityMatching =
               (data['mixed_community_matching'] as bool?) ?? false;
@@ -351,7 +356,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         final rawAll = await supabase
             .from('user_profiles')
             .select(
-              'id, full_name, email, skill_levels, bike_types, preferred_roads, riding_speed, gender, avatar_url, bio, latitude, longitude, ride_mode, mixed_community_matching',
+              'id, full_name, email, skill_levels, bike_types, preferred_roads, riding_speed, gender, same_gender_matching, avatar_url, bio, latitude, longitude, ride_mode, mixed_community_matching',
             )
             .limit(150);
 
@@ -405,6 +410,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
     final afterCommunityFilter = afterExcludeBlocked
         .where(_canShowForRideCommunity)
+        .where(_canShowForGenderPreference)
         .toList();
 
     final riders = afterCommunityFilter.map((p) {
@@ -510,6 +516,35 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     final otherMixed =
         (profile['mixed_community_matching'] as bool?) ?? false;
     return _mixedCommunityMatching && otherMixed;
+  }
+
+  bool _canShowForGenderPreference(Map<String, dynamic> profile) {
+    final myGender = _myGender?.trim();
+    final otherGender = (profile['gender'] as String?)?.trim();
+    final otherSameGenderOnly =
+        (profile['same_gender_matching'] as bool?) ?? false;
+
+    if (_sameGenderMatching) {
+      if (myGender == null ||
+          myGender.isEmpty ||
+          myGender == 'prefer_not_to_say') {
+        return false;
+      }
+
+      return otherGender == myGender;
+    }
+
+    if (otherSameGenderOnly) {
+      if (myGender == null ||
+          myGender.isEmpty ||
+          myGender == 'prefer_not_to_say') {
+        return false;
+      }
+
+      return otherGender == myGender;
+    }
+
+    return true;
   }
 
   String _rideModeLabel(String rideMode) {
