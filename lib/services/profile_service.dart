@@ -177,9 +177,9 @@ class ProfileService {
       if (imageFiles.isEmpty) return null;
 
       final storagePath = '${userId.trim()}/profile/${imageFiles.first.name}';
-      return Supabase.instance.client.storage
+      return await Supabase.instance.client.storage
           .from('user-photos')
-          .getPublicUrl(storagePath);
+          .createSignedUrl(storagePath, 3600);
     } catch (e) {
       debugPrint('resolveUserProfilePhotoUrl: failed to find photo: $e');
       await DiagnosticsService.instance.logError(

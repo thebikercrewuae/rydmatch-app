@@ -195,7 +195,10 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           ? data['full_name'] as String
           : (data['email'] as String?)?.split('@').first ?? 'You';
 
-      final photo = data['avatar_url'] as String?;
+      final photo = await ProfileService.resolveUserProfilePhotoUrl(
+        userId: currentUser.id,
+        avatarUrl: data['avatar_url'] as String?,
+      );
 
       if (mounted) {
         setState(() {
