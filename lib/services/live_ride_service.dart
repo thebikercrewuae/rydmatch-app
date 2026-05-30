@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'diagnostics_service.dart';
+import 'profile_service.dart';
 
 class RiderLocation {
   final String userId;
@@ -104,6 +105,10 @@ class LiveRideService {
   Timer? _locationTimer;
   RealtimeChannel? _locationsChannel;
   RealtimeChannel? _participantsChannel;
+  DateTime? _lastSessionHealthCheck;
+  DateTime? _lastLocationErrorLogAt;
+  final Map<String, ({String displayName, String? avatarUrl})> _profileCache =
+      {};
 
   String? get currentSessionId => _currentSessionId;
 
@@ -132,6 +137,14 @@ class LiveRideService {
 
       final now = DateTime.now().toUtc();
       final autoStopAt = now.add(const Duration(hours: 8));
+
+      final existingSession = await _getActiveSessionForGroup(rideGroupId);
+      if (existingSession != null) {
+        _currentSessionId = existingSession.id;
+        await _joinAsParticipant(existingSession.id, userId);
+        await _activateRealtime(existingSession.id);
+        return existingSession;
+      }
 
       final payload = {
         'ride_group_id': rideGroupId,
@@ -162,11 +175,7 @@ class LiveRideService {
       await _joinAsParticipant(session.id, userId);
       await _notifyGroupMembers(rideGroupId, session.id);
 
-      _startTracking();
-      _subscribeToLocations(session.id);
-      _subscribeToParticipants(session.id);
-
-      isRideActive.value = true;
+      await _activateRealtime(session.id);
       return session;
     } catch (e, stack) {
       lastError = e.toString();
@@ -193,15 +202,17 @@ class LiveRideService {
         return false;
       }
 
-      _currentSessionId = sessionId;
+      final session = await _getJoinableSession(sessionId);
+      if (session == null) {
+        lastError = 'This live ride is no longer active';
+        return false;
+      }
 
-      await _joinAsParticipant(sessionId, userId);
+      _currentSessionId = session.id;
 
-      _startTracking();
-      _subscribeToLocations(sessionId);
-      _subscribeToParticipants(sessionId);
+      await _joinAsParticipant(session.id, userId);
 
-      isRideActive.value = true;
+      await _activateRealtime(session.id);
       return true;
     } catch (e, stack) {
       lastError = e.toString();
@@ -354,6 +365,81 @@ class LiveRideService {
     }
   }
 
+  Future<void> _activateRealtime(String sessionId) async {
+    _subscribeToLocations(sessionId);
+    _subscribeToParticipants(sessionId);
+
+    participants.value = await getParticipants(sessionId);
+    await _loadLatestLocations(sessionId);
+
+    _startTracking();
+    isRideActive.value = true;
+  }
+
+  Future<LiveRideSession?> _getActiveSessionForGroup(String rideGroupId) async {
+    try {
+      final sessionData = await _supabase
+          .from('live_ride_sessions')
+          .select()
+          .eq('ride_group_id', rideGroupId)
+          .eq('status', 'active')
+          .order('started_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (sessionData == null) return null;
+
+      final session = LiveRideSession.fromMap(sessionData);
+      if (session.autoStopAt.isBefore(DateTime.now().toUtc())) {
+        await _markSessionExpired(session.id);
+        return null;
+      }
+
+      return session;
+    } catch (e) {
+      debugPrint('LiveRideService._getActiveSessionForGroup error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'live_ride',
+        action: 'get_active_session_for_group',
+        error: e,
+        severity: 'warning',
+        context: {'ride_group_id': rideGroupId},
+      );
+      return null;
+    }
+  }
+
+  Future<LiveRideSession?> _getJoinableSession(String sessionId) async {
+    final sessionData = await _supabase
+        .from('live_ride_sessions')
+        .select()
+        .eq('id', sessionId)
+        .maybeSingle();
+
+    if (sessionData == null) return null;
+
+    final session = LiveRideSession.fromMap(sessionData);
+    if (session.status != 'active') return null;
+
+    if (session.autoStopAt.isBefore(DateTime.now().toUtc())) {
+      await _markSessionExpired(session.id);
+      return null;
+    }
+
+    return session;
+  }
+
+  Future<void> _markSessionExpired(String sessionId) async {
+    await _supabase
+        .from('live_ride_sessions')
+        .update({
+          'status': 'completed',
+          'ended_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', sessionId)
+        .eq('status', 'active');
+  }
+
   Future<void> _joinAsParticipant(String sessionId, String userId) async {
     final existing = await _supabase
         .from('live_ride_participants')
@@ -386,6 +472,7 @@ class LiveRideService {
 
   void _startTracking() {
     _locationTimer?.cancel();
+    unawaited(_sendLocation());
     _locationTimer = Timer.periodic(
       const Duration(seconds: 5),
       (_) => _sendLocation(),
@@ -410,12 +497,29 @@ class LiveRideService {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null || _currentSessionId == null) return;
 
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return;
+      final sessionActive = await _isCurrentSessionActive();
+      if (!sessionActive) {
+        _stopTracking();
+        return;
+      }
 
-      final permission = await Geolocator.checkPermission();
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        await _logLocationWarningOnce('location_service_disabled');
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
+        await _logLocationWarningOnce(
+          permission == LocationPermission.deniedForever
+              ? 'location_permission_denied_forever'
+              : 'location_permission_denied',
+        );
         return;
       }
 
@@ -436,12 +540,96 @@ class LiveRideService {
       });
     } catch (e) {
       debugPrint('LiveRideService._sendLocation error: $e');
+      final shouldLog =
+          _lastLocationErrorLogAt == null ||
+          DateTime.now().difference(_lastLocationErrorLogAt!) >
+              const Duration(minutes: 2);
+      if (shouldLog) {
+        _lastLocationErrorLogAt = DateTime.now();
+        await DiagnosticsService.instance.logError(
+          feature: 'live_ride',
+          action: 'send_location',
+          error: e,
+          severity: 'warning',
+          context: {'session_id': _currentSessionId},
+        );
+      }
+    }
+  }
+
+  Future<bool> _isCurrentSessionActive() async {
+    final sessionId = _currentSessionId;
+    if (sessionId == null) return false;
+
+    final now = DateTime.now();
+    if (_lastSessionHealthCheck != null &&
+        now.difference(_lastSessionHealthCheck!) <
+            const Duration(seconds: 30)) {
+      return true;
+    }
+    _lastSessionHealthCheck = now;
+
+    try {
+      final session = await _getJoinableSession(sessionId);
+      return session != null;
+    } catch (e) {
+      debugPrint('LiveRideService._isCurrentSessionActive error: $e');
+      return true;
+    }
+  }
+
+  Future<void> _logLocationWarningOnce(String action) async {
+    final now = DateTime.now();
+    if (_lastLocationErrorLogAt != null &&
+        now.difference(_lastLocationErrorLogAt!) < const Duration(minutes: 5)) {
+      return;
+    }
+    _lastLocationErrorLogAt = now;
+
+    await DiagnosticsService.instance.logError(
+      feature: 'live_ride',
+      action: action,
+      error: 'Live ride location sharing is unavailable',
+      severity: 'warning',
+      context: {'session_id': _currentSessionId},
+    );
+  }
+
+  Future<void> _loadLatestLocations(String sessionId) async {
+    try {
+      final data = await _supabase
+          .from('live_ride_locations')
+          .select()
+          .eq('session_id', sessionId)
+          .order('created_at', ascending: false)
+          .limit(100);
+
+      final currentUserId = _supabase.auth.currentUser?.id;
+      final latestByUser = <String, Map<String, dynamic>>{};
+
+      for (final row in List<Map<String, dynamic>>.from(data)) {
+        final userId = row['user_id'] as String?;
+        if (userId == null || userId == currentUserId) continue;
+        latestByUser.putIfAbsent(userId, () => row);
+      }
+
+      final updated = <String, RiderLocation>{};
+      for (final entry in latestByUser.entries) {
+        final rider = await _riderLocationFromRecord(entry.value);
+        if (rider != null) {
+          updated[entry.key] = rider;
+        }
+      }
+
+      riderLocations.value = updated;
+    } catch (e) {
+      debugPrint('LiveRideService._loadLatestLocations error: $e');
       await DiagnosticsService.instance.logError(
         feature: 'live_ride',
-        action: 'send_location',
+        action: 'load_latest_locations',
         error: e,
         severity: 'warning',
-        context: {'session_id': _currentSessionId},
+        context: {'session_id': sessionId},
       );
     }
   }
@@ -467,45 +655,86 @@ class LiveRideService {
 
             if (userId == null || userId == currentUserId) return;
 
-            String displayName = 'Rider';
-            String? avatarUrl;
-
-            try {
-              final profile = await _supabase
-                  .from('user_profiles')
-                  .select('full_name, avatar_url')
-                  .eq('id', userId)
-                  .maybeSingle();
-
-              if (profile != null) {
-                displayName = profile['full_name'] as String? ?? 'Rider';
-                avatarUrl = profile['avatar_url'] as String?;
-              }
-            } catch (_) {}
+            final rider = await _riderLocationFromRecord(record);
+            if (rider == null) return;
 
             final updated = Map<String, RiderLocation>.from(
               riderLocations.value,
             );
 
-            updated[userId] = RiderLocation(
-              userId: userId,
-              displayName: displayName,
-              avatarUrl: avatarUrl,
-              latitude: (record['latitude'] as num).toDouble(),
-              longitude: (record['longitude'] as num).toDouble(),
-              heading: record['heading'] != null
-                  ? (record['heading'] as num).toDouble()
-                  : null,
-              speed: record['speed'] != null
-                  ? (record['speed'] as num).toDouble()
-                  : null,
-              updatedAt: DateTime.now(),
-            );
+            updated[userId] = rider;
 
             riderLocations.value = updated;
           },
         )
         .subscribe();
+  }
+
+  Future<RiderLocation?> _riderLocationFromRecord(
+    Map<String, dynamic> record,
+  ) async {
+    final userId = record['user_id'] as String?;
+    final latitude = record['latitude'];
+    final longitude = record['longitude'];
+
+    if (userId == null || latitude is! num || longitude is! num) return null;
+
+    final profile = await _profileForUser(userId);
+
+    return RiderLocation(
+      userId: userId,
+      displayName: profile.displayName,
+      avatarUrl: profile.avatarUrl,
+      latitude: latitude.toDouble(),
+      longitude: longitude.toDouble(),
+      heading: record['heading'] != null
+          ? (record['heading'] as num).toDouble()
+          : null,
+      speed: record['speed'] != null
+          ? (record['speed'] as num).toDouble()
+          : null,
+      updatedAt: record['created_at'] is String
+          ? DateTime.tryParse(record['created_at'] as String) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
+
+  Future<({String displayName, String? avatarUrl})> _profileForUser(
+    String userId,
+  ) async {
+    final cached = _profileCache[userId];
+    if (cached != null) return cached;
+
+    String displayName = 'Rider';
+    String? avatarUrl;
+
+    try {
+      final profile = await _supabase
+          .from('user_profiles')
+          .select('full_name, email, avatar_url')
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (profile != null) {
+        final fullName = profile['full_name'] as String?;
+        final email = profile['email'] as String?;
+
+        if (fullName != null && fullName.trim().isNotEmpty) {
+          displayName = fullName.trim();
+        } else if (email != null && email.trim().isNotEmpty) {
+          displayName = email.split('@').first;
+        }
+
+        avatarUrl = await ProfileService.resolveUserProfilePhotoUrl(
+          userId: userId,
+          avatarUrl: profile['avatar_url'] as String?,
+        );
+      }
+    } catch (_) {}
+
+    final result = (displayName: displayName, avatarUrl: avatarUrl);
+    _profileCache[userId] = result;
+    return result;
   }
 
   void _subscribeToParticipants(String sessionId) {
