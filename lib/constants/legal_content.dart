@@ -77,7 +77,7 @@ class RydMatchLegalContent {
     LegalSection(
       title: '14. Contact Us',
       content:
-          'If you have any questions about these Terms of Service, please contact us at:\n\nEmail: legal@rydmatch.app\nSupport: support@rydmatch.app\nWebsite: motomatch9264.builtwithrocket.new',
+          'If you have any questions about these Terms of Service, please contact us at:\n\nEmail: legal@rydmatch.app\nSupport: support@rydmatch.app\nWebsite: www.rydmatch.com',
     ),
   ];
 
@@ -154,7 +154,7 @@ class RydMatchLegalContent {
     LegalSection(
       title: '13. Contact Us',
       content:
-          'If you have any questions about this Privacy Policy or our data practices, please contact us at:\n\nEmail: privacy@rydmatch.app\nSupport: support@rydmatch.app\nWebsite: motomatch9264.builtwithrocket.new',
+          'If you have any questions about this Privacy Policy or our data practices, please contact us at:\n\nEmail: privacy@rydmatch.app\nSupport: support@rydmatch.app\nWebsite: www.rydmatch.com',
     ),
   ];
 }
