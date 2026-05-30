@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../services/swipe_service.dart';
+import '../../services/diagnostics_service.dart';
 import '../../widgets/app_icons.dart';
 import '../chat_screen/chat_screen.dart';
 
@@ -89,6 +90,12 @@ class _MatchesScreenState extends State<MatchesScreen> {
       });
     } catch (e, stack) {
       debugPrint('MatchesScreen._loadMatches error: $e\n$stack');
+      await DiagnosticsService.instance.logError(
+        feature: 'matches',
+        action: 'load_matches_screen',
+        error: e,
+        stackTrace: stack,
+      );
 
       if (!mounted) return;
 

@@ -11,6 +11,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../presentation/match_success_screen/match_success_screen.dart';
 import '../../services/analytics_service.dart';
+import '../../services/diagnostics_service.dart';
 import '../../services/haptic_service.dart';
 import '../../services/premium_service.dart';
 import '../../services/swipe_service.dart';
@@ -167,6 +168,12 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       _swipedIds.addAll(ids);
     } catch (e) {
       debugPrint('DiscoveryScreen: _loadSwipedIds error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'discovery',
+        action: 'load_swiped_ids',
+        error: e,
+        severity: 'warning',
+      );
     }
   }
 
@@ -202,7 +209,14 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
               (data['mixed_community_matching'] as bool?) ?? false;
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      await DiagnosticsService.instance.logError(
+        feature: 'discovery',
+        action: 'load_my_profile',
+        error: e,
+        severity: 'warning',
+      );
+    }
   }
 
   Future<void> _fetchAndStoreLocation() async {
@@ -241,7 +255,14 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           'location_updated_at': DateTime.now().toIso8601String(),
         }, onConflict: 'id');
       }
-    } catch (_) {}
+    } catch (e) {
+      await DiagnosticsService.instance.logError(
+        feature: 'discovery',
+        action: 'fetch_and_store_location',
+        error: e,
+        severity: 'warning',
+      );
+    }
   }
 
   double _distanceMiles(double lat1, double lng1, double lat2, double lng2) {
@@ -317,7 +338,15 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         profile['is_verified'] = row['is_verified'];
         profile['verification_status'] = row['verification_status'];
       }
-    } catch (_) {}
+    } catch (e) {
+      await DiagnosticsService.instance.logError(
+        feature: 'discovery',
+        action: 'hydrate_profile_fields',
+        error: e,
+        severity: 'warning',
+        context: {'profile_count': profiles.length},
+      );
+    }
   }
 
   Future<void> _loadRiders() async {
@@ -351,6 +380,13 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       usedDiscoveryRpc = true;
     } catch (e) {
       debugPrint('DiscoveryScreen: RPC discovery failed, using fallback: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'discovery',
+        action: 'load_profiles_rpc',
+        error: e,
+        severity: 'warning',
+        context: {'excluded_count': _swipedIds.length},
+      );
 
       try {
         final rawAll = await supabase
@@ -364,6 +400,12 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       } catch (fallbackError) {
         debugPrint(
           'DiscoveryScreen: failed to fetch fallback profiles: $fallbackError',
+        );
+        await DiagnosticsService.instance.logError(
+          feature: 'discovery',
+          action: 'load_profiles_fallback',
+          error: fallbackError,
+          context: {'excluded_count': _swipedIds.length},
         );
         if (mounted) {
           setState(() {
@@ -383,9 +425,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
     final afterExcludeSwiped = _swipedIds.isEmpty
         ? List<Map<String, dynamic>>.from(afterExcludeSelf)
-        : afterExcludeSelf
-              .where((p) => !_swipedIds.contains(p['id']))
-              .toList();
+        : afterExcludeSelf.where((p) => !_swipedIds.contains(p['id'])).toList();
 
     List<String> blockedIds = [];
 
@@ -457,7 +497,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         'photo': imageUrl,
         'image': imageUrl,
         'photos': <String>[imageUrl],
-        'semanticLabel': '$name ${rideModeLabel.toLowerCase()} rider profile photo',
+        'semanticLabel':
+            '$name ${rideModeLabel.toLowerCase()} rider profile photo',
         'rideMode': rideMode,
         'rideModeLabel': rideModeLabel,
         'age': p['age'] as int? ?? '',
@@ -513,8 +554,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     final otherRideMode = profile['ride_mode'] as String? ?? 'motorcycle';
     if (otherRideMode == _myRideMode) return true;
 
-    final otherMixed =
-        (profile['mixed_community_matching'] as bool?) ?? false;
+    final otherMixed = (profile['mixed_community_matching'] as bool?) ?? false;
     return _mixedCommunityMatching && otherMixed;
   }
 
@@ -797,6 +837,13 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       }
     } catch (e) {
       debugPrint('DiscoveryScreen: undo delete swipe error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'discovery',
+        action: 'undo_swipe_delete',
+        error: e,
+        severity: 'warning',
+        context: {'rider_id': riderId},
+      );
     }
 
     _allRiders.insert(0, rider);
@@ -809,11 +856,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       _lastSwipeDirection = null;
     });
 
-    AppToast.show(
-      context,
-      message: 'Last swipe undone',
-      type: ToastType.info,
-    );
+    AppToast.show(context, message: 'Last swipe undone', type: ToastType.info);
   }
 
   void _showMatchToast(String category) {
@@ -1012,9 +1055,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                               imageUrl,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => Container(
-                                color: theme
-                                    .colorScheme
-                                    .surfaceContainerHighest,
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
                                 child: const Center(
                                   child: Icon(Icons.person_rounded, size: 44),
                                 ),
@@ -1168,7 +1210,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                                   side: const BorderSide(
                                     color: Color(0xFFE85A4F),
                                   ),
-                                  padding: EdgeInsets.symmetric(vertical: 1.6.h),
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: 1.6.h,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
                                   ),
@@ -1184,7 +1228,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF2E7D32),
                                   foregroundColor: Colors.white,
-                                  padding: EdgeInsets.symmetric(vertical: 1.6.h),
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: 1.6.h,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
                                   ),

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'diagnostics_service.dart';
 import 'profile_service.dart';
 
 class SwipeResult {
@@ -30,8 +31,15 @@ class SwipeService {
         isMatch: data['is_match'] as bool? ?? false,
         matchId: data['match_id'] as String?,
       );
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('SwipeService.recordSwipe error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'matching',
+        action: 'record_swipe',
+        error: e,
+        stackTrace: stack,
+        context: {'swiped_id': swipedId, 'direction': direction},
+      );
       return const SwipeResult(isMatch: false);
     }
   }
@@ -42,8 +50,15 @@ class SwipeService {
       if (result == null) return [];
 
       return List<String>.from((result as List).map((e) => e.toString()));
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('SwipeService.getSwipedIds error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'matching',
+        action: 'get_swiped_ids',
+        error: e,
+        stackTrace: stack,
+        severity: 'warning',
+      );
       return [];
     }
   }
@@ -82,6 +97,12 @@ class SwipeService {
       return _profilesForIds(otherIds, matchedAtMap);
     } catch (e, stack) {
       debugPrint('SwipeService.getMatches error: $e\n$stack');
+      await DiagnosticsService.instance.logError(
+        feature: 'matches',
+        action: 'get_matches',
+        error: e,
+        stackTrace: stack,
+      );
       return [];
     }
   }
@@ -118,8 +139,12 @@ class SwipeService {
           }
         }
       } catch (e) {
-        debugPrint(
-          'SwipeService.getInviteableMatches rider_matches error: $e',
+        debugPrint('SwipeService.getInviteableMatches rider_matches error: $e');
+        await DiagnosticsService.instance.logError(
+          feature: 'ride_groups',
+          action: 'get_inviteable_matches_rider_matches',
+          error: e,
+          severity: 'warning',
         );
       }
 
@@ -144,11 +169,23 @@ class SwipeService {
         }
       } catch (e) {
         debugPrint('SwipeService.getInviteableMatches matches error: $e');
+        await DiagnosticsService.instance.logError(
+          feature: 'ride_groups',
+          action: 'get_inviteable_matches_legacy_matches',
+          error: e,
+          severity: 'warning',
+        );
       }
 
       return _profilesForIds(otherIds.toList(), matchedAtMap);
     } catch (e, stack) {
       debugPrint('SwipeService.getInviteableMatches error: $e\n$stack');
+      await DiagnosticsService.instance.logError(
+        feature: 'ride_groups',
+        action: 'get_inviteable_matches',
+        error: e,
+        stackTrace: stack,
+      );
       return [];
     }
   }
@@ -203,6 +240,13 @@ class SwipeService {
       return matches;
     } catch (e, stack) {
       debugPrint('SwipeService._profilesForIds error: $e\n$stack');
+      await DiagnosticsService.instance.logError(
+        feature: 'matches',
+        action: 'profiles_for_ids',
+        error: e,
+        stackTrace: stack,
+        context: {'profile_count': ids.length},
+      );
       return [];
     }
   }

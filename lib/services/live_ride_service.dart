@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'diagnostics_service.dart';
 
 class RiderLocation {
   final String userId;
@@ -172,6 +173,13 @@ class LiveRideService {
       lastError = e.toString();
       debugPrint('LiveRideService.startRide error: $e');
       debugPrint('LiveRideService.startRide stack: $stack');
+      await DiagnosticsService.instance.logError(
+        feature: 'live_ride',
+        action: 'start_ride',
+        error: e,
+        stackTrace: stack,
+        context: {'ride_group_id': rideGroupId, 'route_id': routeId},
+      );
       return null;
     }
   }
@@ -200,6 +208,13 @@ class LiveRideService {
       lastError = e.toString();
       debugPrint('LiveRideService.joinRide error: $e');
       debugPrint('LiveRideService.joinRide stack: $stack');
+      await DiagnosticsService.instance.logError(
+        feature: 'live_ride',
+        action: 'join_ride',
+        error: e,
+        stackTrace: stack,
+        context: {'session_id': sessionId},
+      );
       return false;
     }
   }
@@ -221,6 +236,13 @@ class LiveRideService {
       _stopTracking();
     } catch (e) {
       debugPrint('LiveRideService.leaveRide error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'live_ride',
+        action: 'leave_ride',
+        error: e,
+        severity: 'warning',
+        context: {'session_id': _currentSessionId},
+      );
       _stopTracking();
     }
   }
@@ -240,6 +262,12 @@ class LiveRideService {
       _stopTracking();
     } catch (e) {
       debugPrint('LiveRideService.endRide error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'live_ride',
+        action: 'end_ride',
+        error: e,
+        context: {'session_id': _currentSessionId},
+      );
       _stopTracking();
     }
   }
@@ -256,6 +284,13 @@ class LiveRideService {
           .eq('user_id', userId);
     } catch (e) {
       debugPrint('LiveRideService.toggleLocationSharing error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'live_ride',
+        action: 'toggle_location_sharing',
+        error: e,
+        severity: 'warning',
+        context: {'session_id': _currentSessionId, 'is_sharing': isSharing},
+      );
     }
   }
 
@@ -288,6 +323,12 @@ class LiveRideService {
       return LiveRideSession.fromMap(sessionData);
     } catch (e) {
       debugPrint('LiveRideService.getActiveRide error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'live_ride',
+        action: 'get_active_ride',
+        error: e,
+        severity: 'warning',
+      );
       return null;
     }
   }
@@ -303,6 +344,13 @@ class LiveRideService {
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
       debugPrint('LiveRideService.getParticipants error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'live_ride',
+        action: 'get_participants',
+        error: e,
+        severity: 'warning',
+        context: {'session_id': sessionId},
+      );
       return [];
     }
   }
@@ -399,6 +447,13 @@ class LiveRideService {
       });
     } catch (e) {
       debugPrint('LiveRideService._sendLocation error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'live_ride',
+        action: 'send_location',
+        error: e,
+        severity: 'warning',
+        context: {'session_id': _currentSessionId},
+      );
     }
   }
 
@@ -535,6 +590,13 @@ class LiveRideService {
       }
     } catch (e) {
       debugPrint('LiveRideService._notifyGroupMembers error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'live_ride',
+        action: 'notify_group_members',
+        error: e,
+        severity: 'warning',
+        context: {'ride_group_id': rideGroupId, 'session_id': sessionId},
+      );
     }
   }
 

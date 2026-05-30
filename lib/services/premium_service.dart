@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'diagnostics_service.dart';
 
 class PremiumService extends ChangeNotifier {
   static final PremiumService _instance = PremiumService._internal();
@@ -71,6 +72,12 @@ class PremiumService extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('PremiumService.refresh error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'premium',
+        action: 'refresh_entitlement',
+        error: e,
+        context: {'has_local_premium': localPremium},
+      );
       _isPremiumAccount = localPremium;
       _isAdmin = false;
       _priorityListingsEnabled = false;
@@ -92,12 +99,20 @@ class PremiumService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await supabase.from('user_profiles').update({
-        'is_premium': true,
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', currentUser.id);
+      await supabase
+          .from('user_profiles')
+          .update({
+            'is_premium': true,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', currentUser.id);
     } catch (e) {
       debugPrint('PremiumService.activatePremium sync error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'premium',
+        action: 'activate_premium_sync',
+        error: e,
+      );
     }
   }
 
@@ -129,10 +144,13 @@ class PremiumService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_localPremiumKey);
 
-    await supabase.from('user_profiles').update({
-      'is_premium': false,
-      'updated_at': DateTime.now().toIso8601String(),
-    }).eq('id', currentUser.id);
+    await supabase
+        .from('user_profiles')
+        .update({
+          'is_premium': false,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', currentUser.id);
 
     _isPremiumAccount = false;
 

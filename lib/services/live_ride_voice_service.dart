@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'diagnostics_service.dart';
 import 'premium_service.dart';
 
 class LiveRideVoiceService extends ChangeNotifier {
@@ -39,6 +40,13 @@ class LiveRideVoiceService extends ChangeNotifier {
       await PremiumService().refresh();
       if (!PremiumService().isPremium) {
         _lastError = 'Premium subscription required for voice chat';
+        await DiagnosticsService.instance.logError(
+          feature: 'live_ride_voice',
+          action: 'connect_premium_required',
+          error: _lastError!,
+          context: {'session_id': sessionId},
+          severity: 'warning',
+        );
         _isConnecting = false;
         _sessionId = null;
         notifyListeners();
@@ -48,6 +56,16 @@ class LiveRideVoiceService extends ChangeNotifier {
       final micPermission = await Permission.microphone.request();
       if (!micPermission.isGranted) {
         _lastError = 'Microphone permission is required for voice chat';
+        await DiagnosticsService.instance.logError(
+          feature: 'live_ride_voice',
+          action: 'microphone_permission_denied',
+          error: _lastError!,
+          context: {
+            'session_id': sessionId,
+            'permission_status': micPermission.name,
+          },
+          severity: 'warning',
+        );
         _isConnecting = false;
         _sessionId = null;
         notifyListeners();
@@ -62,6 +80,15 @@ class LiveRideVoiceService extends ChangeNotifier {
       final data = response.data;
       if (data is! Map) {
         _lastError = 'Could not start voice chat';
+        await DiagnosticsService.instance.logError(
+          feature: 'live_ride_voice',
+          action: 'token_response_invalid',
+          error: 'LiveKit token response was not a map',
+          context: {
+            'session_id': sessionId,
+            'response_type': data.runtimeType.toString(),
+          },
+        );
         _isConnecting = false;
         _sessionId = null;
         notifyListeners();
@@ -73,6 +100,16 @@ class LiveRideVoiceService extends ChangeNotifier {
 
       if (livekitUrl == null || token == null) {
         _lastError = data['error'] as String? ?? 'Could not start voice chat';
+        await DiagnosticsService.instance.logError(
+          feature: 'live_ride_voice',
+          action: 'token_missing',
+          error: _lastError!,
+          context: {
+            'session_id': sessionId,
+            'has_url': livekitUrl != null,
+            'has_token': token != null,
+          },
+        );
         _isConnecting = false;
         _sessionId = null;
         notifyListeners();
@@ -94,6 +131,13 @@ class LiveRideVoiceService extends ChangeNotifier {
     } catch (e, stack) {
       debugPrint('LiveRideVoiceService.connect error: $e');
       debugPrintStack(stackTrace: stack);
+      await DiagnosticsService.instance.logError(
+        feature: 'live_ride_voice',
+        action: 'connect',
+        error: e,
+        stackTrace: stack,
+        context: {'session_id': sessionId},
+      );
       try {
         await pendingRoom?.localParticipant?.setMicrophoneEnabled(false);
         await pendingRoom?.disconnect();
@@ -111,7 +155,8 @@ class LiveRideVoiceService extends ChangeNotifier {
   void _syncRoomState(Room room) {
     if (_room != room) return;
 
-    final isConnected = room.connectionState == ConnectionState.connected ||
+    final isConnected =
+        room.connectionState == ConnectionState.connected ||
         room.connectionState == ConnectionState.reconnecting;
     if (_isConnected == isConnected) return;
 
@@ -133,6 +178,13 @@ class LiveRideVoiceService extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('LiveRideVoiceService.toggleMute error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'live_ride_voice',
+        action: 'toggle_mute',
+        error: e,
+        context: {'session_id': _sessionId},
+        severity: 'warning',
+      );
       _lastError = 'Could not update microphone state';
       notifyListeners();
     }
@@ -148,6 +200,13 @@ class LiveRideVoiceService extends ChangeNotifier {
       await room?.dispose();
     } catch (e) {
       debugPrint('LiveRideVoiceService.disconnect error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'live_ride_voice',
+        action: 'disconnect',
+        error: e,
+        context: {'session_id': _sessionId},
+        severity: 'warning',
+      );
     }
 
     _sessionId = null;

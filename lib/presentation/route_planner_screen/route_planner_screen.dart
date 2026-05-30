@@ -13,6 +13,7 @@ import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../routes/app_routes.dart';
+import '../../services/diagnostics_service.dart';
 import '../../services/premium_service.dart';
 import '../../services/profile_service.dart';
 import '../../widgets/toast_widget.dart';
@@ -26,7 +27,6 @@ import './widgets/weather_premium_gate_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../widgets/app_logo_widget.dart';
 import '../ride_groups_screen/ride_groups_screen.dart';
-
 
 class RoutePlannerScreen extends StatefulWidget {
   const RoutePlannerScreen({super.key});
@@ -152,9 +152,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                 ),
               ListTile(
                 leading: Icon(
-                  _isBicycleMode
-                      ? Icons.directions_bike_rounded
-                      : Icons.map,
+                  _isBicycleMode ? Icons.directions_bike_rounded : Icons.map,
                   color: Colors.green,
                 ),
                 title: const Text('Open in Google Maps'),
@@ -664,9 +662,10 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       _routeSet = true;
       _distanceKm = approxKm * multiplier;
       final fallbackSpeedKmh = _isBicycleMode ? 22.0 : 60.0;
-      _estimatedMinutes = (_distanceKm / fallbackSpeedKmh * 60)
-          .round()
-          .clamp(5, 999);
+      _estimatedMinutes = (_distanceKm / fallbackSpeedKmh * 60).round().clamp(
+        5,
+        999,
+      );
       _weatherLocation = _destinationController.text.trim();
       _routePolylinePoints = [_startPoint, ..._waypointPoints, _endPoint];
     });
@@ -1485,117 +1484,120 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   }
 
   void _createGroupRide() {
-  final routeDescription = _waypoints.isNotEmpty
-      ? '${_startController.text} → ${_waypoints.join(' → ')} → ${_destinationController.text}'
-      : '${_startController.text} → ${_destinationController.text}';
+    final routeDescription = _waypoints.isNotEmpty
+        ? '${_startController.text} → ${_waypoints.join(' → ')} → ${_destinationController.text}'
+        : '${_startController.text} → ${_destinationController.text}';
 
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => CreateGroupModalWidget(
-      prefillRoute: routeDescription,
-      prefillDate: DateTime.now().add(const Duration(days: 3)),
-      prefillDistanceKm: _distanceKm > 0 ? _distanceKm : null,
-      prefillRouteType: _routeType,
-      prefillWaypoints: _waypoints.isNotEmpty
-          ? List<String>.from(_waypoints)
-          : null,
-      prefillRoutePolylinePoints: _routePolylinePoints.isNotEmpty
-          ? List<LatLng>.from(_routePolylinePoints)
-          : null,
-      onCreate: (group, invitees) async {
-        try {
-          final supabase = Supabase.instance.client;
-          final currentUser = supabase.auth.currentUser;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => CreateGroupModalWidget(
+        prefillRoute: routeDescription,
+        prefillDate: DateTime.now().add(const Duration(days: 3)),
+        prefillDistanceKm: _distanceKm > 0 ? _distanceKm : null,
+        prefillRouteType: _routeType,
+        prefillWaypoints: _waypoints.isNotEmpty
+            ? List<String>.from(_waypoints)
+            : null,
+        prefillRoutePolylinePoints: _routePolylinePoints.isNotEmpty
+            ? List<LatLng>.from(_routePolylinePoints)
+            : null,
+        onCreate: (group, invitees) async {
+          try {
+            final supabase = Supabase.instance.client;
+            final currentUser = supabase.auth.currentUser;
 
-          if (currentUser == null) {
+            if (currentUser == null) {
+              if (mounted) {
+                AppToast.show(
+                  context,
+                  message: 'You must be signed in to create a ride',
+                  type: ToastType.error,
+                );
+              }
+              return;
+            }
+
+            final inserted = await _insertRideGroup(supabase, {
+              'creator_id': currentUser.id,
+              'name': group.name,
+              'route': group.route,
+              'ride_date': group.date.toIso8601String(),
+              'max_riders': group.maxRiders,
+              'member_count': 1,
+              'leader_name': 'You',
+              'ride_community': group.rideCommunity,
+              'ride_type': group.rideType,
+              'difficulty': group.difficulty,
+              'duration': group.duration,
+              'route_image_url': group.routeImageUrl,
+              'route_polyline': _routePolylineToJson(group.routePolyline),
+              'route_waypoints': group.routeWaypoints,
+            });
+
+            final groupId = inserted['id'] as String?;
+
+            if (groupId != null && invitees.isNotEmpty) {
+              final inviteRows = invitees
+                  .map(
+                    (inviteeId) => {
+                      'group_id': groupId,
+                      'group_name': group.name,
+                      'inviter_id': currentUser.id,
+                      'invitee_id': inviteeId,
+                      'status': 'pending',
+                      'created_at': DateTime.now().toIso8601String(),
+                    },
+                  )
+                  .toList();
+
+              await supabase.from('ride_group_invites').insert(inviteRows);
+            }
+
             if (mounted) {
               AppToast.show(
                 context,
-                message: 'You must be signed in to create a ride',
+                message: invitees.isNotEmpty
+                    ? 'Group ride created & ${invitees.length} rider${invitees.length > 1 ? 's' : ''} invited!'
+                    : 'Group ride created!',
+                type: ToastType.success,
+              );
+
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RideGroupsScreen()),
+              );
+            }
+          } catch (e) {
+            debugPrint('RoutePlannerScreen: create group ride failed: $e');
+            await DiagnosticsService.instance.logError(
+              feature: 'route_planner',
+              action: 'create_group_ride',
+              error: e,
+              context: {
+                'invitee_count': invitees.length,
+                'has_route_polyline': group.routePolyline.isNotEmpty,
+                'waypoint_count': group.routeWaypoints.length,
+              },
+            );
+
+            if (mounted) {
+              AppToast.show(
+                context,
+                message: 'Could not create group ride',
                 type: ToastType.error,
               );
             }
-            return;
           }
-
-          final inserted = await _insertRideGroup(supabase, {
-            'creator_id': currentUser.id,
-            'name': group.name,
-            'route': group.route,
-            'ride_date': group.date.toIso8601String(),
-            'max_riders': group.maxRiders,
-            'member_count': 1,
-            'leader_name': 'You',
-            'ride_community': group.rideCommunity,
-            'ride_type': group.rideType,
-            'difficulty': group.difficulty,
-            'duration': group.duration,
-            'route_image_url': group.routeImageUrl,
-            'route_polyline': _routePolylineToJson(group.routePolyline),
-            'route_waypoints': group.routeWaypoints,
-          });
-
-          final groupId = inserted['id'] as String?;
-
-          if (groupId != null && invitees.isNotEmpty) {
-            final inviteRows = invitees
-                .map(
-                  (inviteeId) => {
-                    'group_id': groupId,
-                    'group_name': group.name,
-                    'inviter_id': currentUser.id,
-                    'invitee_id': inviteeId,
-                    'status': 'pending',
-                    'created_at': DateTime.now().toIso8601String(),
-                  },
-                )
-                .toList();
-
-            await supabase.from('ride_group_invites').insert(inviteRows);
-          }
-
-          if (mounted) {
-            AppToast.show(
-              context,
-              message: invitees.isNotEmpty
-                  ? 'Group ride created & ${invitees.length} rider${invitees.length > 1 ? 's' : ''} invited!'
-                  : 'Group ride created!',
-              type: ToastType.success,
-            );
-
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const RideGroupsScreen(),
-              ),
-            );
-          }
-        } catch (e) {
-          debugPrint('RoutePlannerScreen: create group ride failed: $e');
-
-          if (mounted) {
-            AppToast.show(
-              context,
-              message: 'Could not create group ride',
-              type: ToastType.error,
-            );
-          }
-        }
-      },
-    ),
-  );
-}
+        },
+      ),
+    );
+  }
 
   List<Map<String, double>> _routePolylineToJson(List<LatLng> points) {
     return points
-        .map(
-          (point) => {
-            'lat': point.latitude,
-            'lng': point.longitude,
-          },
-        )
+        .map((point) => {'lat': point.latitude, 'lng': point.longitude})
         .toList();
   }
 
@@ -1631,6 +1633,13 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
           debugPrint(
             'RoutePlannerScreen: route columns missing, retrying basic group insert: $e',
           );
+          await DiagnosticsService.instance.logError(
+            feature: 'route_planner',
+            action: 'insert_group_retry_without_route_columns',
+            error: e,
+            severity: 'warning',
+            context: {'attempt': attempt + 1},
+          );
           insertPayload.remove('route_polyline');
           insertPayload.remove('route_waypoints');
           continue;
@@ -1641,6 +1650,13 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
           debugPrint(
             'RoutePlannerScreen: ride_community column missing, retrying basic group insert: $e',
           );
+          await DiagnosticsService.instance.logError(
+            feature: 'route_planner',
+            action: 'insert_group_retry_without_ride_community',
+            error: e,
+            severity: 'warning',
+            context: {'attempt': attempt + 1},
+          );
           insertPayload.remove('ride_community');
           continue;
         }
@@ -1649,6 +1665,12 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       }
     }
 
+    await DiagnosticsService.instance.logError(
+      feature: 'route_planner',
+      action: 'insert_group_exhausted_retries',
+      error: 'Unable to create ride group',
+      context: {'payload_keys': insertPayload.keys.toList()},
+    );
     throw Exception('Unable to create ride group');
   }
 

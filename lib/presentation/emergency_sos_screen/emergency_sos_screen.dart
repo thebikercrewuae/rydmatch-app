@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/haptic_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/analytics_service.dart';
+import '../../services/diagnostics_service.dart';
 import './widgets/sos_button_widget.dart';
 import './widgets/emergency_contact_widget.dart';
 import './widgets/location_display_widget.dart';
@@ -258,6 +259,19 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
       }
     } on FunctionException catch (e) {
       debugPrint('SOS FunctionException: ${e.status} - ${e.details}');
+      await DiagnosticsService.instance.logError(
+        feature: 'emergency_sos',
+        action: 'send_sos_function_exception',
+        error: e,
+        context: {
+          'status': e.status,
+          'details': e.details?.toString(),
+          'contact_last4': contactPhone.length >= 4
+              ? contactPhone.substring(contactPhone.length - 4)
+              : contactPhone,
+          'has_location': _latitude != null && _longitude != null,
+        },
+      );
       if (mounted) {
         setState(() => _isSending = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -273,6 +287,17 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
       }
     } catch (e) {
       debugPrint('SOS send error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'emergency_sos',
+        action: 'send_sos',
+        error: e,
+        context: {
+          'contact_last4': contactPhone.length >= 4
+              ? contactPhone.substring(contactPhone.length - 4)
+              : contactPhone,
+          'has_location': _latitude != null && _longitude != null,
+        },
+      );
       if (mounted) {
         setState(() => _isSending = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -342,6 +367,19 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
       }
     } on FunctionException catch (e) {
       debugPrint('Test SMS FunctionException: ${e.status} - ${e.details}');
+      await DiagnosticsService.instance.logError(
+        feature: 'emergency_sos',
+        action: 'send_test_sms_function_exception',
+        error: e,
+        context: {
+          'status': e.status,
+          'details': e.details?.toString(),
+          'contact_last4': contactPhone.length >= 4
+              ? contactPhone.substring(contactPhone.length - 4)
+              : contactPhone,
+          'using_fallback_location': usingFallback,
+        },
+      );
       if (mounted) {
         setState(() => _isSendingTest = false);
         _showTestResultDialog(
@@ -351,6 +389,17 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
       }
     } catch (e) {
       debugPrint('Test SMS error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'emergency_sos',
+        action: 'send_test_sms',
+        error: e,
+        context: {
+          'contact_last4': contactPhone.length >= 4
+              ? contactPhone.substring(contactPhone.length - 4)
+              : contactPhone,
+          'using_fallback_location': usingFallback,
+        },
+      );
       if (mounted) {
         setState(() => _isSendingTest = false);
         _showTestResultDialog(
@@ -635,8 +684,9 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
                     _contactNameKey,
                     nameController.text.trim(),
                   );
-                  final normalizedPhone =
-                      _normalizePhoneNumber(phoneController.text);
+                  final normalizedPhone = _normalizePhoneNumber(
+                    phoneController.text,
+                  );
                   await prefs.setString(_contactPhoneKey, normalizedPhone);
                   if (mounted) {
                     setState(() {

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'diagnostics_service.dart';
 
 class ProfileService {
   static String? _lastUploadError;
@@ -24,8 +25,7 @@ class ProfileService {
   static const String _keyGender = 'profile_gender';
   static const String _keySameGenderMatching = 'profile_same_gender_matching';
   static const String _keyDateOfBirth = 'profile_date_of_birth';
-  static const String _keyMinimumAgeConfirmed =
-      'profile_minimum_age_confirmed';
+  static const String _keyMinimumAgeConfirmed = 'profile_minimum_age_confirmed';
   static const String _keyRideMode = 'profile_ride_mode';
   static const String _keyMixedCommunityMatching =
       'profile_mixed_community_matching';
@@ -97,6 +97,12 @@ class ProfileService {
     } catch (e) {
       debugPrint('❌ uploadPhoto failed: $e');
       _lastUploadError = e.toString();
+      await DiagnosticsService.instance.logError(
+        feature: 'profile_media',
+        action: 'upload_photo',
+        error: e,
+        context: {'folder': folder, 'photo_name': photo.name},
+      );
       return null;
     }
   }
@@ -124,6 +130,13 @@ class ProfileService {
           .createSignedUrl(storagePath, 3600);
     } catch (e) {
       debugPrint('resolvePhotoUrl: failed to sign photo URL: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'profile_media',
+        action: 'sign_photo_url',
+        error: e,
+        context: {'url': trimmed},
+        severity: 'warning',
+      );
       return trimmed;
     }
   }
@@ -150,17 +163,18 @@ class ProfileService {
       final files = await Supabase.instance.client.storage
           .from('user-photos')
           .list(path: '${userId.trim()}/profile');
-      final imageFiles = files
-          .where(
-            (file) =>
-                !file.name.startsWith('.') &&
-                RegExp(
-                  r'\.(jpe?g|png|webp|gif)$',
-                  caseSensitive: false,
-                ).hasMatch(file.name),
-          )
-          .toList()
-        ..sort((a, b) => b.name.compareTo(a.name));
+      final imageFiles =
+          files
+              .where(
+                (file) =>
+                    !file.name.startsWith('.') &&
+                    RegExp(
+                      r'\.(jpe?g|png|webp|gif)$',
+                      caseSensitive: false,
+                    ).hasMatch(file.name),
+              )
+              .toList()
+            ..sort((a, b) => b.name.compareTo(a.name));
 
       if (imageFiles.isEmpty) return null;
 
@@ -176,6 +190,13 @@ class ProfileService {
       }
     } catch (e) {
       debugPrint('resolveUserProfilePhotoUrl: failed to find photo: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'profile_media',
+        action: 'resolve_user_profile_photo',
+        error: e,
+        context: {'target_user_id': userId},
+        severity: 'warning',
+      );
       return null;
     }
   }
@@ -190,8 +211,8 @@ class ProfileService {
     final marker = path.contains(publicMarker)
         ? publicMarker
         : path.contains(signedMarker)
-            ? signedMarker
-            : null;
+        ? signedMarker
+        : null;
     if (marker == null) return null;
 
     final storagePath = Uri.decodeComponent(path.split(marker).last);
@@ -306,13 +327,17 @@ class ProfileService {
     await prefs.setString(_keySpeedUnit, isMetric ? 'metric' : 'imperial');
     await prefs.setBool('unit_system_metric', isMetric);
     await prefs.setBool('isMetric', isMetric);
-    final effectiveSameGenderMatching =
-        gender == 'prefer_not_to_say' ? false : sameGenderMatching;
+    final effectiveSameGenderMatching = gender == 'prefer_not_to_say'
+        ? false
+        : sameGenderMatching;
     if (dateOfBirth != null) {
       await prefs.setString(
         _keyDateOfBirth,
-        DateTime(dateOfBirth.year, dateOfBirth.month, dateOfBirth.day)
-            .toIso8601String(),
+        DateTime(
+          dateOfBirth.year,
+          dateOfBirth.month,
+          dateOfBirth.day,
+        ).toIso8601String(),
       );
     }
     if (minimumAgeConfirmed != null) {
@@ -426,6 +451,16 @@ class ProfileService {
       debugPrint('✅ Profile synced successfully');
     } catch (e) {
       debugPrint('❌ SYNC FAILED: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'profile',
+        action: 'sync_to_supabase',
+        error: e,
+        context: {
+          'has_avatar_url': avatarUrl != null && avatarUrl.isNotEmpty,
+          'bike_photo_count': bikePhotoUrls.length,
+          'ride_mode': rideMode,
+        },
+      );
     }
   }
 
@@ -442,7 +477,8 @@ class ProfileService {
     final settingsMetric = prefs.getBool('unit_system_metric');
     final legacyMetric = prefs.getBool('isMetric');
     final speedUnit = prefs.getString(_keySpeedUnit);
-    final isMetric = settingsMetric ?? legacyMetric ?? (speedUnit != 'imperial');
+    final isMetric =
+        settingsMetric ?? legacyMetric ?? (speedUnit != 'imperial');
 
     return {
       'ridingSpeed': prefs.getDouble(_keyRidingSpeed) ?? 60.0,
@@ -568,10 +604,7 @@ class ProfileService {
       final mixedCommunityMatching =
           response['mixed_community_matching'] as bool?;
       if (mixedCommunityMatching != null) {
-        await prefs.setBool(
-          _keyMixedCommunityMatching,
-          mixedCommunityMatching,
-        );
+        await prefs.setBool(_keyMixedCommunityMatching, mixedCommunityMatching);
       }
 
       // Restore avatar/photo URL

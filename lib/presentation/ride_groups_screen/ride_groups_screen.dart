@@ -5,6 +5,7 @@ import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/ride_group_model.dart';
+import '../../services/diagnostics_service.dart';
 import '../../services/live_ride_service.dart';
 import '../../services/premium_service.dart';
 import '../../widgets/app_icons.dart';
@@ -123,9 +124,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       final acceptedInvites = List<Map<String, dynamic>>.from(
         acceptedInviteData,
       );
-      final pendingInvites = List<Map<String, dynamic>>.from(
-        pendingInviteData,
-      );
+      final pendingInvites = List<Map<String, dynamic>>.from(pendingInviteData);
       final inviteGroupIds = <String>{
         for (final invite in acceptedInvites)
           if ((invite['group_id'] as String?)?.isNotEmpty == true)
@@ -189,6 +188,12 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       }
     } catch (e, stack) {
       debugPrint('RideGroupsScreen: _loadGroups failed: $e\n$stack');
+      await DiagnosticsService.instance.logError(
+        feature: 'ride_groups',
+        action: 'load_groups',
+        error: e,
+        stackTrace: stack,
+      );
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -211,6 +216,13 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       };
     } catch (e) {
       debugPrint('RideGroupsScreen: group batch fetch failed: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'ride_groups',
+        action: 'fetch_group_rows',
+        error: e,
+        severity: 'warning',
+        context: {'group_count': groupIds.length},
+      );
       return {};
     }
   }
@@ -245,6 +257,13 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       return names;
     } catch (e) {
       debugPrint('RideGroupsScreen: leader profiles batch fetch failed: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'ride_groups',
+        action: 'fetch_leader_names',
+        error: e,
+        severity: 'warning',
+        context: {'leader_count': inviterIds.length},
+      );
       return {};
     }
   }
@@ -297,12 +316,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
 
   List<Map<String, double>> _routePolylineToJson(List<LatLng> points) {
     return points
-        .map(
-          (point) => {
-            'lat': point.latitude,
-            'lng': point.longitude,
-          },
-        )
+        .map((point) => {'lat': point.latitude, 'lng': point.longitude})
         .toList();
   }
 
@@ -338,6 +352,13 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
           debugPrint(
             'RideGroupsScreen: route columns missing, retrying basic group insert: $e',
           );
+          await DiagnosticsService.instance.logError(
+            feature: 'ride_groups',
+            action: 'insert_group_retry_without_route_columns',
+            error: e,
+            severity: 'warning',
+            context: {'attempt': attempt + 1},
+          );
           insertPayload.remove('route_polyline');
           insertPayload.remove('route_waypoints');
           continue;
@@ -348,6 +369,13 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
           debugPrint(
             'RideGroupsScreen: ride_community column missing, retrying basic group insert: $e',
           );
+          await DiagnosticsService.instance.logError(
+            feature: 'ride_groups',
+            action: 'insert_group_retry_without_ride_community',
+            error: e,
+            severity: 'warning',
+            context: {'attempt': attempt + 1},
+          );
           insertPayload.remove('ride_community');
           continue;
         }
@@ -356,6 +384,12 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       }
     }
 
+    await DiagnosticsService.instance.logError(
+      feature: 'ride_groups',
+      action: 'insert_group_exhausted_retries',
+      error: 'Unable to create ride group',
+      context: {'payload_keys': insertPayload.keys.toList()},
+    );
     throw Exception('Unable to create ride group');
   }
 
@@ -418,6 +452,13 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       }
     } catch (e, stack) {
       debugPrint('RideGroupsScreen: delete rides failed: $e\n$stack');
+      await DiagnosticsService.instance.logError(
+        feature: 'ride_groups',
+        action: 'delete_selected_rides',
+        error: e,
+        stackTrace: stack,
+        context: {'selected_count': selectedGroups.length},
+      );
 
       if (mounted) {
         AppToast.show(
@@ -521,6 +562,16 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
                 debugPrint(
                   'RideGroupsScreen: invite notifications skipped: $e',
                 );
+                await DiagnosticsService.instance.logError(
+                  feature: 'ride_groups',
+                  action: 'create_invite_notifications',
+                  error: e,
+                  severity: 'warning',
+                  context: {
+                    'group_id': groupId,
+                    'invitee_count': invitees.length,
+                  },
+                );
               }
             }
 
@@ -537,6 +588,13 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
             }
           } catch (e, stack) {
             debugPrint('RideGroupsScreen: create group failed: $e\n$stack');
+            await DiagnosticsService.instance.logError(
+              feature: 'ride_groups',
+              action: 'create_group',
+              error: e,
+              stackTrace: stack,
+              context: {'invitee_count': invitees.length},
+            );
 
             if (mounted) {
               AppToast.show(
@@ -570,6 +628,13 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
         );
       } catch (e) {
         debugPrint('RideGroupsScreen: member count increment skipped: $e');
+        await DiagnosticsService.instance.logError(
+          feature: 'ride_groups',
+          action: 'increment_member_count',
+          error: e,
+          severity: 'warning',
+          context: {'group_id': group.id},
+        );
       }
 
       await _loadGroups();
@@ -584,6 +649,13 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       }
     } catch (e, stack) {
       debugPrint('RideGroupsScreen: accept invitation failed: $e\n$stack');
+      await DiagnosticsService.instance.logError(
+        feature: 'ride_groups',
+        action: 'accept_invitation',
+        error: e,
+        stackTrace: stack,
+        context: {'group_id': group.id},
+      );
 
       if (mounted) {
         AppToast.show(
@@ -610,6 +682,13 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       await _loadGroups();
     } catch (e) {
       debugPrint('RideGroupsScreen: decline invitation failed: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'ride_groups',
+        action: 'decline_invitation',
+        error: e,
+        severity: 'warning',
+        context: {'group_id': group.id},
+      );
       setState(() => _invitations.remove(group));
     }
   }
@@ -926,11 +1005,11 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
                 width: isSelected ? 2 : 1,
               )
             : isPast
-                ? Border.all(
-                    color: const Color(0xFFE85A4F).withValues(alpha: 0.55),
-                    width: 1,
-                  )
-                : null,
+            ? Border.all(
+                color: const Color(0xFFE85A4F).withValues(alpha: 0.55),
+                width: 1,
+              )
+            : null,
         color: isPast
             ? const Color(0xFFE85A4F).withValues(alpha: 0.05)
             : Colors.transparent,
@@ -1452,7 +1531,8 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
     } else if (mounted) {
       AppToast.show(
         context,
-        message: LiveRideService.instance.lastError ?? 'Failed to join live ride',
+        message:
+            LiveRideService.instance.lastError ?? 'Failed to join live ride',
         type: ToastType.error,
       );
     }
