@@ -487,11 +487,25 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       if (_isEditMode) {
         Navigator.of(context).pop();
       } else {
-        Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
-          '/profile-view-screen',
-          (route) => route.settings.name == '/main-screen' || route.isFirst,
-        );
+        Navigator.of(
+          context,
+          rootNavigator: true,
+        ).pushNamedAndRemoveUntil('/main-screen', (route) => false);
       }
+    }
+  }
+
+  void _handleBackNavigation() {
+    if (_isEditMode) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    if (_currentPage > 0) {
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+      );
     }
   }
 
@@ -524,94 +538,102 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         body: const Center(child: CircularProgressIndicator()),
       );
     }
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 2.h, horizontal: 4.w),
-          child: Column(
-            children: [
-              _buildHeader(theme),
-              SizedBox(height: 1.h),
-              _buildProgressIndicator(theme),
-              SizedBox(height: 2.h),
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  onPageChanged: (index) =>
-                      setState(() => _currentPage = index),
-                  children: [
-                    _buildNameInputPage(theme),
-                    SpeedSelectionWidget(
-                      ridingSpeed: _ridingSpeed,
-                      isMetric: _isMetric,
-                      onSpeedChanged: (val) =>
-                          setState(() => _ridingSpeed = val),
-                      onUnitChanged: (val) => setState(() => _isMetric = val),
-                      rideMode: _rideMode,
-                    ),
-                    GenderSelectionWidget(
-                      selectedGender: _gender,
-                      sameGenderMatching: _sameGenderMatching,
-                      onGenderChanged: (val) => setState(() {
-                        _gender = val;
-                        if (val == 'prefer_not_to_say') {
-                          _sameGenderMatching = false;
-                        }
-                      }),
-                      onSameGenderMatchingChanged: (val) =>
-                          setState(() => _sameGenderMatching = val),
-                    ),
-                    SkillLevelWidget(
-                      selectedLevels: _skillLevels,
-                      onLevelsChanged: (val) =>
-                          setState(() => _skillLevels = val),
-                    ),
-                    BikeTypeWidget(
-                      selectedBikes: _bikeTypes,
-                      onBikesChanged: (val) => setState(() => _bikeTypes = val),
-                      rideMode: _rideMode,
-                    ),
-                    PreferredRoadsWidget(
-                      selectedRoads: _preferredRoads,
-                      onRoadsChanged: (val) =>
-                          setState(() => _preferredRoads = val),
-                    ),
-                    RideTimesWidget(
-                      rideTimes: _rideTimes,
-                      onTimesChanged: (val) => setState(() => _rideTimes = val),
-                    ),
-                    PhotoUploadWidget(
-                      riderPhoto: _riderPhoto,
-                      existingRiderPhotoUrl: _existingRiderPhotoUrl,
-                      existingBikePhotoUrls: _existingBikePhotoUrls,
-                      bikePhotos: _bikePhotos,
-                      onRiderPhotoChanged: (val) => setState(() {
-                        _riderPhoto = val;
-                        if (val != null || _existingRiderPhotoUrl != null) {
-                          _existingRiderPhotoUrl = null;
-                        }
-                      }),
-                      onExistingBikePhotoUrlsChanged: (val) =>
-                          setState(() => _existingBikePhotoUrls = val),
-                      onBikePhotosChanged: (val) =>
-                          setState(() => _bikePhotos = val),
-                    ),
-                    EmergencyContactSetupWidget(
-                      contactName: _emergencyContactName,
-                      contactPhone: _emergencyContactPhone,
-                      onNameChanged: (val) =>
-                          setState(() => _emergencyContactName = val),
-                      onPhoneChanged: (val) =>
-                          setState(() => _emergencyContactPhone = val),
-                    ),
-                  ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _handleBackNavigation();
+      },
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 2.h, horizontal: 4.w),
+            child: Column(
+              children: [
+                _buildHeader(theme),
+                SizedBox(height: 1.h),
+                _buildProgressIndicator(theme),
+                SizedBox(height: 2.h),
+                Expanded(
+                  child: PageView(
+                    controller: _pageController,
+                    physics: const NeverScrollableScrollPhysics(),
+                    onPageChanged: (index) =>
+                        setState(() => _currentPage = index),
+                    children: [
+                      _buildNameInputPage(theme),
+                      SpeedSelectionWidget(
+                        ridingSpeed: _ridingSpeed,
+                        isMetric: _isMetric,
+                        onSpeedChanged: (val) =>
+                            setState(() => _ridingSpeed = val),
+                        onUnitChanged: (val) => setState(() => _isMetric = val),
+                        rideMode: _rideMode,
+                      ),
+                      GenderSelectionWidget(
+                        selectedGender: _gender,
+                        sameGenderMatching: _sameGenderMatching,
+                        onGenderChanged: (val) => setState(() {
+                          _gender = val;
+                          if (val == 'prefer_not_to_say') {
+                            _sameGenderMatching = false;
+                          }
+                        }),
+                        onSameGenderMatchingChanged: (val) =>
+                            setState(() => _sameGenderMatching = val),
+                      ),
+                      SkillLevelWidget(
+                        selectedLevels: _skillLevels,
+                        onLevelsChanged: (val) =>
+                            setState(() => _skillLevels = val),
+                      ),
+                      BikeTypeWidget(
+                        selectedBikes: _bikeTypes,
+                        onBikesChanged: (val) =>
+                            setState(() => _bikeTypes = val),
+                        rideMode: _rideMode,
+                      ),
+                      PreferredRoadsWidget(
+                        selectedRoads: _preferredRoads,
+                        onRoadsChanged: (val) =>
+                            setState(() => _preferredRoads = val),
+                      ),
+                      RideTimesWidget(
+                        rideTimes: _rideTimes,
+                        onTimesChanged: (val) =>
+                            setState(() => _rideTimes = val),
+                      ),
+                      PhotoUploadWidget(
+                        riderPhoto: _riderPhoto,
+                        existingRiderPhotoUrl: _existingRiderPhotoUrl,
+                        existingBikePhotoUrls: _existingBikePhotoUrls,
+                        bikePhotos: _bikePhotos,
+                        onRiderPhotoChanged: (val) => setState(() {
+                          _riderPhoto = val;
+                          if (val != null || _existingRiderPhotoUrl != null) {
+                            _existingRiderPhotoUrl = null;
+                          }
+                        }),
+                        onExistingBikePhotoUrlsChanged: (val) =>
+                            setState(() => _existingBikePhotoUrls = val),
+                        onBikePhotosChanged: (val) =>
+                            setState(() => _bikePhotos = val),
+                      ),
+                      EmergencyContactSetupWidget(
+                        contactName: _emergencyContactName,
+                        contactPhone: _emergencyContactPhone,
+                        onNameChanged: (val) =>
+                            setState(() => _emergencyContactName = val),
+                        onPhoneChanged: (val) =>
+                            setState(() => _emergencyContactPhone = val),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              SizedBox(height: 2.h),
-              _buildContinueButton(theme),
-            ],
+                SizedBox(height: 2.h),
+                _buildContinueButton(theme),
+              ],
+            ),
           ),
         ),
       ),
