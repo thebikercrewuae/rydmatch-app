@@ -32,9 +32,10 @@ class RideTimesWidget extends StatelessWidget {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          SizedBox(height: 3.h),
+          SizedBox(height: 1.6.h),
           ...days.map((day) {
             final dayTimes = rideTimes[day] ?? [];
+            final isLastDay = day == days.last;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -110,13 +111,15 @@ class RideTimesWidget extends StatelessWidget {
                     ),
                   ],
                 ),
-                Divider(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.4),
-                ),
+                if (!isLastDay)
+                  Divider(
+                    height: 1.2.h,
+                    color: theme.colorScheme.outline.withValues(alpha: 0.4),
+                  ),
               ],
             );
           }),
-          SizedBox(height: 1.h),
+          SizedBox(height: 0.8.h),
           _buildLegend(theme),
         ],
       ),
