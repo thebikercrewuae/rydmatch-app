@@ -565,6 +565,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                       : _referralCodeValid == false
                       ? 'Invalid code. Please check and try again.'
                       : 'Both you and your friend earn 7 premium trial days!',
+                  helperMaxLines: 3,
                   helperStyle: GoogleFonts.dmSans(
                     fontSize: 10.sp,
                     color: _referralCodeValid == true
