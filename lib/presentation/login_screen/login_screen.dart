@@ -35,73 +35,73 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _signIn() async {
-  if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) return;
 
-  setState(() {
-    _isLoading = true;
-    _errorMessage = null;
-  });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
-  try {
-    final response = await Supabase.instance.client.auth.signInWithPassword(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-    );
+    try {
+      final response = await Supabase.instance.client.auth.signInWithPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
-    if (response.user == null) {
+      if (response.user == null) {
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Sign in failed. Please check your details.';
+        });
+        return;
+      }
+
+      try {
+        await SessionService.saveSession(staySignedIn: _staySignedIn);
+      } catch (e) {
+        debugPrint('LoginScreen: saveSession failed: $e');
+      }
+
+      try {
+        await ProfileService.restoreProfileFromSupabase();
+      } catch (e) {
+        debugPrint('LoginScreen: restoreProfileFromSupabase failed: $e');
+      }
+
+      try {
+        await PremiumService().refresh();
+      } catch (e) {
+        debugPrint('LoginScreen: premium refresh failed: $e');
+      }
+
       if (!mounted) return;
+
+      setState(() => _isLoading = false);
+
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/main-screen',
+        (route) => false,
+      );
+    } on AuthException catch (e) {
+      if (!mounted) return;
+
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Sign in failed. Please check your details.';
+        _errorMessage = e.message;
       });
-      return;
-    }
-
-    try {
-      await SessionService.saveSession(staySignedIn: _staySignedIn);
     } catch (e) {
-      debugPrint('LoginScreen: saveSession failed: $e');
+      debugPrint('LoginScreen: unexpected sign in error: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString();
+      });
     }
-
-    try {
-      await ProfileService.restoreProfileFromSupabase();
-    } catch (e) {
-      debugPrint('LoginScreen: restoreProfileFromSupabase failed: $e');
-    }
-
-    try {
-      await PremiumService().refresh();
-    } catch (e) {
-      debugPrint('LoginScreen: premium refresh failed: $e');
-    }
-
-    if (!mounted) return;
-
-    setState(() => _isLoading = false);
-
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      '/main-screen',
-      (route) => false,
-    );
-  } on AuthException catch (e) {
-    if (!mounted) return;
-
-    setState(() {
-      _isLoading = false;
-      _errorMessage = e.message;
-    });
-  } catch (e) {
-    debugPrint('LoginScreen: unexpected sign in error: $e');
-
-    if (!mounted) return;
-
-    setState(() {
-      _isLoading = false;
-      _errorMessage = e.toString();
-    });
   }
-}
 
   void _showForgotPassword() {
     showModalBottomSheet(
@@ -256,6 +256,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               return null;
                             },
                           ),
+                          SizedBox(height: 1.2.h),
                           // Forgot password row + Stay signed in
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -316,9 +317,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ],
                           ),
+                          SizedBox(height: 1.4.h),
                           // Error message
                           if (_errorMessage != null) ...[
-                            SizedBox(height: 1.h),
                             Container(
                               padding: EdgeInsets.all(3.w),
                               decoration: BoxDecoration(
@@ -352,7 +353,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             SizedBox(height: 1.5.h),
                           ],
-                          SizedBox(height: 1.h),
                           // Sign In button
                           SizedBox(
                             width: double.infinity,
