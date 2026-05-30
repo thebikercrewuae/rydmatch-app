@@ -206,22 +206,30 @@ class _RegistrationScreenState extends State<RegistrationScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
       body: Stack(
         children: [
-          // Top accent
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              height: 30.h,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF1B365D), Color(0xFF2A4A7A)],
-                ),
+          // Background
+          SizedBox.expand(
+            child: Image.network(
+              'https://images.pexels.com/photos/1715193/pexels-photo-1715193.jpeg',
+              fit: BoxFit.cover,
+              semanticLabel:
+                  'Motorcycle rider on open road at sunset with dramatic sky',
+              errorBuilder: (_, __, ___) =>
+                  const ColoredBox(color: Color(0xFF0D1B2A)),
+            ),
+          ),
+          // Gradient overlay
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  const Color(0xFF1B365D).withValues(alpha: 0.85),
+                  const Color(0xFF0D1B2A).withValues(alpha: 0.97),
+                ],
+                stops: const [0.0, 0.65],
               ),
             ),
           ),
@@ -232,6 +240,8 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: EdgeInsets.only(
+                    left: 6.w,
+                    right: 6.w,
                     bottom: MediaQuery.viewInsetsOf(context).bottom + 2.h,
                   ),
                   child: ConstrainedBox(
@@ -239,19 +249,27 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                       minHeight: constraints.maxHeight,
                     ),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         // Header with full logo
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 5.w,
-                            vertical: 2.h,
+                        SizedBox(height: 5.h),
+                        Center(child: BrandLogoFull(width: 55.w)),
+                        SizedBox(height: 4.h),
+                        // Content card
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(5.w),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20.0),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.2),
+                                blurRadius: 30,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
                           ),
-                          child: Center(child: BrandLogoFull(width: 52.w)),
-                        ),
-                        SizedBox(height: 1.h),
-                        // Title area
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 5.w),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -260,9 +278,9 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                     ? 'Join RydMatch'
                                     : 'You\'re in!',
                                 style: GoogleFonts.dmSans(
-                                  fontSize: 20.sp,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
+                                  fontSize: 17.sp,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1B365D),
                                 ),
                               ),
                               SizedBox(height: 0.5.h),
@@ -272,34 +290,17 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                     : 'Account created successfully.',
                                 style: GoogleFonts.dmSans(
                                   fontSize: 11.sp,
-                                  color: Colors.white.withValues(alpha: 0.75),
+                                  color: const Color(0xFF666666),
                                 ),
                               ),
+                              SizedBox(height: 2.5.h),
+                              _step == _RegistrationStep.signup
+                                  ? _buildSignUpStep()
+                                  : _buildSuccessStep(),
                             ],
                           ),
                         ),
                         SizedBox(height: 3.h),
-                        // Content card
-                        Container(
-                          width: double.infinity,
-                          margin: EdgeInsets.symmetric(horizontal: 4.w),
-                          padding: EdgeInsets.all(5.w),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20.0),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.08),
-                                blurRadius: 20,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: _step == _RegistrationStep.signup
-                              ? _buildSignUpStep()
-                              : _buildSuccessStep(),
-                        ),
-                        SizedBox(height: 2.h),
                         // Sign in link
                         if (_step == _RegistrationStep.signup)
                           Padding(
@@ -310,8 +311,8 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                 Text(
                                   'Already have an account? ',
                                   style: GoogleFonts.dmSans(
-                                    fontSize: 11.sp,
-                                    color: const Color(0xFF666666),
+                                    fontSize: 12.sp,
+                                    color: Colors.white.withValues(alpha: 0.8),
                                   ),
                                 ),
                                 GestureDetector(
@@ -322,15 +323,66 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                   child: Text(
                                     'Sign In',
                                     style: GoogleFonts.dmSans(
-                                      fontSize: 11.sp,
+                                      fontSize: 12.sp,
                                       fontWeight: FontWeight.w700,
                                       color: const Color(0xFFE85A4F),
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: const Color(0xFFE85A4F),
                                     ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
+                        if (_step == _RegistrationStep.signup) ...[
+                          SizedBox(height: 2.h),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              GestureDetector(
+                                onTap: () =>
+                                    Navigator.pushNamed(context, '/terms'),
+                                child: Text(
+                                  'Terms of Service',
+                                  style: GoogleFonts.dmSans(
+                                    fontSize: 10.sp,
+                                    color: Colors.white.withValues(alpha: 0.45),
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: Colors.white.withValues(
+                                      alpha: 0.3,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 2.w),
+                                child: Text(
+                                  'Â·',
+                                  style: GoogleFonts.dmSans(
+                                    fontSize: 10.sp,
+                                    color: Colors.white.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () =>
+                                    Navigator.pushNamed(context, '/privacy'),
+                                child: Text(
+                                  'Privacy Policy',
+                                  style: GoogleFonts.dmSans(
+                                    fontSize: 10.sp,
+                                    color: Colors.white.withValues(alpha: 0.45),
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: Colors.white.withValues(
+                                      alpha: 0.3,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 4.h),
+                        ],
                       ],
                     ),
                   ),

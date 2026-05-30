@@ -129,6 +129,8 @@ class _LoginScreenState extends State<LoginScreen> {
               fit: BoxFit.cover,
               semanticLabel:
                   'Motorcycle rider on open road at sunset with dramatic sky',
+              errorBuilder: (_, __, ___) =>
+                  const ColoredBox(color: Color(0xFF0D1B2A)),
             ),
           ),
           // Gradient overlay
@@ -196,8 +198,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
                             textInputAction: TextInputAction.next,
-                            style: GoogleFonts.dmSans(fontSize: 13.sp),
+                            style: GoogleFonts.dmSans(
+                              fontSize: 13.sp,
+                              color: const Color(0xFF1B365D),
+                            ),
                             decoration: InputDecoration(
+                              filled: true,
+                              fillColor: const Color(0xFFF8F9FA),
                               labelText: 'Email address',
                               prefixIcon: Icon(
                                 AppIcons.email,
@@ -223,9 +230,14 @@ class _LoginScreenState extends State<LoginScreen> {
                             controller: _passwordController,
                             obscureText: _obscurePassword,
                             textInputAction: TextInputAction.done,
-                            style: GoogleFonts.dmSans(fontSize: 13.sp),
+                            style: GoogleFonts.dmSans(
+                              fontSize: 13.sp,
+                              color: const Color(0xFF1B365D),
+                            ),
                             onFieldSubmitted: (_) => _signIn(),
                             decoration: InputDecoration(
+                              filled: true,
+                              fillColor: const Color(0xFFF8F9FA),
                               labelText: 'Password',
                               prefixIcon: Icon(
                                 AppIcons.lock,
