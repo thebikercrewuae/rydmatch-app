@@ -19,7 +19,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   late AnimationController _illustrationController;
   late Animation<double> _illustrationScale;
-  late Animation<double> _illustrationFade;
 
   static const String _onboardingKey = 'onboarding_seen';
 
@@ -69,14 +68,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    _illustrationScale = Tween<double>(begin: 0.85, end: 1.0).animate(
+    _illustrationScale = Tween<double>(begin: 0.96, end: 1.0).animate(
       CurvedAnimation(
         parent: _illustrationController,
-        curve: Curves.easeOutBack,
+        curve: Curves.easeOutCubic,
       ),
-    );
-    _illustrationFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _illustrationController, curve: Curves.easeOut),
     );
     _illustrationController.forward();
   }
@@ -300,26 +296,25 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             builder: (context, child) {
               return Transform.scale(
                 scale: isActive ? _illustrationScale.value : 1.0,
-                child: Opacity(
-                  opacity: isActive ? _illustrationFade.value : 1.0,
-                  child: child,
-                ),
+                child: child,
               );
             },
-            child: Container(
-              width: 70.w,
-              height: 30.h,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(28.0),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  width: 1.5,
+            child: RepaintBoundary(
+              child: Container(
+                width: 70.w,
+                height: 30.h,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(28.0),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    width: 1.5,
+                  ),
                 ),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(26.0),
-                child: page.illustrationWidgets,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(26.0),
+                  child: page.illustrationWidgets,
+                ),
               ),
             ),
           ),
@@ -789,6 +784,7 @@ class _MiniRiderCard extends StatelessWidget {
               width: 32,
               height: 32,
               fit: BoxFit.cover,
+              gaplessPlayback: true,
               semanticLabel: semanticLabel,
               errorBuilder: (_, __, ___) => Container(
                 width: 32,
@@ -856,6 +852,7 @@ class _ProfileCircle extends StatelessWidget {
         child: Image.network(
           imageUrl,
           fit: BoxFit.cover,
+          gaplessPlayback: true,
           semanticLabel: semanticLabel,
           errorBuilder: (_, __, ___) => Container(
             color: Colors.white.withValues(alpha: 0.2),
@@ -889,6 +886,7 @@ class _SmallAvatar extends StatelessWidget {
         child: Image.network(
           imageUrl,
           fit: BoxFit.cover,
+          gaplessPlayback: true,
           semanticLabel: semanticLabel,
           errorBuilder: (_, __, ___) => Container(
             color: Colors.white.withValues(alpha: 0.2),
