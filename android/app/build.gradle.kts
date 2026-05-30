@@ -26,8 +26,8 @@ android {
         applicationId = "com.rydmatch.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 14
-        versionName = "1.0.14"
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
         manifestPlaceholders["GOOGLE_MAPS_API_KEY"] =
             System.getenv("GOOGLE_MAPS_API_KEY") ?: ""
     }
