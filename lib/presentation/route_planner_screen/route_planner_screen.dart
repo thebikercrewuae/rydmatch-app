@@ -83,6 +83,9 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
 
   bool get _isBicycleMode => _rideMode == 'bicycle';
 
+  String _weatherLocationForPoint(LatLng point) =>
+      '${point.latitude.toStringAsFixed(5)},${point.longitude.toStringAsFixed(5)}';
+
   @override
   void initState() {
     super.initState();
@@ -443,7 +446,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
             _routeSet = true;
             _distanceKm = totalDistanceM / 1000.0;
             _estimatedMinutes = (totalDurationSec / 60).round().clamp(1, 9999);
-            _weatherLocation = destText;
+            _weatherLocation = _weatherLocationForPoint(_endPoint);
             _isFetchingRoute = false;
           });
           _rebuildMapOverlays();
@@ -627,7 +630,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       if (latLng != null) {
         setState(() {
           _endPoint = latLng;
-          _weatherLocation = text;
+          _weatherLocation = _weatherLocationForPoint(latLng);
         });
         _updateRoute();
         _mapController?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 13));
@@ -667,7 +670,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
         5,
         999,
       );
-      _weatherLocation = _destinationController.text.trim();
+      _weatherLocation = _weatherLocationForPoint(_endPoint);
       _routePolylinePoints = [_startPoint, ..._waypointPoints, _endPoint];
     });
 
@@ -811,13 +814,14 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
         _endPoint = point;
         _destinationController.text =
             '${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}';
+        _weatherLocation = _weatherLocationForPoint(point);
       });
       _updateRoute();
       final address = await _reverseGeocode(point);
       if (address != null && mounted) {
         setState(() {
           _destinationController.text = address;
-          _weatherLocation = address;
+          _weatherLocation = _weatherLocationForPoint(point);
         });
         _rebuildMapOverlays();
       }

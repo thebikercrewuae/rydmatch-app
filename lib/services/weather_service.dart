@@ -80,8 +80,8 @@ class WeatherService {
       if (data['results'] != null && (data['results'] as List).isNotEmpty) {
         final result = data['results'][0];
         return {
-          'lat': result['latitude'] as double,
-          'lng': result['longitude'] as double,
+          'lat': (result['latitude'] as num).toDouble(),
+          'lng': (result['longitude'] as num).toDouble(),
           'name': result['name'] as String,
         };
       }
@@ -114,6 +114,7 @@ class WeatherService {
       );
 
       final current = response.data['current'];
+      if (current is! Map<String, dynamic>) return null;
       final temp = (current['temperature_2m'] as num).toDouble();
       final feelsLike = (current['apparent_temperature'] as num).toDouble();
       final windSpeed = (current['wind_speed_10m'] as num).toDouble();
