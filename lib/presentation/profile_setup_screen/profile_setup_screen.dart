@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sizer/sizer.dart';
@@ -945,22 +946,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     final now = DateTime.now();
     final initialDate =
         _dateOfBirth ?? DateTime(now.year - _minimumAge, now.month, now.day);
-    final selectedDate = await showDatePicker(
+    final selectedDate = await showDialog<DateTime>(
       context: context,
-      initialDate: initialDate,
-      firstDate: DateTime(now.year - 100),
-      lastDate: DateTime(now.year, now.month, now.day),
-      helpText: 'Select date of birth',
-      builder: (context, child) {
-        return Theme(
-          data: theme.copyWith(
-            colorScheme: theme.colorScheme.copyWith(
-              primary: theme.colorScheme.primary,
-            ),
-          ),
-          child: child!,
-        );
-      },
+      builder: (context) => _DateOfBirthDialog(
+        initialDate: initialDate,
+        firstDate: DateTime(now.year - 100),
+        lastDate: DateTime(now.year, now.month, now.day),
+      ),
     );
 
     if (selectedDate == null) return;
@@ -1077,6 +1069,212 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
         ),
       ),
+    );
+  }
+}
+
+class _DateOfBirthDialog extends StatefulWidget {
+  final DateTime initialDate;
+  final DateTime firstDate;
+  final DateTime lastDate;
+
+  const _DateOfBirthDialog({
+    required this.initialDate,
+    required this.firstDate,
+    required this.lastDate,
+  });
+
+  @override
+  State<_DateOfBirthDialog> createState() => _DateOfBirthDialogState();
+}
+
+class _DateOfBirthDialogState extends State<_DateOfBirthDialog> {
+  late final TextEditingController _controller;
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: _formatDialogDate(widget.initialDate),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openCalendarPicker() async {
+    final theme = Theme.of(context);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _parseDate(_controller.text) ?? widget.initialDate,
+      firstDate: widget.firstDate,
+      lastDate: widget.lastDate,
+      helpText: 'Select date of birth',
+      initialEntryMode: DatePickerEntryMode.calendarOnly,
+      builder: (context, child) {
+        return Theme(
+          data: theme.copyWith(
+            colorScheme: theme.colorScheme.copyWith(
+              primary: theme.colorScheme.primary,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked == null) return;
+    setState(() {
+      _controller.text = _formatDialogDate(picked);
+      _errorText = null;
+    });
+  }
+
+  void _submit() {
+    final parsed = _parseDate(_controller.text);
+
+    if (parsed == null) {
+      setState(() => _errorText = 'Enter date as DD/MM/YYYY.');
+      return;
+    }
+
+    if (parsed.isBefore(widget.firstDate) || parsed.isAfter(widget.lastDate)) {
+      setState(() => _errorText = 'Enter a valid date of birth.');
+      return;
+    }
+
+    Navigator.of(context).pop(parsed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return AlertDialog(
+      title: Text(
+        'Select date of birth',
+        style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(8),
+                    _DateSlashInputFormatter(),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: 'DD/MM/YYYY',
+                    hintText: '10/07/1997',
+                    errorText: _errorText,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  style: GoogleFonts.dmSans(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                  onChanged: (_) {
+                    if (_errorText != null) {
+                      setState(() => _errorText = null);
+                    }
+                  },
+                  onSubmitted: (_) => _submit(),
+                ),
+              ),
+              const SizedBox(width: 10),
+              IconButton(
+                tooltip: 'Open calendar',
+                onPressed: _openCalendarPicker,
+                icon: Icon(
+                  Icons.calendar_today_rounded,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Type numbers only. Slashes are added automatically.',
+            style: GoogleFonts.dmSans(
+              fontSize: 12,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text('Cancel', style: GoogleFonts.dmSans()),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: Text('OK', style: GoogleFonts.dmSans()),
+        ),
+      ],
+    );
+  }
+
+  static String _formatDialogDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    return '$day/$month/${date.year}';
+  }
+
+  static DateTime? _parseDate(String value) {
+    final parts = value.split('/');
+    if (parts.length != 3 || parts[2].length != 4) return null;
+
+    final day = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    final year = int.tryParse(parts[2]);
+    if (day == null || month == null || year == null) return null;
+
+    final parsed = DateTime(year, month, day);
+    if (parsed.year != year || parsed.month != month || parsed.day != day) {
+      return null;
+    }
+
+    return parsed;
+  }
+}
+
+class _DateSlashInputFormatter extends TextInputFormatter {
+  const _DateSlashInputFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final limited = digits.length > 8 ? digits.substring(0, 8) : digits;
+    final buffer = StringBuffer();
+
+    for (var i = 0; i < limited.length; i++) {
+      if (i == 2 || i == 4) buffer.write('/');
+      buffer.write(limited[i]);
+    }
+
+    final text = buffer.toString();
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
     );
   }
 }
