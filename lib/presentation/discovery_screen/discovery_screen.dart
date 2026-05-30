@@ -14,6 +14,7 @@ import '../../services/analytics_service.dart';
 import '../../services/diagnostics_service.dart';
 import '../../services/haptic_service.dart';
 import '../../services/premium_service.dart';
+import '../../services/profile_service.dart';
 import '../../services/swipe_service.dart';
 import '../../widgets/app_icons.dart';
 import '../../widgets/skeleton_loader_widget.dart';
@@ -321,7 +322,10 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         final row = byId[profile['id']?.toString()];
         if (row == null) continue;
 
-        final avatarUrl = _usableAvatarUrl(row['avatar_url']);
+        final avatarUrl = await ProfileService.resolveUserProfilePhotoUrl(
+          userId: profile['id']?.toString() ?? '',
+          avatarUrl: row['avatar_url'] as String?,
+        );
         if (avatarUrl != null) {
           profile['avatar_url'] = avatarUrl;
         }

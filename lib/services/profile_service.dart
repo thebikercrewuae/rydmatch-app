@@ -151,15 +151,6 @@ class ProfileService {
     if (userId.trim().isEmpty) return null;
 
     try {
-      for (final extension in const ['jpg', 'jpeg', 'png', 'webp']) {
-        final storagePath = '${userId.trim()}/profile/avatar.$extension';
-        try {
-          return await Supabase.instance.client.storage
-              .from('user-photos')
-              .createSignedUrl(storagePath, 3600);
-        } catch (_) {}
-      }
-
       final files = await Supabase.instance.client.storage
           .from('user-photos')
           .list(path: '${userId.trim()}/profile');
@@ -174,20 +165,21 @@ class ProfileService {
                     ).hasMatch(file.name),
               )
               .toList()
-            ..sort((a, b) => b.name.compareTo(a.name));
+            ..sort((a, b) {
+              final aTime = a.updatedAt ?? a.createdAt;
+              final bTime = b.updatedAt ?? b.createdAt;
+              if (aTime != null && bTime != null) {
+                return bTime.compareTo(aTime);
+              }
+              return b.name.compareTo(a.name);
+            });
 
       if (imageFiles.isEmpty) return null;
 
       final storagePath = '${userId.trim()}/profile/${imageFiles.first.name}';
-      try {
-        return await Supabase.instance.client.storage
-            .from('user-photos')
-            .createSignedUrl(storagePath, 3600);
-      } catch (_) {
-        return Supabase.instance.client.storage
-            .from('user-photos')
-            .getPublicUrl(storagePath);
-      }
+      return Supabase.instance.client.storage
+          .from('user-photos')
+          .getPublicUrl(storagePath);
     } catch (e) {
       debugPrint('resolveUserProfilePhotoUrl: failed to find photo: $e');
       await DiagnosticsService.instance.logError(
