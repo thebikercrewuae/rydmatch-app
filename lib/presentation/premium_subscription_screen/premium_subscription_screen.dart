@@ -8,6 +8,7 @@ import 'package:sizer/sizer.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../services/premium_service.dart';
 import '../../services/analytics_service.dart';
+import '../../services/diagnostics_service.dart';
 import '../../services/profile_service.dart';
 import './widgets/feature_card_widget.dart';
 import './widgets/payment_option_widget.dart';
@@ -55,8 +56,13 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
     );
     _purchaseSubscription = _inAppPurchase.purchaseStream.listen(
       _handlePurchaseUpdates,
-      onError: (_) {
+      onError: (error) async {
         if (mounted) setState(() => _isProcessing = false);
+        await DiagnosticsService.instance.logError(
+          feature: 'premium',
+          action: 'purchase_stream_error',
+          error: error,
+        );
         _showStoreMessage('Purchase could not be completed.');
       },
     );
@@ -109,7 +115,13 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
             : null;
         _loadingStoreProduct = false;
       });
-    } catch (_) {
+    } catch (e) {
+      await DiagnosticsService.instance.logError(
+        feature: 'premium',
+        action: 'load_store_product',
+        error: e,
+        severity: 'warning',
+      );
       if (!mounted) return;
       setState(() {
         _storeAvailable = false;
@@ -131,12 +143,18 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
 
       if (purchase.status == PurchaseStatus.error) {
         if (mounted) setState(() => _isProcessing = false);
+        await DiagnosticsService.instance.logError(
+          feature: 'premium',
+          action: 'purchase_error',
+          error: purchase.error?.message ?? 'Purchase failed',
+          context: _purchaseContext(purchase),
+        );
         _showStoreMessage('Purchase failed. Please try again.');
       }
 
       if (purchase.status == PurchaseStatus.purchased ||
           purchase.status == PurchaseStatus.restored) {
-        await _activatePremiumAfterStorePurchase();
+        await _activatePremiumAfterStorePurchase(purchase);
       }
 
       if (purchase.pendingCompletePurchase) {
@@ -145,11 +163,39 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
     }
   }
 
-  Future<void> _activatePremiumAfterStorePurchase() async {
-    await PremiumService().activatePremium();
+  Future<void> _activatePremiumAfterStorePurchase(
+    PurchaseDetails purchase,
+  ) async {
+    final purchaseContext = _purchaseContext(purchase);
+
+    await PremiumService().activatePremium(
+      source: purchase.status == PurchaseStatus.restored
+          ? 'store_restore'
+          : 'store_purchase',
+      productId: purchase.productID,
+      purchaseContext: purchaseContext,
+    );
     if (_priorityListings) {
       await PremiumService().setPriorityListings(true);
     }
+    await PremiumService().refresh(reason: 'store_purchase_completed');
+
+    if (!PremiumService().isPremium) {
+      await DiagnosticsService.instance.logError(
+        feature: 'premium',
+        action: 'purchase_completed_but_locked',
+        error: 'Store purchase completed but PremiumService remained locked',
+        context: purchaseContext,
+      );
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        _showStoreMessage(
+          'Purchase completed, but Premium did not unlock. Please contact support.',
+        );
+      }
+      return;
+    }
+
     await AnalyticsService.instance.logPremiumConverted(plan: 'premium');
 
     if (!mounted) return;
@@ -178,6 +224,13 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
     );
 
     if (!started && mounted) {
+      await DiagnosticsService.instance.logError(
+        feature: 'premium',
+        action: 'purchase_start_failed',
+        error: 'buyNonConsumable returned false',
+        context: {'product_id': product.id},
+        severity: 'warning',
+      );
       setState(() => _isProcessing = false);
       _showStoreMessage('Purchase could not be started.');
     }
@@ -191,6 +244,21 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
 
     setState(() => _isProcessing = true);
     await _inAppPurchase.restorePurchases();
+  }
+
+  Map<String, dynamic> _purchaseContext(PurchaseDetails purchase) {
+    return {
+      'product_id': purchase.productID,
+      'purchase_id': purchase.purchaseID,
+      'status': purchase.status.name,
+      'transaction_date': purchase.transactionDate,
+      'source': purchase.verificationData.source,
+      'server_verification_data_present':
+          purchase.verificationData.serverVerificationData.isNotEmpty,
+      'local_verification_data_present':
+          purchase.verificationData.localVerificationData.isNotEmpty,
+      'pending_complete_purchase': purchase.pendingCompletePurchase,
+    };
   }
 
   void _showStoreMessage(String message) {

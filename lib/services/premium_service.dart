@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'diagnostics_service.dart';
 
 class PremiumService extends ChangeNotifier {
@@ -16,6 +17,10 @@ class PremiumService extends ChangeNotifier {
   bool _isLoaded = false;
 
   static const String _localPremiumKey = 'premium_entitlement_active';
+  static const String _localPremiumSourceKey = 'premium_entitlement_source';
+  static const String _localPremiumProductKey = 'premium_entitlement_product';
+  static const String _localPremiumActivatedAtKey =
+      'premium_entitlement_activated_at';
 
   /// Existing app code mostly checks isPremium.
   /// Admin users should receive full access too, so this returns true for either.
@@ -34,14 +39,16 @@ class PremiumService extends ChangeNotifier {
   bool get isLoaded => _isLoaded;
 
   Future<void> init() async {
-    await refresh();
+    await refresh(reason: 'init');
   }
 
-  Future<void> refresh() async {
+  Future<void> refresh({String reason = 'manual'}) async {
     final supabase = Supabase.instance.client;
     final currentUser = supabase.auth.currentUser;
     final prefs = await SharedPreferences.getInstance();
     final localPremium = prefs.getBool(_localPremiumKey) ?? false;
+    final localSource = prefs.getString(_localPremiumSourceKey);
+    final localProduct = prefs.getString(_localPremiumProductKey);
 
     if (currentUser == null) {
       _isPremiumAccount = localPremium;
@@ -59,8 +66,24 @@ class PremiumService extends ChangeNotifier {
           .eq('id', currentUser.id)
           .maybeSingle();
 
-      _isPremiumAccount = profile?['is_premium'] == true || localPremium;
+      final remotePremium = profile?['is_premium'] == true;
+      _isPremiumAccount = remotePremium || localPremium;
       _isAdmin = profile?['is_admin'] == true;
+
+      if (remotePremium && !localPremium) {
+        await prefs.setBool(_localPremiumKey, true);
+        await prefs.setString(_localPremiumSourceKey, 'remote_profile');
+      }
+
+      if (localPremium && !remotePremium) {
+        await _syncLocalEntitlementToProfile(
+          supabase: supabase,
+          userId: currentUser.id,
+          source: localSource ?? 'local_cache',
+          productId: localProduct,
+          reason: reason,
+        );
+      }
 
       // Admins should have access to priority listings as part of full access.
       if (_isAdmin) {
@@ -76,7 +99,11 @@ class PremiumService extends ChangeNotifier {
         feature: 'premium',
         action: 'refresh_entitlement',
         error: e,
-        context: {'has_local_premium': localPremium},
+        context: {
+          'has_local_premium': localPremium,
+          'local_source': localSource,
+          'reason': reason,
+        },
       );
       _isPremiumAccount = localPremium;
       _isAdmin = false;
@@ -86,7 +113,11 @@ class PremiumService extends ChangeNotifier {
     }
   }
 
-  Future<void> activatePremium() async {
+  Future<void> activatePremium({
+    String source = 'manual',
+    String? productId,
+    Map<String, dynamic>? purchaseContext,
+  }) async {
     final supabase = Supabase.instance.client;
     final currentUser = supabase.auth.currentUser;
 
@@ -94,24 +125,38 @@ class PremiumService extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_localPremiumKey, true);
+    await prefs.setString(_localPremiumSourceKey, source);
+    await prefs.setString(
+      _localPremiumActivatedAtKey,
+      DateTime.now().toIso8601String(),
+    );
+    if (productId != null && productId.isNotEmpty) {
+      await prefs.setString(_localPremiumProductKey, productId);
+    }
 
     _isPremiumAccount = true;
     notifyListeners();
 
     try {
-      await supabase
-          .from('user_profiles')
-          .update({
-            'is_premium': true,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', currentUser.id);
+      await _syncLocalEntitlementToProfile(
+        supabase: supabase,
+        userId: currentUser.id,
+        source: source,
+        productId: productId,
+        reason: 'activate',
+        purchaseContext: purchaseContext,
+      );
     } catch (e) {
       debugPrint('PremiumService.activatePremium sync error: $e');
       await DiagnosticsService.instance.logError(
         feature: 'premium',
         action: 'activate_premium_sync',
         error: e,
+        context: {
+          'source': source,
+          'product_id': productId,
+          if (purchaseContext != null) 'purchase': purchaseContext,
+        },
       );
     }
   }
@@ -130,19 +175,17 @@ class PremiumService extends ChangeNotifier {
   Future<void> cancelPremium() async {
     final supabase = Supabase.instance.client;
     final currentUser = supabase.auth.currentUser;
+    final prefs = await SharedPreferences.getInstance();
+
+    await _clearStoredEntitlement(prefs);
 
     if (currentUser == null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_localPremiumKey);
       _isPremiumAccount = false;
       _isAdmin = false;
       _priorityListingsEnabled = false;
       notifyListeners();
       return;
     }
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_localPremiumKey);
 
     await supabase
         .from('user_profiles')
@@ -164,11 +207,48 @@ class PremiumService extends ChangeNotifier {
 
   Future<void> clearLocalState() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_localPremiumKey);
+    await _clearStoredEntitlement(prefs);
     _isPremiumAccount = false;
     _isAdmin = false;
     _priorityListingsEnabled = false;
     _isLoaded = false;
     notifyListeners();
+  }
+
+  Future<void> _clearStoredEntitlement(SharedPreferences prefs) async {
+    await prefs.remove(_localPremiumKey);
+    await prefs.remove(_localPremiumSourceKey);
+    await prefs.remove(_localPremiumProductKey);
+    await prefs.remove(_localPremiumActivatedAtKey);
+  }
+
+  Future<void> _syncLocalEntitlementToProfile({
+    required SupabaseClient supabase,
+    required String userId,
+    required String source,
+    required String reason,
+    String? productId,
+    Map<String, dynamic>? purchaseContext,
+  }) async {
+    await supabase
+        .from('user_profiles')
+        .update({
+          'is_premium': true,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', userId);
+
+    await DiagnosticsService.instance.logError(
+      feature: 'premium',
+      action: 'entitlement_synced',
+      error: 'Premium entitlement synced to profile',
+      severity: 'info',
+      context: {
+        'source': source,
+        'reason': reason,
+        'product_id': productId,
+        if (purchaseContext != null) 'purchase': purchaseContext,
+      },
+    );
   }
 }

@@ -15,7 +15,7 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
   final NotificationService _notificationService = NotificationService.instance;
 
@@ -25,9 +25,10 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _notificationService.addListener(_onNotificationsChanged);
     _notificationService.initialize();
-    PremiumService().refresh();
+    PremiumService().refresh(reason: 'main_screen_init');
   }
 
   void _onNotificationsChanged() {
@@ -36,8 +37,16 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _notificationService.removeListener(_onNotificationsChanged);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      PremiumService().refresh(reason: 'app_resumed');
+    }
   }
 
   Future<void> _handleProfileTap() async {
