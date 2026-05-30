@@ -226,100 +226,116 @@ class _RegistrationScreenState extends State<RegistrationScreen>
             ),
           ),
           SafeArea(
-            child: Column(
-              children: [
-                // Header with full logo
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.h),
-                  child: Center(child: BrandLogoFull(width: 52.w)),
-                ),
-                SizedBox(height: 1.h),
-                // Title area
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 5.w),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _step == _RegistrationStep.signup
-                            ? 'Join RydMatch'
-                            : 'You\'re in!',
-                        style: GoogleFonts.dmSans(
-                          fontSize: 20.sp,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
-                      ),
-                      SizedBox(height: 0.5.h),
-                      Text(
-                        _step == _RegistrationStep.signup
-                            ? 'Create your account to find your perfect riding partner.'
-                            : 'Account created successfully.',
-                        style: GoogleFonts.dmSans(
-                          fontSize: 11.sp,
-                          color: Colors.white.withValues(alpha: 0.75),
-                        ),
-                      ),
-                    ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.viewInsetsOf(context).bottom + 2.h,
                   ),
-                ),
-                SizedBox(height: 3.h),
-                // Content card
-                Expanded(
-                  child: Container(
-                    margin: EdgeInsets.symmetric(horizontal: 4.w),
-                    padding: EdgeInsets.all(5.w),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20.0),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 20,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
                     ),
-                    child: SingleChildScrollView(
-                      child: _step == _RegistrationStep.signup
-                          ? _buildSignUpStep()
-                          : _buildSuccessStep(),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 2.h),
-                // Sign in link
-                if (_step == _RegistrationStep.signup)
-                  Padding(
-                    padding: EdgeInsets.only(bottom: 2.h),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: Column(
                       children: [
-                        Text(
-                          'Already have an account? ',
-                          style: GoogleFonts.dmSans(
-                            fontSize: 11.sp,
-                            color: const Color(0xFF666666),
+                        // Header with full logo
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 5.w,
+                            vertical: 2.h,
+                          ),
+                          child: Center(child: BrandLogoFull(width: 52.w)),
+                        ),
+                        SizedBox(height: 1.h),
+                        // Title area
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 5.w),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _step == _RegistrationStep.signup
+                                    ? 'Join RydMatch'
+                                    : 'You\'re in!',
+                                style: GoogleFonts.dmSans(
+                                  fontSize: 20.sp,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              SizedBox(height: 0.5.h),
+                              Text(
+                                _step == _RegistrationStep.signup
+                                    ? 'Create your account to find your perfect riding partner.'
+                                    : 'Account created successfully.',
+                                style: GoogleFonts.dmSans(
+                                  fontSize: 11.sp,
+                                  color: Colors.white.withValues(alpha: 0.75),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        GestureDetector(
-                          onTap: () => Navigator.pushReplacementNamed(
-                            context,
-                            '/login-screen',
+                        SizedBox(height: 3.h),
+                        // Content card
+                        Container(
+                          width: double.infinity,
+                          margin: EdgeInsets.symmetric(horizontal: 4.w),
+                          padding: EdgeInsets.all(5.w),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20.0),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 20,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
-                          child: Text(
-                            'Sign In',
-                            style: GoogleFonts.dmSans(
-                              fontSize: 11.sp,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFFE85A4F),
+                          child: _step == _RegistrationStep.signup
+                              ? _buildSignUpStep()
+                              : _buildSuccessStep(),
+                        ),
+                        SizedBox(height: 2.h),
+                        // Sign in link
+                        if (_step == _RegistrationStep.signup)
+                          Padding(
+                            padding: EdgeInsets.only(bottom: 2.h),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Already have an account? ',
+                                  style: GoogleFonts.dmSans(
+                                    fontSize: 11.sp,
+                                    color: const Color(0xFF666666),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () => Navigator.pushReplacementNamed(
+                                    context,
+                                    '/login-screen',
+                                  ),
+                                  child: Text(
+                                    'Sign In',
+                                    style: GoogleFonts.dmSans(
+                                      fontSize: 11.sp,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFFE85A4F),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ),
                       ],
                     ),
                   ),
-              ],
+                );
+              },
             ),
           ),
         ],
@@ -345,9 +361,14 @@ class _RegistrationScreenState extends State<RegistrationScreen>
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
           autocorrect: false,
-          style: GoogleFonts.dmSans(fontSize: 13.sp),
+          style: GoogleFonts.dmSans(
+            fontSize: 13.sp,
+            color: const Color(0xFF1B365D),
+          ),
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFFF8F9FA),
             hintText: 'you@example.com',
             hintStyle: GoogleFonts.dmSans(
               color: const Color(0xFF9E9E9E),
@@ -377,9 +398,14 @@ class _RegistrationScreenState extends State<RegistrationScreen>
         TextFormField(
           controller: _passwordController,
           obscureText: _obscurePassword,
-          style: GoogleFonts.dmSans(fontSize: 13.sp),
+          style: GoogleFonts.dmSans(
+            fontSize: 13.sp,
+            color: const Color(0xFF1B365D),
+          ),
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFFF8F9FA),
             hintText: 'Min. 8 characters',
             hintStyle: GoogleFonts.dmSans(
               color: const Color(0xFF9E9E9E),
@@ -419,9 +445,14 @@ class _RegistrationScreenState extends State<RegistrationScreen>
         TextFormField(
           controller: _confirmPasswordController,
           obscureText: _obscureConfirmPassword,
-          style: GoogleFonts.dmSans(fontSize: 13.sp),
+          style: GoogleFonts.dmSans(
+            fontSize: 13.sp,
+            color: const Color(0xFF1B365D),
+          ),
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFFF8F9FA),
             hintText: 'Re-enter your password',
             hintStyle: GoogleFonts.dmSans(
               color: const Color(0xFF9E9E9E),
@@ -466,11 +497,17 @@ class _RegistrationScreenState extends State<RegistrationScreen>
               child: TextFormField(
                 controller: _referralCodeController,
                 textCapitalization: TextCapitalization.characters,
-                style: GoogleFonts.dmSans(fontSize: 13.sp, letterSpacing: 1.5),
+                style: GoogleFonts.dmSans(
+                  fontSize: 13.sp,
+                  letterSpacing: 1.5,
+                  color: const Color(0xFF1B365D),
+                ),
                 onChanged: (val) {
                   setState(() => _referralCodeValid = null);
                 },
                 decoration: InputDecoration(
+                  filled: true,
+                  fillColor: const Color(0xFFF8F9FA),
                   hintText: 'Enter a friend\'s code',
                   hintStyle: GoogleFonts.dmSans(
                     color: const Color(0xFF9E9E9E),
