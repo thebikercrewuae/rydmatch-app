@@ -119,7 +119,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           // Background
@@ -149,14 +152,22 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           SafeArea(
             child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: 6.w),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.only(
+                left: 6.w,
+                right: 6.w,
+                bottom: MediaQuery.viewInsetsOf(context).bottom + 2.h,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  SizedBox(height: 5.h),
+                  SizedBox(height: keyboardOpen ? 2.h : 5.h),
                   // Full horizontal logo
-                  Center(child: BrandLogoFull(width: 55.w)),
-                  SizedBox(height: 4.h),
+                  Center(
+                    child: BrandLogoFull(width: keyboardOpen ? 44.w : 55.w),
+                  ),
+                  SizedBox(height: keyboardOpen ? 2.h : 4.h),
                   // Card
                   Container(
                     padding: EdgeInsets.all(5.w),

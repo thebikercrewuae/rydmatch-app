@@ -205,7 +205,10 @@ class _RegistrationScreenState extends State<RegistrationScreen>
 
   @override
   Widget build(BuildContext context) {
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           // Background
@@ -239,6 +242,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                 return SingleChildScrollView(
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.only(
                     left: 6.w,
                     right: 6.w,
@@ -252,9 +256,13 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         // Header with full logo
-                        SizedBox(height: 5.h),
-                        Center(child: BrandLogoFull(width: 55.w)),
-                        SizedBox(height: 4.h),
+                        SizedBox(height: keyboardOpen ? 2.h : 5.h),
+                        Center(
+                          child: BrandLogoFull(
+                            width: keyboardOpen ? 44.w : 55.w,
+                          ),
+                        ),
+                        SizedBox(height: keyboardOpen ? 2.h : 4.h),
                         // Content card
                         Container(
                           width: double.infinity,
