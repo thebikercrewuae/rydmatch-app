@@ -120,32 +120,35 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
       final community = _rideCommunity;
       final matches = await SwipeService.instance.getInviteableMatches();
 
-      final riders = matches.where((match) {
-        final rideMode = match['ride_mode'] as String? ?? 'motorcycle';
-        return rideMode == community;
-      }).map<Map<String, dynamic>>((match) {
-        final bikeTypes = match['bike_types'];
+      final riders = matches
+          .where((match) {
+            final rideMode = match['ride_mode'] as String? ?? 'motorcycle';
+            return rideMode == community;
+          })
+          .map<Map<String, dynamic>>((match) {
+            final bikeTypes = match['bike_types'];
 
-        String bikeModel = '';
-        if (bikeTypes is List && bikeTypes.isNotEmpty) {
-          bikeModel = bikeTypes.first.toString();
-        } else if (bikeTypes is String && bikeTypes.isNotEmpty) {
-          bikeModel = bikeTypes;
-        }
+            String bikeModel = '';
+            if (bikeTypes is List && bikeTypes.isNotEmpty) {
+              bikeModel = bikeTypes.first.toString();
+            } else if (bikeTypes is String && bikeTypes.isNotEmpty) {
+              bikeModel = bikeTypes;
+            }
 
-        final email = match['email'] as String?;
-        final fallbackName = email != null && email.isNotEmpty
-            ? email.split('@').first
-            : 'Rider';
+            final email = match['email'] as String?;
+            final fallbackName = email != null && email.isNotEmpty
+                ? email.split('@').first
+                : 'Rider';
 
-        return {
-          'userId': match['id'] as String,
-          'name': match['full_name'] as String? ?? fallbackName,
-          'image': match['avatar_url'] as String? ?? '',
-          'bikeModel': bikeModel,
-          'rideMode': match['ride_mode'] as String? ?? 'motorcycle',
-        };
-      }).toList();
+            return {
+              'userId': match['id'] as String,
+              'name': match['full_name'] as String? ?? fallbackName,
+              'image': match['avatar_url'] as String? ?? '',
+              'bikeModel': bikeModel,
+              'rideMode': match['ride_mode'] as String? ?? 'motorcycle',
+            };
+          })
+          .toList();
 
       if (!mounted) return;
       if (community != _rideCommunity) return;
@@ -238,10 +241,9 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
       rideType: _rideType,
       difficulty: _difficulty,
       duration: '${2 + _groupSize ~/ 2}h',
-      routeImageUrl:
-          _rideCommunity == 'bicycle'
-              ? 'https://images.pexels.com/photos/163491/bike-mountain-mountain-biking-trail-163491.jpeg'
-              : 'https://images.pexels.com/photos/1119796/pexels-photo-1119796.jpeg',
+      routeImageUrl: _rideCommunity == 'bicycle'
+          ? 'https://images.pexels.com/photos/163491/bike-mountain-mountain-biking-trail-163491.jpeg'
+          : 'https://images.pexels.com/photos/1119796/pexels-photo-1119796.jpeg',
       routePolyline: widget.prefillRoutePolylinePoints ?? const [],
       routeWaypoints: widget.prefillWaypoints ?? const [],
     );
@@ -254,6 +256,7 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bool isFromRoutePlanner = widget.prefillRoute != null;
+    final mediaQuery = MediaQuery.of(context);
 
     return Container(
       decoration: BoxDecoration(
@@ -264,7 +267,8 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
         left: 5.w,
         right: 5.w,
         top: 2.h,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 3.h,
+        bottom:
+            mediaQuery.viewInsets.bottom + mediaQuery.viewPadding.bottom + 3.h,
       ),
       child: Form(
         key: _formKey,
@@ -365,10 +369,9 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty
-                        ? 'Enter a ride name'
-                        : null,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Enter a ride name'
+                    : null,
               ),
               SizedBox(height: 1.5.h),
               _buildLabel('Route / Destination'),
@@ -392,10 +395,9 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
                         )
                       : null,
                 ),
-                validator: (value) =>
-                    value == null || value.trim().isEmpty
-                        ? 'Enter a route'
-                        : null,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Enter a route'
+                    : null,
               ),
               if (isFromRoutePlanner &&
                   widget.prefillDistanceKm != null &&
@@ -803,8 +805,9 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
                 CircleAvatar(
                   radius: 18,
                   backgroundColor: Colors.grey[200],
-                  backgroundImage:
-                      imageUrl.isNotEmpty ? NetworkImage(imageUrl) : null,
+                  backgroundImage: imageUrl.isNotEmpty
+                      ? NetworkImage(imageUrl)
+                      : null,
                   child: imageUrl.isEmpty
                       ? Icon(Icons.person, size: 18, color: Colors.grey[500])
                       : null,

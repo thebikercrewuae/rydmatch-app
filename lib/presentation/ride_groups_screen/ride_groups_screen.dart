@@ -1209,6 +1209,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       builder: (_) => StatefulBuilder(
         builder: (ctx, setModalState) {
           final isHome = _imHomeStatus[group.id] == true;
+          final bottomSafeArea = MediaQuery.of(ctx).viewPadding.bottom;
 
           return Container(
             height: 75.h,
@@ -1231,7 +1232,12 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
                 ),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: EdgeInsets.all(5.w),
+                    padding: EdgeInsets.fromLTRB(
+                      5.w,
+                      5.w,
+                      5.w,
+                      5.w + bottomSafeArea + 2.h,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
