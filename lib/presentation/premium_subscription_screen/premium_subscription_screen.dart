@@ -25,6 +25,7 @@ class PremiumSubscriptionScreen extends StatefulWidget {
 class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
     with SingleTickerProviderStateMixin {
   static const String _premiumProductId = 'rydmatch_premium_monthly';
+  static const bool _betaPremiumUnlockEnabled = true;
 
   bool _isProcessing = false;
   bool _showSuccess = false;
@@ -209,6 +210,11 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
   }
 
   Future<void> _handleSubscribe() async {
+    if (_betaPremiumUnlockEnabled) {
+      await _activatePremiumForBeta();
+      return;
+    }
+
     final product = _premiumProduct;
 
     if (!_storeAvailable || product == null) {
@@ -234,6 +240,38 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
       setState(() => _isProcessing = false);
       _showStoreMessage('Purchase could not be started.');
     }
+  }
+
+  Future<void> _activatePremiumForBeta() async {
+    if (_isProcessing) return;
+
+    setState(() => _isProcessing = true);
+
+    await PremiumService().activatePremium(
+      source: 'beta_subscribe_button',
+      productId: _premiumProductId,
+      purchaseContext: {
+        'beta_unlock_enabled': true,
+        'store_available': _storeAvailable,
+        'store_product_loaded': _premiumProduct != null,
+      },
+    );
+
+    if (_priorityListings) {
+      await PremiumService().setPriorityListings(true);
+    }
+
+    await PremiumService().refresh(reason: 'beta_subscribe_button');
+    await AnalyticsService.instance.logPremiumConverted(plan: 'beta_premium');
+
+    if (!mounted) return;
+    setState(() {
+      _isProcessing = false;
+      _showSuccess = true;
+    });
+    _successController.forward();
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) Navigator.of(context).pop(true);
   }
 
   Future<void> _handleRestorePurchase() async {
@@ -602,7 +640,9 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
   Widget _buildPricingSection() {
     final priceText = _premiumProduct?.price;
     final hasStorePrice = priceText != null && priceText.isNotEmpty;
-    final displayPrice = hasStorePrice
+    final displayPrice = _betaPremiumUnlockEnabled
+        ? 'Free during beta'
+        : hasStorePrice
         ? priceText
         : _loadingStoreProduct
         ? 'Loading price'
@@ -628,27 +668,32 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
               Text(
                 displayPrice,
                 style: GoogleFonts.dmSans(
-                  fontSize: hasStorePrice ? 28.sp : 20.sp,
+                  fontSize: hasStorePrice && !_betaPremiumUnlockEnabled
+                      ? 28.sp
+                      : 20.sp,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
                   height: 1.0,
                 ),
               ),
-              Padding(
-                padding: EdgeInsets.only(top: 1.5.h),
-                child: Text(
-                  '/month',
-                  style: GoogleFonts.dmSans(
-                    fontSize: 12.sp,
-                    color: Colors.white.withValues(alpha: 0.8),
+              if (!_betaPremiumUnlockEnabled)
+                Padding(
+                  padding: EdgeInsets.only(top: 1.5.h),
+                  child: Text(
+                    '/month',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 12.sp,
+                      color: Colors.white.withValues(alpha: 0.8),
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           SizedBox(height: 0.8.h),
           Text(
-            'Billed monthly via your app store · Cancel anytime',
+            _betaPremiumUnlockEnabled
+                ? 'Tap Subscribe to unlock all Premium features for testing'
+                : 'Billed monthly via your app store - Cancel anytime',
             style: GoogleFonts.dmSans(
               fontSize: 11.sp,
               color: Colors.white.withValues(alpha: 0.75),
@@ -662,7 +707,9 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
               borderRadius: BorderRadius.circular(20.0),
             ),
             child: Text(
-              '7-day free trial included',
+              _betaPremiumUnlockEnabled
+                  ? 'Beta tester access'
+                  : '7-day free trial included',
               style: GoogleFonts.dmSans(
                 fontSize: 11.sp,
                 fontWeight: FontWeight.w600,
@@ -722,7 +769,9 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
                   const Icon(AppIcons.lock, size: 16),
                   SizedBox(width: 2.w),
                   Text(
-                    'Subscribe Now',
+                    _betaPremiumUnlockEnabled
+                        ? 'Unlock Premium'
+                        : 'Subscribe Now',
                     style: GoogleFonts.dmSans(
                       fontSize: 14.sp,
                       fontWeight: FontWeight.w700,
