@@ -1,9 +1,11 @@
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:js' as js;
+import 'dart:js_interop';
+
+@JS('loadGoogleMapsWithKey')
+external void _loadGoogleMapsWithKey(String apiKey);
 
 void loadGoogleMapsApi(String apiKey) {
   try {
-    js.context.callMethod('loadGoogleMapsWithKey', [apiKey]);
+    _loadGoogleMapsWithKey(apiKey);
   } catch (e) {
     // ignore
   }

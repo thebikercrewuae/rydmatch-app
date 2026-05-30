@@ -15,7 +15,7 @@ class MarkerUtils {
     double borderWidth = 4,
     double pointerHeight = 16,
   }) async {
-    final cacheKey = '${borderColor.value}';
+    final cacheKey = '${borderColor.toARGB32()}';
     if (_cache.containsKey(cacheKey)) {
       return _cache[cacheKey]!;
     }

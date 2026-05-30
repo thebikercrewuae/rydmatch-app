@@ -32,7 +32,6 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
   late Animation<double> _scaleAnimation;
   String? _referralCode;
   bool _loadingReferral = true;
-  String _userName = '';
   final InAppPurchase _inAppPurchase = InAppPurchase.instance;
   StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
   ProductDetails? _premiumProduct;
@@ -71,7 +70,6 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
     final name = (profile['riderName'] as String? ?? '').trim();
     if (mounted) {
       setState(() {
-        _userName = name;
         _referralCode =
             '1N23456${name.isNotEmpty ? name.replaceAll(' ', '') : ''}';
         _loadingReferral = false;
@@ -199,10 +197,7 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          message,
-          style: GoogleFonts.dmSans(fontSize: 13.sp),
-        ),
+        content: Text(message, style: GoogleFonts.dmSans(fontSize: 13.sp)),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10.0),
@@ -870,9 +865,11 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
                           onTap: () {
                             final shareText =
                                 'Join me on RydMatch! Use my referral code $_referralCode to sign up and we both get a 7-day free Premium trial! 🏍️🔥';
-                            Share.share(
-                              shareText,
-                              subject: 'RydMatch Referral Code',
+                            SharePlus.instance.share(
+                              ShareParams(
+                                text: shareText,
+                                subject: 'RydMatch Referral Code',
+                              ),
                             );
                           },
                           child: Container(

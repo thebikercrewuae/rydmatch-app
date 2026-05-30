@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
@@ -23,7 +22,6 @@ class GarageScreen extends StatefulWidget {
 }
 
 class _GarageScreenState extends State<GarageScreen> {
-  bool _isRefreshing = false;
   bool _isLoading = true;
 
   final List<Map<String, dynamic>> _bikes = [];
@@ -88,9 +86,7 @@ class _GarageScreenState extends State<GarageScreen> {
   }
 
   Future<void> _onRefresh() async {
-    setState(() => _isRefreshing = true);
     await _loadBikes();
-    if (mounted) setState(() => _isRefreshing = false);
   }
 
   Future<void> _saveBike(Map<String, dynamic> bike) async {

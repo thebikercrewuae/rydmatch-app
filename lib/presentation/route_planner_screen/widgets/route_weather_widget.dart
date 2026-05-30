@@ -361,9 +361,7 @@ class _StatChip extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 2.5.w, vertical: 0.7.h),
       decoration: BoxDecoration(
-        color:
-            theme.colorScheme.surfaceContainerHighest ??
-            theme.colorScheme.onSurface.withValues(alpha: 0.05),
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8.0),
       ),
       child: Row(

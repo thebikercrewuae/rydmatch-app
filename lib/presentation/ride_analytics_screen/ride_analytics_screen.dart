@@ -118,17 +118,6 @@ class _RideAnalyticsScreenState extends State<RideAnalyticsScreen> {
           .map((r) => Map<String, dynamic>.from(r as Map))
           .toList();
 
-      // Fetch ratings given by this user
-      final ratingsRaw = await _client
-          .from('ride_ratings')
-          .select('stars, created_at')
-          .eq('reviewer_id', user.id)
-          .gte('created_at', yearStart.toIso8601String());
-
-      final ratings = (ratingsRaw as List<dynamic>)
-          .map((r) => Map<String, dynamic>.from(r as Map))
-          .toList();
-
       // --- Build activity data ---
       // Week: rides per day of week (Mon=0..Sun=6)
       final weekActivity = List<double>.filled(7, 0);
@@ -233,17 +222,6 @@ class _RideAnalyticsScreenState extends State<RideAnalyticsScreen> {
         );
       }).toList();
 
-      // --- Avg speed from ratings (proxy: use stars as engagement metric) ---
-      // Since there's no speed data, derive a reasonable display value
-      double avgStars = 0;
-      if (ratings.isNotEmpty) {
-        avgStars =
-            ratings.fold<double>(
-              0,
-              (s, r) => s + ((r['stars'] as num?)?.toDouble() ?? 0),
-            ) /
-            ratings.length;
-      }
       // Rank percentile based on ride count vs a baseline of 10 rides/year
       final rankPercentile = (countYear / 10 * 100).clamp(1, 99).toInt();
       final bikeType = 'rider';

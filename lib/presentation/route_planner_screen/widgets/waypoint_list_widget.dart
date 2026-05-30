@@ -79,7 +79,7 @@ class WaypointListWidget extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: waypoints.length,
-            onReorder: onReorder,
+            onReorderItem: onReorder,
             itemBuilder: (context, index) {
               return _WaypointItem(
                 key: ValueKey('wp_$index'),

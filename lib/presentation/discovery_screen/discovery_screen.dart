@@ -50,7 +50,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   double? _myLng;
 
   Map<String, dynamic>? _lastSwipedRider;
-  CardSwiperDirection? _lastSwipeDirection;
   bool get _canUndo => _lastSwipedRider != null;
 
   final Set<String> _swipedIds = {};
@@ -470,9 +469,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           ? skillLevels.first
           : 'Intermediate';
 
-      final imageUrl = avatarUrl != null
-          ? avatarUrl
-          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400';
+      final imageUrl =
+          avatarUrl ??
+          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400';
 
       final otherLat = (p['latitude'] as num?)?.toDouble();
       final otherLng = (p['longitude'] as num?)?.toDouble();
@@ -670,8 +669,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     );
 
     _lastSwipedRider = rider;
-    _lastSwipeDirection = direction;
-
     if (swipedId.isNotEmpty) {
       _swipedIds.add(swipedId);
     }
@@ -853,9 +850,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       _filteredRiders = _applyFiltersToList(_allRiders, _activeFilters);
       _isEmpty = _filteredRiders.isEmpty;
       _lastSwipedRider = null;
-      _lastSwipeDirection = null;
     });
 
+    if (!mounted) return;
     AppToast.show(context, message: 'Last swipe undone', type: ToastType.info);
   }
 

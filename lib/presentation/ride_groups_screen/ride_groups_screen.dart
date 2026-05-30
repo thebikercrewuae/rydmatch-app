@@ -444,6 +444,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
 
         await _loadGroups();
 
+        if (!mounted) return;
         AppToast.show(
           context,
           message: 'Ride${selectedGroups.length == 1 ? '' : 's'} deleted',

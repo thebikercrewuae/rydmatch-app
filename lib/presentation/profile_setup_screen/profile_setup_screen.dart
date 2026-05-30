@@ -102,9 +102,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     'Emergency SOS',
   ];
 
-  int get _minimumAge => _rideMode == 'motorcycle' || _mixedCommunityMatching
-      ? 18
-      : 16;
+  int get _minimumAge =>
+      _rideMode == 'motorcycle' || _mixedCommunityMatching ? 18 : 16;
 
   bool get _meetsMinimumAge {
     final birthDate = _dateOfBirth;
@@ -194,8 +193,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ? null
               : DateTime.tryParse(savedBirthDate);
           _gender = data['gender'] as String?;
-          _sameGenderMatching =
-              (data['sameGenderMatching'] as bool?) ?? false;
+          _sameGenderMatching = (data['sameGenderMatching'] as bool?) ?? false;
           _rideMode = data['rideMode'] as String? ?? 'motorcycle';
           _mixedCommunityMatching =
               (data['mixedCommunityMatching'] as bool?) ?? false;
@@ -414,6 +412,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       }
     }
 
+    if (!mounted) return;
+
     final firstName = _firstNameController.text.trim();
     final lastName = _lastNameController.text.trim();
     final fullName = lastName.isNotEmpty ? '$firstName $lastName' : firstName;
@@ -586,13 +586,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       existingRiderPhotoUrl: _existingRiderPhotoUrl,
                       existingBikePhotoUrls: _existingBikePhotoUrls,
                       bikePhotos: _bikePhotos,
-                      onRiderPhotoChanged: (val) =>
-                          setState(() {
-                            _riderPhoto = val;
-                            if (val != null || _existingRiderPhotoUrl != null) {
-                              _existingRiderPhotoUrl = null;
-                            }
-                          }),
+                      onRiderPhotoChanged: (val) => setState(() {
+                        _riderPhoto = val;
+                        if (val != null || _existingRiderPhotoUrl != null) {
+                          _existingRiderPhotoUrl = null;
+                        }
+                      }),
                       onExistingBikePhotoUrlsChanged: (val) =>
                           setState(() => _existingBikePhotoUrls = val),
                       onBikePhotosChanged: (val) =>
@@ -861,7 +860,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ),
               Switch(
                 value: _mixedCommunityMatching,
-                activeColor: theme.colorScheme.primary,
+                activeThumbColor: theme.colorScheme.primary,
                 onChanged: (value) =>
                     setState(() => _mixedCommunityMatching = value),
               ),
@@ -1064,10 +1063,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         ),
         filled: true,
         fillColor: theme.colorScheme.surface,
-        contentPadding: EdgeInsets.symmetric(
-          horizontal: 4.w,
-          vertical: 1.8.h,
-        ),
+        contentPadding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.8.h),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: theme.colorScheme.outline),
@@ -1078,10 +1074,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: theme.colorScheme.primary,
-            width: 2,
-          ),
+          borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
         ),
       ),
     );

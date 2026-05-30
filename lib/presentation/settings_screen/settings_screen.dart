@@ -128,7 +128,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final onSurface = theme.colorScheme.onSurface;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -826,7 +825,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                             SizedBox(height: 1.h),
                             GestureDetector(
-                              onTap: () => _copyReferralCode(_referralStats!.code),
+                              onTap: () =>
+                                  _copyReferralCode(_referralStats!.code),
                               child: Container(
                                 padding: EdgeInsets.symmetric(
                                   horizontal: 4.w,

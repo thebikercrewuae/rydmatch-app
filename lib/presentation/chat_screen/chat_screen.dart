@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
@@ -31,7 +30,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
   final bool _isTyping = false;
   bool _showSuggestRide = false;
-  bool _isRefreshing = false;
   bool _isLoading = true;
   RealtimeChannel? _statusSubscription;
   RealtimeChannel? _newMessageSubscription;
@@ -513,9 +511,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _onRefresh() async {
-    setState(() => _isRefreshing = true);
     await _loadMessages();
-    if (mounted) setState(() => _isRefreshing = false);
   }
 
   void _showMessageOptions(Map<String, dynamic> msg) {

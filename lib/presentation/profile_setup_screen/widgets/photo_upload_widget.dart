@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:ui' show ImageByteFormat;
 import 'dart:io' if (dart.library.io) 'dart:io';
 
@@ -40,9 +39,6 @@ class PhotoUploadWidget extends StatefulWidget {
 }
 
 class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
-  int? _draggingIndex;
-  int? _hoverIndex;
-
   /// Returns true if there's any photo to display (new XFile or existing URL)
   bool get _hasRiderPhoto =>
       widget.riderPhoto != null ||
@@ -259,13 +255,6 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
     final updated = List<String>.from(widget.existingBikePhotoUrls);
     updated.removeAt(index);
     widget.onExistingBikePhotoUrlsChanged(updated);
-  }
-
-  void _reorderBikePhotos(int oldIndex, int newIndex) {
-    final updated = List<XFile>.from(widget.bikePhotos);
-    final item = updated.removeAt(oldIndex);
-    updated.insert(newIndex, item);
-    widget.onBikePhotosChanged(updated);
   }
 
   /// Builds the rider photo image widget — handles new XFile, existing URL, or placeholder
@@ -688,8 +677,9 @@ class _RiderPhotoAdjustScreenState extends State<_RiderPhotoAdjustScreen> {
     setState(() => _isSaving = true);
 
     try {
-      final boundary = _previewKey.currentContext?.findRenderObject()
-          as RenderRepaintBoundary?;
+      final boundary =
+          _previewKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
       if (boundary == null) {
         if (mounted) Navigator.of(context).pop(widget.photo);
         return;
@@ -718,7 +708,8 @@ class _RiderPhotoAdjustScreenState extends State<_RiderPhotoAdjustScreen> {
       }
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final filePath = '${Directory.systemTemp.path}/'
+      final filePath =
+          '${Directory.systemTemp.path}/'
           'rydmatch_profile_$timestamp.png';
       final file = await File(filePath).writeAsBytes(bytes, flush: true);
 

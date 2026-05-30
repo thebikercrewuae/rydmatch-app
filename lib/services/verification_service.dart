@@ -82,7 +82,7 @@ class VerificationService {
           .from('rider_verifications')
           .select('id')
           .eq('status', 'pending');
-      return response is List ? response.length : 0;
+      return response.length;
     } catch (_) {}
 
     try {
@@ -90,7 +90,7 @@ class VerificationService {
           .from('verification_requests')
           .select('id')
           .eq('status', 'pending');
-      return response is List ? response.length : 0;
+      return response.length;
     } catch (_) {}
 
     return 0;

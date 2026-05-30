@@ -19,7 +19,6 @@ class PerformanceMetricsWidget extends StatelessWidget {
 
   static const Color _primary = Color(0xFF1B365D);
   static const Color _orange = Color(0xFFE85A4F);
-  static const Color _gold = Color(0xFFFFB347);
   static const Color _teal = Color(0xFF26A69A);
 
   @override

@@ -101,7 +101,6 @@ class LiveRideService {
   static final ValueNotifier<bool> isRideActive = ValueNotifier(false);
 
   String? _currentSessionId;
-  String? _currentParticipantId;
   Timer? _locationTimer;
   RealtimeChannel? _locationsChannel;
   RealtimeChannel? _participantsChannel;
@@ -364,34 +363,25 @@ class LiveRideService {
         .maybeSingle();
 
     if (existing != null) {
-      final result = await _supabase
+      await _supabase
           .from('live_ride_participants')
           .update({
             'status': 'active',
             'is_sharing_location': true,
             'left_at': null,
           })
-          .eq('id', existing['id'] as String)
-          .select()
-          .single();
+          .eq('id', existing['id'] as String);
 
-      _currentParticipantId = result['id'] as String?;
       return;
     }
 
-    final result = await _supabase
-        .from('live_ride_participants')
-        .insert({
-          'session_id': sessionId,
-          'user_id': userId,
-          'status': 'active',
-          'is_sharing_location': true,
-          'joined_at': DateTime.now().toUtc().toIso8601String(),
-        })
-        .select()
-        .single();
-
-    _currentParticipantId = result['id'] as String?;
+    await _supabase.from('live_ride_participants').insert({
+      'session_id': sessionId,
+      'user_id': userId,
+      'status': 'active',
+      'is_sharing_location': true,
+      'joined_at': DateTime.now().toUtc().toIso8601String(),
+    });
   }
 
   void _startTracking() {
@@ -410,7 +400,6 @@ class LiveRideService {
     _locationsChannel = null;
     _participantsChannel = null;
     _currentSessionId = null;
-    _currentParticipantId = null;
     isRideActive.value = false;
     riderLocations.value = {};
     participants.value = [];

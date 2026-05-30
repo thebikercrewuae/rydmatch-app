@@ -402,12 +402,6 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
                     itemCount: _filtered.length,
                     itemBuilder: (_, i) {
                       final c = _filtered[i];
-                      final isSelected =
-                          c['code'] ==
-                          widget.countries.firstWhere(
-                            (x) => x['flag'] == c['flag'],
-                            orElse: () => c,
-                          )['code'];
                       return ListTile(
                         leading: Text(
                           c['flag']!,

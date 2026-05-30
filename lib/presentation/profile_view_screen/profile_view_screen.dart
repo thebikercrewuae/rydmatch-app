@@ -213,56 +213,126 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   Future<void> _loadAdminVerificationCount() async {
     if (!PremiumService().isAdmin) return;
 
-    final count =
-        await VerificationService.instance.pendingVerificationRequestCount();
+    final count = await VerificationService.instance
+        .pendingVerificationRequestCount();
     if (!mounted) return;
 
     setState(() => _pendingVerificationRequests = count);
   }
 
   Future<void> _loadProfile() async {
-  setState(() => _isLoading = true);
+    setState(() => _isLoading = true);
 
-  final args = ModalRoute.of(context)?.settings.arguments;
-  final isOtherUser = args is Map<String, dynamic>
-      ? (args['isOtherUser'] as bool? ?? false)
-      : false;
-  final otherUserId = args is Map<String, dynamic>
-      ? args['userId'] as String?
-      : null;
-  final otherUserName = args is Map<String, dynamic>
-      ? args['userName'] as String?
-      : null;
-  final otherUserImage = args is Map<String, dynamic>
-      ? args['userImage'] as String?
-      : null;
+    final args = ModalRoute.of(context)?.settings.arguments;
+    final isOtherUser = args is Map<String, dynamic>
+        ? (args['isOtherUser'] as bool? ?? false)
+        : false;
+    final otherUserId = args is Map<String, dynamic>
+        ? args['userId'] as String?
+        : null;
+    final otherUserName = args is Map<String, dynamic>
+        ? args['userName'] as String?
+        : null;
+    final otherUserImage = args is Map<String, dynamic>
+        ? args['userImage'] as String?
+        : null;
 
-  List<String> stringList(dynamic value) {
-    if (value is List) {
-      return value.map((item) => item.toString()).toList();
+    List<String> stringList(dynamic value) {
+      if (value is List) {
+        return value.map((item) => item.toString()).toList();
+      }
+      return <String>[];
     }
-    return <String>[];
-  }
 
-  final preferredIsMetric =
-      (await ProfileService.loadProfile())['isMetric'] as bool? ?? true;
+    final preferredIsMetric =
+        (await ProfileService.loadProfile())['isMetric'] as bool? ?? true;
 
-  if (isOtherUser && otherUserId != null && otherUserId.isNotEmpty) {
-    try {
-      final profile = await Supabase.instance.client
-          .from('user_profiles')
-          .select(
-            'id, full_name, email, avatar_url, bio, skill_levels, bike_types, '
-            'preferred_roads, riding_speed, gender, is_verified, '
-            'verification_status, ride_mode, mixed_community_matching, '
-            'bike_photo_urls',
-          )
-          .eq('id', otherUserId)
-          .maybeSingle();
+    if (isOtherUser && otherUserId != null && otherUserId.isNotEmpty) {
+      try {
+        final profile = await Supabase.instance.client
+            .from('user_profiles')
+            .select(
+              'id, full_name, email, avatar_url, bio, skill_levels, bike_types, '
+              'preferred_roads, riding_speed, gender, is_verified, '
+              'verification_status, ride_mode, mixed_community_matching, '
+              'bike_photo_urls',
+            )
+            .eq('id', otherUserId)
+            .maybeSingle();
 
-      if (!mounted) return;
+        if (!mounted) return;
 
-      if (profile == null) {
+        if (profile == null) {
+          setState(() {
+            _riderName = otherUserName ?? 'Rider';
+            _riderPhotoPath = otherUserImage;
+            _riderBio = '';
+            _skillLevels = [];
+            _bikeTypes = [];
+            _preferredRoads = [];
+            _rideTimes = {};
+            _ridingSpeed = 60.0;
+            _isMetric = preferredIsMetric;
+            _gender = null;
+            _rideMode = 'motorcycle';
+            _mixedCommunityMatching = false;
+            _isVerified = false;
+            _isLoading = false;
+          });
+          return;
+        }
+
+        final fullName = profile['full_name'] as String?;
+        final email = profile['email'] as String?;
+        final avatarUrl = await ProfileService.resolveUserProfilePhotoUrl(
+          userId: otherUserId,
+          avatarUrl: profile['avatar_url'] as String?,
+        );
+        final fallbackAvatarUrl = await ProfileService.resolvePhotoUrl(
+          otherUserImage,
+        );
+
+        setState(() {
+          _riderName = fullName?.trim().isNotEmpty == true
+              ? fullName!.trim()
+              : otherUserName ??
+                    (email?.isNotEmpty == true
+                        ? email!.split('@').first
+                        : 'Rider');
+
+          _riderBio = profile['bio'] as String? ?? '';
+          _riderPhotoPath = avatarUrl?.trim().isNotEmpty == true
+              ? avatarUrl
+              : fallbackAvatarUrl;
+
+          _skillLevels = stringList(profile['skill_levels']);
+          _bikeTypes = stringList(profile['bike_types']);
+          _preferredRoads = stringList(profile['preferred_roads']);
+          _rideTimes = {};
+
+          _ridingSpeed = (profile['riding_speed'] as num?)?.toDouble() ?? 60.0;
+          _isMetric = preferredIsMetric;
+          _gender = profile['gender'] as String?;
+          _rideMode = profile['ride_mode'] as String? ?? 'motorcycle';
+          _mixedCommunityMatching =
+              (profile['mixed_community_matching'] as bool?) ?? false;
+          _bikePhotoPaths = stringList(
+            profile['bike_photo_urls'],
+          ).where(_canOpenPhoto).toList();
+          _isVerified = _profileIsVerified(profile);
+          _isLoading = false;
+        });
+
+        if (!_isVerified) {
+          await _loadOtherUserVerification(otherUserId);
+        }
+        await _loadRatings(otherUserId);
+        return;
+      } catch (e) {
+        debugPrint('ProfileViewScreen: failed to load other profile: $e');
+
+        if (!mounted) return;
+
         setState(() {
           _riderName = otherUserName ?? 'Rider';
           _riderPhotoPath = otherUserImage;
@@ -281,112 +351,43 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         });
         return;
       }
+    }
 
-      final fullName = profile['full_name'] as String?;
-      final email = profile['email'] as String?;
-      final avatarUrl = await ProfileService.resolveUserProfilePhotoUrl(
-        userId: otherUserId,
-        avatarUrl: profile['avatar_url'] as String?,
-      );
-      final fallbackAvatarUrl = await ProfileService.resolvePhotoUrl(
-        otherUserImage,
-      );
+    final data = await ProfileService.loadProfile();
 
+    if (mounted) {
       setState(() {
-        _riderName = fullName?.trim().isNotEmpty == true
-            ? fullName!.trim()
-            : otherUserName ??
-                (email?.isNotEmpty == true ? email!.split('@').first : 'Rider');
-
-        _riderBio = profile['bio'] as String? ?? '';
-        _riderPhotoPath = avatarUrl?.trim().isNotEmpty == true
-            ? avatarUrl
-            : fallbackAvatarUrl;
-
-        _skillLevels = stringList(profile['skill_levels']);
-        _bikeTypes = stringList(profile['bike_types']);
-        _preferredRoads = stringList(profile['preferred_roads']);
-        _rideTimes = {};
-
-        _ridingSpeed =
-            (profile['riding_speed'] as num?)?.toDouble() ?? 60.0;
-        _isMetric = preferredIsMetric;
-        _gender = profile['gender'] as String?;
-        _rideMode = profile['ride_mode'] as String? ?? 'motorcycle';
+        _ridingSpeed = data['ridingSpeed'] as double;
+        _skillLevels = List<String>.from(data['skillLevels'] as List);
+        _bikeTypes = List<String>.from(data['bikeTypes'] as List);
+        _preferredRoads = List<String>.from(data['preferredRoads'] as List);
+        _rideTimes = data['rideTimes'] as Map<String, List<String>>;
+        _riderPhotoPath = data['riderPhotoPath'] as String?;
+        _bikePhotoPaths = List<String>.from(data['bikePhotoPaths'] as List);
+        _riderName = data['riderName'] as String;
+        _riderBio = data['riderBio'] as String;
+        _isMetric = data['isMetric'] as bool? ?? true;
+        _gender = data['gender'] as String?;
+        _rideMode = data['rideMode'] as String? ?? 'motorcycle';
         _mixedCommunityMatching =
-            (profile['mixed_community_matching'] as bool?) ?? false;
-        _bikePhotoPaths = stringList(profile['bike_photo_urls'])
-            .where(_canOpenPhoto)
-            .toList();
-        _isVerified = _profileIsVerified(profile);
+            (data['mixedCommunityMatching'] as bool?) ?? false;
         _isLoading = false;
       });
+    }
 
-      if (!_isVerified) {
-        await _loadOtherUserVerification(otherUserId);
-      }
-      await _loadRatings(otherUserId);
-      return;
-    } catch (e) {
-      debugPrint('ProfileViewScreen: failed to load other profile: $e');
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    final isVerified = currentUserId == null
+        ? false
+        : await VerificationService.instance.isUserVerified(currentUserId);
 
-      if (!mounted) return;
+    await PremiumService().refresh();
 
+    if (mounted) {
       setState(() {
-        _riderName = otherUserName ?? 'Rider';
-        _riderPhotoPath = otherUserImage;
-        _riderBio = '';
-        _skillLevels = [];
-        _bikeTypes = [];
-        _preferredRoads = [];
-        _rideTimes = {};
-        _ridingSpeed = 60.0;
-        _isMetric = preferredIsMetric;
-        _gender = null;
-        _rideMode = 'motorcycle';
-        _mixedCommunityMatching = false;
-        _isVerified = false;
-        _isLoading = false;
+        _isVerified = isVerified;
       });
-      return;
     }
   }
-
-  final data = await ProfileService.loadProfile();
-
-  if (mounted) {
-    setState(() {
-      _ridingSpeed = data['ridingSpeed'] as double;
-      _skillLevels = List<String>.from(data['skillLevels'] as List);
-      _bikeTypes = List<String>.from(data['bikeTypes'] as List);
-      _preferredRoads = List<String>.from(data['preferredRoads'] as List);
-      _rideTimes = data['rideTimes'] as Map<String, List<String>>;
-      _riderPhotoPath = data['riderPhotoPath'] as String?;
-      _bikePhotoPaths = List<String>.from(data['bikePhotoPaths'] as List);
-      _riderName = data['riderName'] as String;
-      _riderBio = data['riderBio'] as String;
-      _isMetric = data['isMetric'] as bool? ?? true;
-      _gender = data['gender'] as String?;
-      _rideMode = data['rideMode'] as String? ?? 'motorcycle';
-      _mixedCommunityMatching =
-          (data['mixedCommunityMatching'] as bool?) ?? false;
-      _isLoading = false;
-    });
-  }
-
-  final currentUserId = Supabase.instance.client.auth.currentUser?.id;
-  final isVerified = currentUserId == null
-      ? false
-      : await VerificationService.instance.isUserVerified(currentUserId);
-  
-  await PremiumService().refresh();
-  
-  if (mounted) {
-    setState(() {
-      _isVerified = isVerified;
-    });
-  }
-}
 
   Future<void> _loadRatings(String userId) async {
     try {
@@ -807,10 +808,10 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                         isVerified: _rideMode != 'bicycle' && _isVerified,
                         onPhotoTap: _canOpenPhoto(_riderPhotoPath)
                             ? () => _showPhotoExpanded(
-                                  context,
-                                  _riderPhotoPath!,
-                                  gallery: _profileGalleryPhotos,
-                                )
+                                context,
+                                _riderPhotoPath!,
+                                gallery: _profileGalleryPhotos,
+                              )
                             : null,
                       ),
                     ),
@@ -925,6 +926,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                           ),
                         ),
                       ),
+                      SizedBox(height: 1.5.h),
+                      _buildBoostButton(theme),
                       SizedBox(height: 1.5.h),
                       SizedBox(
                         width: double.infinity,
@@ -1048,44 +1051,46 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                       if (PremiumService().isAdmin) ...[
                         SizedBox(height: 1.5.h),
                         _buildAdminVerificationButton(),
+                        SizedBox(height: 1.5.h),
+                        _buildAdminDiagnosticsButton(),
                       ],
                       if (_rideMode != 'bicycle') ...[
                         SizedBox(height: 1.5.h),
                         SizedBox(
-                        width: double.infinity,
-                        height: 6.h,
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            await Navigator.pushNamed(
-                              context,
-                              '/verification-screen',
-                            );
-                            _loadProfile();
-                          },
-                          icon: Icon(
-                            _isVerified
-                                ? Icons.verified_rounded
-                                : Icons.verified_outlined,
-                            color: Colors.white,
-                          ),
-                          label: Text(
-                            _isVerified ? 'Verified Rider ✓' : 'Get Verified',
-                            style: GoogleFonts.dmSans(
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.w600,
+                          width: double.infinity,
+                          height: 6.h,
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              await Navigator.pushNamed(
+                                context,
+                                '/verification-screen',
+                              );
+                              _loadProfile();
+                            },
+                            icon: Icon(
+                              _isVerified
+                                  ? Icons.verified_rounded
+                                  : Icons.verified_outlined,
                               color: Colors.white,
                             ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _isVerified
-                                ? const Color(0xFF1565C0)
-                                : const Color(0xFF1976D2),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12.0),
+                            label: Text(
+                              _isVerified ? 'Verified Rider ✓' : 'Get Verified',
+                              style: GoogleFonts.dmSans(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _isVerified
+                                  ? const Color(0xFF1565C0)
+                                  : const Color(0xFF1976D2),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12.0),
+                              ),
                             ),
                           ),
                         ),
-                      ),
                       ],
                     ] else ...[
                       SizedBox(
@@ -1233,9 +1238,35 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     );
   }
 
+  Widget _buildAdminDiagnosticsButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 6.h,
+      child: ElevatedButton.icon(
+        onPressed: () {
+          Navigator.pushNamed(context, '/admin-diagnostics-screen');
+        },
+        icon: const Icon(Icons.bug_report_rounded, color: Colors.white),
+        label: Text(
+          'Admin Diagnostics',
+          style: GoogleFonts.dmSans(
+            fontSize: 14.sp,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF263238),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.0),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildBoostButton(ThemeData theme) {
     const Color boostActiveColor = Color(0xFFFF6B35);
-    const Color boostGoldColor = Color(0xFFFFB347);
     const Color boostReadyColor = Color(0xFF7B2FBE);
 
     if (_isBoostLoading) {
@@ -1546,8 +1577,9 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     int initialIndex = 0,
   }) {
     final photos = (gallery == null || gallery.isEmpty) ? [path] : gallery;
-    final safeInitialIndex =
-        initialIndex >= 0 && initialIndex < photos.length ? initialIndex : 0;
+    final safeInitialIndex = initialIndex >= 0 && initialIndex < photos.length
+        ? initialIndex
+        : 0;
 
     Navigator.of(context).push(
       MaterialPageRoute(

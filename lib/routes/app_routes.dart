@@ -28,6 +28,7 @@ import '../presentation/leaderboard_screen/leaderboard_screen.dart';
 import '../presentation/reset_password_screen/reset_password_screen.dart';
 import '../presentation/verification_screen/verification_screen.dart';
 import '../presentation/admin_verification_screen/admin_verification_screen.dart';
+import '../presentation/admin_diagnostics_screen/admin_diagnostics_screen.dart';
 
 class AppRoutes {
   static const String initial = '/';
@@ -63,6 +64,7 @@ class AppRoutes {
   static const String resetPassword = '/reset-password';
   static const String verificationScreen = '/verification-screen';
   static const String adminVerificationScreen = '/admin-verification-screen';
+  static const String adminDiagnosticsScreen = '/admin-diagnostics-screen';
 
   static Map<String, WidgetBuilder> routes = {
     initial: (context) => const RegistrationScreen(),
@@ -111,16 +113,11 @@ class AppRoutes {
     resetPassword: (context) => const ResetPasswordScreen(),
     verificationScreen: (context) => const VerificationScreen(),
     adminVerificationScreen: (context) => const AdminVerificationScreen(),
+    adminDiagnosticsScreen: (context) => const AdminDiagnosticsScreen(),
   };
 }
 
 // Placeholder widgets for modal-only screens (they are shown via show() methods)
-class _ReportUserPlaceholder extends StatelessWidget {
-  const _ReportUserPlaceholder();
-  @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
-}
-
 class _BlockUserPlaceholder extends StatelessWidget {
   const _BlockUserPlaceholder();
   @override

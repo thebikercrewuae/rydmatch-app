@@ -162,7 +162,7 @@ class GenderSelectionWidget extends StatelessWidget {
                   ),
                   Switch(
                     value: sameGenderMatching,
-                    activeColor: theme.colorScheme.primary,
+                    activeThumbColor: theme.colorScheme.primary,
                     onChanged: (value) {
                       HapticService.instance.selection();
                       onSameGenderMatchingChanged(value);

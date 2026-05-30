@@ -68,7 +68,6 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   int _currentStepIndex = 0;
   LatLng? _currentPosition;
   StreamSubscription<Position>? _positionStream;
-  Marker? _userLocationMarker;
 
   // Weather
   String? _weatherLocation;
@@ -360,8 +359,8 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
         ),
       );
 
-      print('[Directions] Raw type: ${response.data.runtimeType}');
-      print(
+      debugPrint('[Directions] Raw type: ${response.data.runtimeType}');
+      debugPrint(
         '[Directions] Raw preview: ${response.data.toString().substring(0, response.data.toString().length.clamp(0, 300))}',
       );
 
@@ -467,7 +466,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       }
     } catch (e) {
       debugPrint('[Directions API] Exception: $e');
-      print('[Directions API] FULL ERROR: $e');
+      debugPrint('[Directions API] FULL ERROR: $e');
 
       if (mounted) {
         setState(() => _isFetchingRoute = false);
@@ -560,7 +559,9 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       setState(() => _isGeocodingStart = true);
 
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
 
       final latLng = LatLng(position.latitude, position.longitude);
@@ -754,7 +755,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
             BitmapDescriptor.hueAzure,
           ),
           infoWindow: const InfoWindow(title: 'You are here'),
-          zIndex: 10,
+          zIndexInt: 10,
         ),
       );
     }
@@ -920,7 +921,9 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     // Get initial position
     try {
       final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+        ),
       );
       setState(() {
         _currentPosition = LatLng(pos.latitude, pos.longitude);
@@ -1058,20 +1061,6 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
           ],
         ),
       );
-    }
-  }
-
-  void _stopNavigation() {
-    _positionStream?.cancel();
-    _positionStream = null;
-    setState(() {
-      _isNavigating = false;
-      _currentStepIndex = 0;
-    });
-    _rebuildMapOverlays();
-    // Zoom back out to show full route
-    if (_routePolylinePoints.isNotEmpty) {
-      _fitCameraToRoute(_routePolylinePoints);
     }
   }
 

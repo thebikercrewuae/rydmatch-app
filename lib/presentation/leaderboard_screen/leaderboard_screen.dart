@@ -469,12 +469,13 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     Color rankColor;
     if (rank == 1) {
       rankColor = _gold;
-    } else if (rank == 2)
+    } else if (rank == 2) {
       rankColor = const Color(0xFFB0BEC5);
-    else if (rank == 3)
+    } else if (rank == 3) {
       rankColor = const Color(0xFFBF8970);
-    else
+    } else {
       rankColor = theme.colorScheme.onSurfaceVariant;
+    }
 
     return Container(
       margin: EdgeInsets.only(bottom: 1.2.h),

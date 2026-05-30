@@ -20,11 +20,9 @@ class RideFeedScreen extends StatefulWidget {
 class _RideFeedScreenState extends State<RideFeedScreen> {
   List<RideFeedPost> _posts = [];
   bool _isLoading = true;
-  bool _isRefreshing = false;
 
   static const Color _orange = Color(0xFFE85A4F);
   static const Color _gold = Color(0xFFFFB347);
-  static const Color _deepBlue = Color(0xFF1B365D);
 
   @override
   void initState() {
@@ -63,12 +61,10 @@ class _RideFeedScreenState extends State<RideFeedScreen> {
   }
 
   Future<void> _onRefresh() async {
-    setState(() => _isRefreshing = true);
     final posts = await RideFeedService.instance.fetchFeedPosts();
     if (mounted) {
       setState(() {
         _posts = posts;
-        _isRefreshing = false;
       });
     }
   }

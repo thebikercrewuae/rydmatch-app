@@ -693,6 +693,8 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
                       _contactName = nameController.text.trim();
                       _contactPhone = normalizedPhone;
                     });
+                  }
+                  if (ctx.mounted) {
                     Navigator.of(ctx).pop();
                   }
                 },
