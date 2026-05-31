@@ -731,6 +731,11 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       );
 
       if (result.isMatch && mounted) {
+        await AnalyticsService.instance.logMatchCreated(
+          matchedUserId: swipedId,
+        );
+        if (!mounted) return;
+
         await MatchSuccessScreen.show(
           context,
           currentUserName: _myName,
@@ -756,7 +761,16 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           },
         );
       }
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('DiscoveryScreen: save swipe error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'matching',
+        action: 'save_swipe_from_discovery',
+        error: e,
+        stackTrace: stack,
+        context: {'swiped_id': swipedId, 'direction': direction},
+      );
+    }
   }
 
   void _handlePass() {

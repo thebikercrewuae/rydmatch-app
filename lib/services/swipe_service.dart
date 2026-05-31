@@ -72,29 +72,71 @@ class SwipeService {
       }
 
       final uid = currentUser.id;
-      final otherIds = <String>[];
+      final otherIds = <String>{};
       final matchedAtMap = <String, String>{};
 
-      final matchRows = await _supabase
-          .from('rider_matches')
-          .select('id, user1_id, user2_id, created_at')
-          .or('user1_id.eq.$uid,user2_id.eq.$uid')
-          .order('created_at', ascending: false);
+      try {
+        final riderMatchRows = await _supabase
+            .from('rider_matches')
+            .select('id, user1_id, user2_id, created_at')
+            .or('user1_id.eq.$uid,user2_id.eq.$uid')
+            .order('created_at', ascending: false);
 
-      for (final row in matchRows as List<dynamic>) {
-        final r = row as Map<String, dynamic>;
-        final user1Id = r['user1_id'] as String?;
-        final user2Id = r['user2_id'] as String?;
+        for (final row in riderMatchRows as List<dynamic>) {
+          final r = row as Map<String, dynamic>;
+          final user1Id = r['user1_id'] as String?;
+          final user2Id = r['user2_id'] as String?;
 
-        final otherId = user1Id == uid ? user2Id : user1Id;
+          final otherId = user1Id == uid ? user2Id : user1Id;
 
-        if (otherId != null && otherId.isNotEmpty && otherId != uid) {
-          otherIds.add(otherId);
-          matchedAtMap[otherId] = (r['created_at'] ?? '').toString();
+          if (otherId != null && otherId.isNotEmpty && otherId != uid) {
+            otherIds.add(otherId);
+            matchedAtMap[otherId] = (r['created_at'] ?? '').toString();
+          }
         }
+      } catch (e) {
+        debugPrint('SwipeService.getMatches rider_matches error: $e');
+        await DiagnosticsService.instance.logError(
+          feature: 'matches',
+          action: 'get_matches_rider_matches',
+          error: e,
+          severity: 'warning',
+        );
       }
 
-      return _profilesForIds(otherIds, matchedAtMap);
+      try {
+        final legacyMatchRows = await _supabase
+            .from('matches')
+            .select('id, user_id, matched_user_id, created_at')
+            .or('user_id.eq.$uid,matched_user_id.eq.$uid')
+            .order('created_at', ascending: false);
+
+        for (final row in legacyMatchRows as List<dynamic>) {
+          final r = row as Map<String, dynamic>;
+          final userId = r['user_id'] as String?;
+          final matchedUserId = r['matched_user_id'] as String?;
+
+          final otherId = userId == uid ? matchedUserId : userId;
+
+          if (otherId != null && otherId.isNotEmpty && otherId != uid) {
+            otherIds.add(otherId);
+            matchedAtMap.putIfAbsent(
+              otherId,
+              () => (r['created_at'] ?? '').toString(),
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('SwipeService.getMatches legacy matches error: $e');
+        await DiagnosticsService.instance.logError(
+          feature: 'matches',
+          action: 'get_matches_legacy_matches',
+          error: e,
+          severity: 'warning',
+        );
+      }
+
+      return _profilesForIds(otherIds.toList(), matchedAtMap);
     } catch (e, stack) {
       debugPrint('SwipeService.getMatches error: $e\n$stack');
       await DiagnosticsService.instance.logError(
