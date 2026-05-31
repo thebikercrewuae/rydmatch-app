@@ -4,6 +4,8 @@ import 'package:sizer/sizer.dart';
 
 import '../../../widgets/app_icons.dart';
 
+const double _defaultSearchRadius = 500;
+
 class FilterState {
   final double distance;
   final String rideCommunity;
@@ -13,7 +15,7 @@ class FilterState {
   final bool onlineOnly;
 
   const FilterState({
-    this.distance = 100,
+    this.distance = _defaultSearchRadius,
     this.rideCommunity = 'All',
     this.skillLevel = 'All',
     this.bikeType = 'All',
@@ -40,7 +42,7 @@ class FilterState {
   }
 
   bool get isDefault =>
-      distance == 100 &&
+      distance == _defaultSearchRadius &&
       rideCommunity == 'All' &&
       skillLevel == 'All' &&
       bikeType == 'All' &&
@@ -50,7 +52,7 @@ class FilterState {
 
   int get activeCount {
     int count = 0;
-    if (distance != 100) count++;
+    if (distance != _defaultSearchRadius) count++;
     if (rideCommunity != 'All') count++;
     if (skillLevel != 'All') count++;
     if (bikeType != 'All') count++;
@@ -92,11 +94,7 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
     'Advanced',
     'Expert',
   ];
-  final List<String> _rideCommunities = [
-    'All',
-    'motorcycle',
-    'bicycle',
-  ];
+  final List<String> _rideCommunities = ['All', 'motorcycle', 'bicycle'];
   final List<String> _motorcycleTypes = [
     'All',
     'sport',
@@ -231,7 +229,7 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
 
   void _resetAll() {
     setState(() {
-      _distance = 100;
+      _distance = _defaultSearchRadius;
       _selectedRideCommunity = 'All';
       _selectedSkill = 'All';
       _selectedBikeType = 'All';
@@ -375,8 +373,8 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
             Slider(
               value: _distance,
               min: 5,
-              max: 100,
-              divisions: 19,
+              max: _defaultSearchRadius,
+              divisions: 99,
               onChanged: (v) => setState(() => _distance = v),
             ),
             SizedBox(height: 0.5.h),
