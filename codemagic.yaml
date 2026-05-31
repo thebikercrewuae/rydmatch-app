@@ -80,6 +80,17 @@ workflows:
 
           DART_DEFINES="$(encode_define "SUPABASE_URL=$SUPABASE_URL"),$(encode_define "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"),$(encode_define "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY"),$(encode_define "STRAVA_CLIENT_ID=$STRAVA_CLIENT_ID"),$(encode_define "STRAVA_REDIRECT_URI=$STRAVA_REDIRECT_URI")"
 
+          APP_VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
+          APP_VERSION_NAME="${APP_VERSION%%+*}"
+          APP_VERSION_CODE="${APP_VERSION##*+}"
+
+          if [ -z "$APP_VERSION_NAME" ] || [ -z "$APP_VERSION_CODE" ] || [ "$APP_VERSION_NAME" = "$APP_VERSION_CODE" ]; then
+            echo "Could not read app version from pubspec.yaml. Expected format: version: 1.0.15+15"
+            exit 1
+          fi
+
+          echo "Building Android App Bundle versionName=$APP_VERSION_NAME versionCode=$APP_VERSION_CODE"
+
           patch_gradle_file
 
           cd android
@@ -96,6 +107,8 @@ workflows:
             -Pdart-defines="$DART_DEFINES" \
             -Ptarget-platform=android-arm,android-arm64,android-x64 \
             -Ptarget=lib/main.dart \
+            -Pbuild-name="$APP_VERSION_NAME" \
+            -Pbuild-number="$APP_VERSION_CODE" \
             -Ptrack-widget-creation=false \
             -Ptree-shake-icons=true \
             --stacktrace 2>&1 | tee ../gradle-build.log
