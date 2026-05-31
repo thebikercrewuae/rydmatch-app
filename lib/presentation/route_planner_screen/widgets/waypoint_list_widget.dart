@@ -79,7 +79,9 @@ class WaypointListWidget extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: waypoints.length,
-            onReorderItem: onReorder,
+            // Codemagic's Flutter SDK does not support onReorderItem yet.
+            // ignore: deprecated_member_use
+            onReorder: onReorder,
             itemBuilder: (context, index) {
               return _WaypointItem(
                 key: ValueKey('wp_$index'),
