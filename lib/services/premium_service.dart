@@ -21,6 +21,7 @@ class PremiumService extends ChangeNotifier {
   static const String _localPremiumProductKey = 'premium_entitlement_product';
   static const String _localPremiumActivatedAtKey =
       'premium_entitlement_activated_at';
+  static const String _localPremiumUserIdKey = 'premium_entitlement_user_id';
 
   /// Existing app code mostly checks isPremium.
   /// Admin users should receive full access too, so this returns true for either.
@@ -46,17 +47,36 @@ class PremiumService extends ChangeNotifier {
     final supabase = Supabase.instance.client;
     final currentUser = supabase.auth.currentUser;
     final prefs = await SharedPreferences.getInstance();
-    final localPremium = prefs.getBool(_localPremiumKey) ?? false;
+    final storedUserId = prefs.getString(_localPremiumUserIdKey);
+    final rawLocalPremium = prefs.getBool(_localPremiumKey) ?? false;
     final localSource = prefs.getString(_localPremiumSourceKey);
     final localProduct = prefs.getString(_localPremiumProductKey);
 
     if (currentUser == null) {
-      _isPremiumAccount = localPremium;
+      _isPremiumAccount = false;
       _isAdmin = false;
       _priorityListingsEnabled = false;
       _isLoaded = true;
       notifyListeners();
       return;
+    }
+
+    final localPremium =
+        rawLocalPremium &&
+        storedUserId != null &&
+        storedUserId == currentUser.id;
+
+    if (rawLocalPremium && storedUserId != currentUser.id) {
+      await DiagnosticsService.instance.logError(
+        feature: 'premium',
+        action: 'ignored_local_entitlement_for_different_user',
+        error: 'Local premium cache belongs to a different user',
+        severity: 'warning',
+        context: {
+          'reason': reason,
+          'stored_user_id_present': storedUserId != null,
+        },
+      );
     }
 
     try {
@@ -101,6 +121,8 @@ class PremiumService extends ChangeNotifier {
         error: e,
         context: {
           'has_local_premium': localPremium,
+          'raw_local_premium': rawLocalPremium,
+          'stored_user_id_matches': storedUserId == currentUser.id,
           'local_source': localSource,
           'reason': reason,
         },
@@ -125,6 +147,7 @@ class PremiumService extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_localPremiumKey, true);
+    await prefs.setString(_localPremiumUserIdKey, currentUser.id);
     await prefs.setString(_localPremiumSourceKey, source);
     await prefs.setString(
       _localPremiumActivatedAtKey,
@@ -220,6 +243,7 @@ class PremiumService extends ChangeNotifier {
     await prefs.remove(_localPremiumSourceKey);
     await prefs.remove(_localPremiumProductKey);
     await prefs.remove(_localPremiumActivatedAtKey);
+    await prefs.remove(_localPremiumUserIdKey);
   }
 
   Future<void> _syncLocalEntitlementToProfile({
