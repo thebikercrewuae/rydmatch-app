@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'diagnostics_service.dart';
+import 'revenuecat_service.dart';
 
 class PremiumService extends ChangeNotifier {
   static final PremiumService _instance = PremiumService._internal();
@@ -86,13 +87,30 @@ class PremiumService extends ChangeNotifier {
           .eq('id', currentUser.id)
           .maybeSingle();
 
+      final revenueCatPremium = await RevenueCatService.instance
+          .refreshPremiumEntitlement();
       final remotePremium = profile?['is_premium'] == true;
-      _isPremiumAccount = remotePremium || localPremium;
+      _isPremiumAccount = remotePremium || localPremium || revenueCatPremium;
       _isAdmin = profile?['is_admin'] == true;
 
       if (remotePremium && !localPremium) {
         await prefs.setBool(_localPremiumKey, true);
+        await prefs.setString(_localPremiumUserIdKey, currentUser.id);
         await prefs.setString(_localPremiumSourceKey, 'remote_profile');
+      }
+
+      if (revenueCatPremium && !remotePremium) {
+        await _syncLocalEntitlementToProfile(
+          supabase: supabase,
+          userId: currentUser.id,
+          source: 'revenuecat',
+          productId: RevenueCatService
+              .instance
+              .premiumPackage
+              ?.storeProduct
+              .identifier,
+          reason: reason,
+        );
       }
 
       if (localPremium && !remotePremium) {

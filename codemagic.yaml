@@ -78,7 +78,7 @@ workflows:
             printf "%s" "$1" | base64 | tr -d '\n'
           }
 
-          DART_DEFINES="$(encode_define "SUPABASE_URL=$SUPABASE_URL"),$(encode_define "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"),$(encode_define "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY"),$(encode_define "STRAVA_CLIENT_ID=$STRAVA_CLIENT_ID"),$(encode_define "STRAVA_REDIRECT_URI=$STRAVA_REDIRECT_URI")"
+          DART_DEFINES="$(encode_define "SUPABASE_URL=$SUPABASE_URL"),$(encode_define "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"),$(encode_define "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY"),$(encode_define "STRAVA_CLIENT_ID=$STRAVA_CLIENT_ID"),$(encode_define "STRAVA_REDIRECT_URI=$STRAVA_REDIRECT_URI"),$(encode_define "REVENUECAT_ANDROID_API_KEY=$REVENUECAT_ANDROID_API_KEY"),$(encode_define "REVENUECAT_PREMIUM_ENTITLEMENT=${REVENUECAT_PREMIUM_ENTITLEMENT:-premium}")"
 
           APP_VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
           APP_VERSION_NAME="${APP_VERSION%%+*}"

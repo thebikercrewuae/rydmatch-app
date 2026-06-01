@@ -1,15 +1,13 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:sizer/sizer.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../services/premium_service.dart';
 import '../../services/analytics_service.dart';
 import '../../services/diagnostics_service.dart';
 import '../../services/profile_service.dart';
+import '../../services/revenuecat_service.dart';
 import './widgets/feature_card_widget.dart';
 import './widgets/payment_option_widget.dart';
 import '../../widgets/app_icons.dart';
@@ -34,10 +32,8 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
   late Animation<double> _scaleAnimation;
   String? _referralCode;
   bool _loadingReferral = true;
-  final InAppPurchase _inAppPurchase = InAppPurchase.instance;
-  StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
-  ProductDetails? _premiumProduct;
-  bool _storeAvailable = false;
+  String? _premiumPrice;
+  bool _revenueCatAvailable = false;
   bool _loadingStoreProduct = true;
 
   static const Color _orange = Color(0xFFE85A4F);
@@ -54,18 +50,6 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
     _scaleAnimation = CurvedAnimation(
       parent: _successController,
       curve: Curves.elasticOut,
-    );
-    _purchaseSubscription = _inAppPurchase.purchaseStream.listen(
-      _handlePurchaseUpdates,
-      onError: (error) async {
-        if (mounted) setState(() => _isProcessing = false);
-        await DiagnosticsService.instance.logError(
-          feature: 'premium',
-          action: 'purchase_stream_error',
-          error: error,
-        );
-        _showStoreMessage('Purchase could not be completed.');
-      },
     );
     _priorityListings = PremiumService().priorityListingsEnabled;
     _loadReferralCode();
@@ -86,34 +70,18 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
 
   @override
   void dispose() {
-    _purchaseSubscription?.cancel();
     _successController.dispose();
     super.dispose();
   }
 
   Future<void> _loadStoreProduct() async {
     try {
-      final available = await _inAppPurchase.isAvailable();
-      if (!mounted) return;
-
-      if (!available) {
-        setState(() {
-          _storeAvailable = false;
-          _loadingStoreProduct = false;
-        });
-        return;
-      }
-
-      final response = await _inAppPurchase.queryProductDetails({
-        _premiumProductId,
-      });
+      final package = await RevenueCatService.instance.loadPremiumPackage();
 
       if (!mounted) return;
       setState(() {
-        _storeAvailable = true;
-        _premiumProduct = response.productDetails.isNotEmpty
-            ? response.productDetails.first
-            : null;
+        _revenueCatAvailable = RevenueCatService.instance.isConfigured;
+        _premiumPrice = package?.storeProduct.priceString;
         _loadingStoreProduct = false;
       });
     } catch (e) {
@@ -125,88 +93,10 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
       );
       if (!mounted) return;
       setState(() {
-        _storeAvailable = false;
+        _revenueCatAvailable = false;
         _loadingStoreProduct = false;
       });
     }
-  }
-
-  Future<void> _handlePurchaseUpdates(
-    List<PurchaseDetails> purchaseDetailsList,
-  ) async {
-    for (final purchase in purchaseDetailsList) {
-      if (purchase.productID != _premiumProductId) continue;
-
-      if (purchase.status == PurchaseStatus.pending) {
-        if (mounted) setState(() => _isProcessing = true);
-        continue;
-      }
-
-      if (purchase.status == PurchaseStatus.error) {
-        if (mounted) setState(() => _isProcessing = false);
-        await DiagnosticsService.instance.logError(
-          feature: 'premium',
-          action: 'purchase_error',
-          error: purchase.error?.message ?? 'Purchase failed',
-          context: _purchaseContext(purchase),
-        );
-        _showStoreMessage('Purchase failed. Please try again.');
-      }
-
-      if (purchase.status == PurchaseStatus.purchased ||
-          purchase.status == PurchaseStatus.restored) {
-        await _activatePremiumAfterStorePurchase(purchase);
-      }
-
-      if (purchase.pendingCompletePurchase) {
-        await _inAppPurchase.completePurchase(purchase);
-      }
-    }
-  }
-
-  Future<void> _activatePremiumAfterStorePurchase(
-    PurchaseDetails purchase,
-  ) async {
-    final purchaseContext = _purchaseContext(purchase);
-
-    await PremiumService().activatePremium(
-      source: purchase.status == PurchaseStatus.restored
-          ? 'store_restore'
-          : 'store_purchase',
-      productId: purchase.productID,
-      purchaseContext: purchaseContext,
-    );
-    if (_priorityListings) {
-      await PremiumService().setPriorityListings(true);
-    }
-    await PremiumService().refresh(reason: 'store_purchase_completed');
-
-    if (!PremiumService().isPremium) {
-      await DiagnosticsService.instance.logError(
-        feature: 'premium',
-        action: 'purchase_completed_but_locked',
-        error: 'Store purchase completed but PremiumService remained locked',
-        context: purchaseContext,
-      );
-      if (mounted) {
-        setState(() => _isProcessing = false);
-        _showStoreMessage(
-          'Purchase completed, but Premium did not unlock. Please contact support.',
-        );
-      }
-      return;
-    }
-
-    await AnalyticsService.instance.logPremiumConverted(plan: 'premium');
-
-    if (!mounted) return;
-    setState(() {
-      _isProcessing = false;
-      _showSuccess = true;
-    });
-    _successController.forward();
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) Navigator.of(context).pop(true);
   }
 
   Future<void> _handleSubscribe() async {
@@ -215,9 +105,8 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
       return;
     }
 
-    final product = _premiumProduct;
-
-    if (!_storeAvailable || product == null) {
+    final package = RevenueCatService.instance.premiumPackage;
+    if (!_revenueCatAvailable || package == null) {
       _showStoreMessage(
         'Subscription is not available yet. Please try again later.',
       );
@@ -225,20 +114,55 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
     }
 
     setState(() => _isProcessing = true);
-    final started = await _inAppPurchase.buyNonConsumable(
-      purchaseParam: PurchaseParam(productDetails: product),
-    );
+    try {
+      final active = await RevenueCatService.instance.purchasePremiumPackage();
+      if (!active) {
+        await DiagnosticsService.instance.logError(
+          feature: 'premium',
+          action: 'revenuecat_purchase_without_entitlement',
+          error: 'RevenueCat purchase completed without premium entitlement',
+          context: _revenueCatPackageContext(),
+        );
+        if (mounted) {
+          setState(() => _isProcessing = false);
+          _showStoreMessage(
+            'Purchase completed, but Premium did not unlock. Please contact support.',
+          );
+        }
+        return;
+      }
 
-    if (!started && mounted) {
+      await _finishPremiumActivation(
+        source: 'revenuecat_purchase',
+        productId: package.storeProduct.identifier,
+        purchaseContext: _revenueCatPackageContext(),
+        analyticsPlan: 'premium',
+      );
+    } on PlatformException catch (e) {
+      if (!mounted) return;
       await DiagnosticsService.instance.logError(
         feature: 'premium',
-        action: 'purchase_start_failed',
-        error: 'buyNonConsumable returned false',
-        context: {'product_id': product.id},
+        action: 'revenuecat_purchase_error',
+        error: e.message ?? e.code,
+        context: {
+          ..._revenueCatPackageContext(),
+          'code': e.code,
+          'details': e.details?.toString(),
+        },
         severity: 'warning',
       );
       setState(() => _isProcessing = false);
-      _showStoreMessage('Purchase could not be started.');
+      _showStoreMessage('Purchase could not be completed.');
+    } catch (e) {
+      if (!mounted) return;
+      await DiagnosticsService.instance.logError(
+        feature: 'premium',
+        action: 'revenuecat_purchase_error',
+        error: e,
+        context: _revenueCatPackageContext(),
+      );
+      setState(() => _isProcessing = false);
+      _showStoreMessage('Purchase could not be completed.');
     }
   }
 
@@ -252,8 +176,9 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
       productId: _premiumProductId,
       purchaseContext: {
         'beta_unlock_enabled': true,
-        'store_available': _storeAvailable,
-        'store_product_loaded': _premiumProduct != null,
+        'revenuecat_available': _revenueCatAvailable,
+        'revenuecat_package_loaded':
+            RevenueCatService.instance.premiumPackage != null,
       },
     );
 
@@ -275,27 +200,94 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
   }
 
   Future<void> _handleRestorePurchase() async {
-    if (!_storeAvailable) {
-      _showStoreMessage('Store purchases are not available on this device.');
+    if (!_revenueCatAvailable) {
+      _showStoreMessage('Subscriptions are not available on this device.');
       return;
     }
 
     setState(() => _isProcessing = true);
-    await _inAppPurchase.restorePurchases();
+    try {
+      final active = await RevenueCatService.instance.restorePurchases();
+      if (!active) {
+        if (mounted) {
+          setState(() => _isProcessing = false);
+          _showStoreMessage('No active Premium subscription was found.');
+        }
+        return;
+      }
+
+      await _finishPremiumActivation(
+        source: 'revenuecat_restore',
+        productId:
+            RevenueCatService.instance.premiumPackage?.storeProduct.identifier,
+        purchaseContext: _revenueCatPackageContext(),
+        analyticsPlan: 'premium_restore',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      await DiagnosticsService.instance.logError(
+        feature: 'premium',
+        action: 'revenuecat_restore_error',
+        error: e,
+        severity: 'warning',
+      );
+      setState(() => _isProcessing = false);
+      _showStoreMessage('Restore could not be completed.');
+    }
   }
 
-  Map<String, dynamic> _purchaseContext(PurchaseDetails purchase) {
+  Future<void> _finishPremiumActivation({
+    required String source,
+    required String analyticsPlan,
+    String? productId,
+    Map<String, dynamic>? purchaseContext,
+  }) async {
+    await PremiumService().activatePremium(
+      source: source,
+      productId: productId,
+      purchaseContext: purchaseContext,
+    );
+    if (_priorityListings) {
+      await PremiumService().setPriorityListings(true);
+    }
+    await PremiumService().refresh(reason: source);
+
+    if (!PremiumService().isPremium) {
+      await DiagnosticsService.instance.logError(
+        feature: 'premium',
+        action: 'premium_activation_completed_but_locked',
+        error:
+            'Premium activation completed but PremiumService remained locked',
+        context: purchaseContext,
+      );
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        _showStoreMessage('Premium did not unlock. Please contact support.');
+      }
+      return;
+    }
+
+    await AnalyticsService.instance.logPremiumConverted(plan: analyticsPlan);
+
+    if (!mounted) return;
+    setState(() {
+      _isProcessing = false;
+      _showSuccess = true;
+    });
+    _successController.forward();
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) Navigator.of(context).pop(true);
+  }
+
+  Map<String, dynamic> _revenueCatPackageContext() {
+    final package = RevenueCatService.instance.premiumPackage;
     return {
-      'product_id': purchase.productID,
-      'purchase_id': purchase.purchaseID,
-      'status': purchase.status.name,
-      'transaction_date': purchase.transactionDate,
-      'source': purchase.verificationData.source,
-      'server_verification_data_present':
-          purchase.verificationData.serverVerificationData.isNotEmpty,
-      'local_verification_data_present':
-          purchase.verificationData.localVerificationData.isNotEmpty,
-      'pending_complete_purchase': purchase.pendingCompletePurchase,
+      'entitlement_id': RevenueCatService.premiumEntitlementId,
+      'package_id': package?.identifier,
+      'product_id': package?.storeProduct.identifier,
+      'price': package?.storeProduct.priceString,
+      'currency_code': package?.storeProduct.currencyCode,
+      'revenuecat_configured': RevenueCatService.instance.isConfigured,
     };
   }
 
@@ -638,7 +630,7 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
   }
 
   Widget _buildPricingSection() {
-    final priceText = _premiumProduct?.price;
+    final priceText = _premiumPrice;
     final hasStorePrice = priceText != null && priceText.isNotEmpty;
     final displayPrice = _betaPremiumUnlockEnabled
         ? 'Free during beta'
