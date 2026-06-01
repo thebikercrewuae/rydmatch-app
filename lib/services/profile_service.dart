@@ -124,21 +124,22 @@ class ProfileService {
     final storagePath = _storagePathFromUserPhotosUrl(trimmed);
     if (storagePath == null) return trimmed;
 
-    try {
-      return await Supabase.instance.client.storage
-          .from('user-photos')
-          .createSignedUrl(storagePath, 3600);
-    } catch (e) {
-      debugPrint('resolvePhotoUrl: failed to sign photo URL: $e');
-      await DiagnosticsService.instance.logError(
-        feature: 'profile_media',
-        action: 'sign_photo_url',
-        error: e,
-        context: {'url': trimmed},
-        severity: 'warning',
-      );
-      return trimmed;
+    return Supabase.instance.client.storage
+        .from('user-photos')
+        .getPublicUrl(storagePath);
+  }
+
+  static Future<List<String>> resolvePhotoUrls(List<String> urls) async {
+    final resolved = <String>[];
+
+    for (final url in urls) {
+      final value = await resolvePhotoUrl(url);
+      if (value != null && value.isNotEmpty && !resolved.contains(value)) {
+        resolved.add(value);
+      }
     }
+
+    return resolved;
   }
 
   static Future<String?> resolveUserProfilePhotoUrl({
@@ -177,9 +178,16 @@ class ProfileService {
       if (imageFiles.isEmpty) return null;
 
       final storagePath = '${userId.trim()}/profile/${imageFiles.first.name}';
-      return await Supabase.instance.client.storage
+      final publicUrl = Supabase.instance.client.storage
           .from('user-photos')
-          .createSignedUrl(storagePath, 3600);
+          .getPublicUrl(storagePath);
+
+      final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+      if (currentUserId == userId.trim()) {
+        await _repairCurrentUserAvatarUrl(publicUrl);
+      }
+
+      return publicUrl;
     } catch (e) {
       debugPrint('resolveUserProfilePhotoUrl: failed to find photo: $e');
       await DiagnosticsService.instance.logError(
@@ -190,6 +198,32 @@ class ProfileService {
         severity: 'warning',
       );
       return null;
+    }
+  }
+
+  static Future<void> _repairCurrentUserAvatarUrl(String avatarUrl) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser == null || avatarUrl.trim().isEmpty) return;
+
+      await supabase
+          .from('user_profiles')
+          .update({
+            'avatar_url': avatarUrl,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', currentUser.id);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyRiderPhotoPath, avatarUrl);
+    } catch (e) {
+      await DiagnosticsService.instance.logError(
+        feature: 'profile_media',
+        action: 'repair_current_user_avatar_url',
+        error: e,
+        severity: 'warning',
+      );
     }
   }
 
@@ -394,6 +428,46 @@ class ProfileService {
       debugPrint('🔄 Syncing profile to Supabase...');
       debugPrint('   avatarUrl: $avatarUrl');
 
+      String? effectiveAvatarUrl = avatarUrl;
+      var effectiveBikePhotoUrls = List<String>.from(bikePhotoUrls);
+
+      try {
+        final existing = await supabase
+            .from('user_profiles')
+            .select('avatar_url, bike_photo_urls')
+            .eq('id', currentUser.id)
+            .maybeSingle();
+
+        final existingAvatar = existing?['avatar_url'] as String?;
+        if ((effectiveAvatarUrl == null || effectiveAvatarUrl.isEmpty) &&
+            existingAvatar != null &&
+            existingAvatar.trim().isNotEmpty &&
+            !existingAvatar.startsWith('blob:') &&
+            !existingAvatar.startsWith('file:')) {
+          effectiveAvatarUrl = existingAvatar;
+        }
+
+        final existingBikePhotos = existing?['bike_photo_urls'];
+        if (effectiveBikePhotoUrls.isEmpty && existingBikePhotos is List) {
+          effectiveBikePhotoUrls = existingBikePhotos
+              .map((url) => url.toString())
+              .where(
+                (url) =>
+                    url.trim().isNotEmpty &&
+                    !url.startsWith('blob:') &&
+                    !url.startsWith('file:'),
+              )
+              .toList();
+        }
+      } catch (e) {
+        await DiagnosticsService.instance.logError(
+          feature: 'profile_media',
+          action: 'load_existing_media_before_sync',
+          error: e,
+          severity: 'warning',
+        );
+      }
+
       final updates = <String, dynamic>{
         'id': currentUser.id,
         'email': currentUser.email,
@@ -406,8 +480,8 @@ class ProfileService {
         'same_gender_matching': sameGenderMatching,
         'bio': riderBio,
         'is_profile_complete': true,
-        'avatar_url': avatarUrl,
-        'bike_photo_urls': bikePhotoUrls,
+        'avatar_url': effectiveAvatarUrl,
+        'bike_photo_urls': effectiveBikePhotoUrls,
         'updated_at': DateTime.now().toIso8601String(),
       };
 

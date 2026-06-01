@@ -169,15 +169,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
             final remoteAvatar = remoteProfile?['avatar_url'] as String?;
             if (remoteAvatar != null && remoteAvatar.startsWith('http')) {
-              existingRiderPhotoUrl = remoteAvatar;
+              existingRiderPhotoUrl =
+                  await ProfileService.resolvePhotoUrl(remoteAvatar) ??
+                  remoteAvatar;
             }
 
             final remoteBikePhotos = remoteProfile?['bike_photo_urls'];
             if (remoteBikePhotos is List) {
-              existingBikePhotoUrls = remoteBikePhotos
-                  .map((url) => url.toString())
-                  .where((url) => url.startsWith('http'))
-                  .toList();
+              existingBikePhotoUrls = await ProfileService.resolvePhotoUrls(
+                remoteBikePhotos
+                    .map((url) => url.toString())
+                    .where((url) => url.startsWith('http'))
+                    .toList(),
+              );
             }
           }
         } catch (_) {}

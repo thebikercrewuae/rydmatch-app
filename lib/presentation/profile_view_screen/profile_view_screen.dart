@@ -291,6 +291,9 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         final fallbackAvatarUrl = await ProfileService.resolvePhotoUrl(
           otherUserImage,
         );
+        final bikePhotoUrls = await ProfileService.resolvePhotoUrls(
+          stringList(profile['bike_photo_urls']),
+        );
 
         setState(() {
           _riderName = fullName?.trim().isNotEmpty == true
@@ -316,9 +319,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
           _rideMode = profile['ride_mode'] as String? ?? 'motorcycle';
           _mixedCommunityMatching =
               (profile['mixed_community_matching'] as bool?) ?? false;
-          _bikePhotoPaths = stringList(
-            profile['bike_photo_urls'],
-          ).where(_canOpenPhoto).toList();
+          _bikePhotoPaths = bikePhotoUrls.where(_canOpenPhoto).toList();
           _isVerified = _profileIsVerified(profile);
           _isLoading = false;
         });
