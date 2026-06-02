@@ -23,7 +23,10 @@ class PremiumSubscriptionScreen extends StatefulWidget {
 class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
     with SingleTickerProviderStateMixin {
   static const String _premiumProductId = 'rydmatch_premium_monthly';
-  static const bool _betaPremiumUnlockEnabled = true;
+  static const bool _betaPremiumUnlockEnabled = bool.fromEnvironment(
+    'BETA_PREMIUM_UNLOCK_ENABLED',
+    defaultValue: true,
+  );
 
   bool _isProcessing = false;
   bool _showSuccess = false;
