@@ -53,6 +53,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   String _riderBio = '';
   bool _isMetric = true;
   String? _gender;
+  bool _sameGenderMatching = false;
   String _rideMode = 'motorcycle';
   bool _mixedCommunityMatching = false;
   double _averageRating = 0.0;
@@ -274,6 +275,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             _ridingSpeed = 60.0;
             _isMetric = preferredIsMetric;
             _gender = null;
+            _sameGenderMatching = false;
             _rideMode = 'motorcycle';
             _mixedCommunityMatching = false;
             _isVerified = false;
@@ -316,6 +318,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
           _ridingSpeed = (profile['riding_speed'] as num?)?.toDouble() ?? 60.0;
           _isMetric = preferredIsMetric;
           _gender = profile['gender'] as String?;
+          _sameGenderMatching = false;
           _rideMode = profile['ride_mode'] as String? ?? 'motorcycle';
           _mixedCommunityMatching =
               (profile['mixed_community_matching'] as bool?) ?? false;
@@ -345,6 +348,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
           _ridingSpeed = 60.0;
           _isMetric = preferredIsMetric;
           _gender = null;
+          _sameGenderMatching = false;
           _rideMode = 'motorcycle';
           _mixedCommunityMatching = false;
           _isVerified = false;
@@ -369,6 +373,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         _riderBio = data['riderBio'] as String;
         _isMetric = data['isMetric'] as bool? ?? true;
         _gender = data['gender'] as String?;
+        _sameGenderMatching = (data['sameGenderMatching'] as bool?) ?? false;
         _rideMode = data['rideMode'] as String? ?? 'motorcycle';
         _mixedCommunityMatching =
             (data['mixedCommunityMatching'] as bool?) ?? false;
@@ -453,6 +458,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       riderBio: _riderBio,
       isMetric: isMetric ?? _isMetric,
       gender: _gender,
+      sameGenderMatching: _sameGenderMatching,
       rideMode: _rideMode,
       mixedCommunityMatching: _mixedCommunityMatching,
     );
@@ -1541,15 +1547,40 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     };
     final label = genderLabels[_gender] ?? _gender ?? '';
     final icon = genderIcons[_gender] ?? Icons.person_outline;
+    final showSameGenderPreference =
+        _gender != null && _gender != 'prefer_not_to_say';
+
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: theme.colorScheme.primary, size: 20),
+        Padding(
+          padding: EdgeInsets.only(top: 0.2.h),
+          child: Icon(icon, color: theme.colorScheme.primary, size: 20),
+        ),
         SizedBox(width: 2.w),
-        Text(
-          label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurface,
-            fontWeight: FontWeight.w500,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (showSameGenderPreference) ...[
+                SizedBox(height: 0.5.h),
+                Text(
+                  _sameGenderMatching
+                      ? 'Only show same-gender matches'
+                      : 'Open to all genders',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.62),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ],
