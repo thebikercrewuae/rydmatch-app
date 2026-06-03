@@ -642,6 +642,13 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
         : _loadingStoreProduct
         ? 'Loading price'
         : 'See store price';
+    final detailText = _betaPremiumUnlockEnabled
+        ? hasStorePrice
+              ? 'Beta access active - Store price loaded: $priceText/month'
+              : _loadingStoreProduct
+              ? 'Beta access active - Loading store price'
+              : 'Tap Subscribe to unlock all Premium features for testing'
+        : 'Billed monthly via your app store - Cancel anytime';
 
     return Container(
       width: double.infinity,
@@ -686,9 +693,7 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
           ),
           SizedBox(height: 0.8.h),
           Text(
-            _betaPremiumUnlockEnabled
-                ? 'Tap Subscribe to unlock all Premium features for testing'
-                : 'Billed monthly via your app store - Cancel anytime',
+            detailText,
             style: GoogleFonts.dmSans(
               fontSize: 11.sp,
               color: Colors.white.withValues(alpha: 0.75),
