@@ -102,17 +102,30 @@ workflows:
             GRADLE_CMD="gradle"
           fi
 
+          export GRADLE_OPTS="${GRADLE_OPTS:-} -Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.internal.repository.max.retries=3 -Dorg.gradle.internal.repository.initial.backoff=500"
+
+          run_gradle_bundle() {
+            $GRADLE_CMD bundleRelease \
+              -Pdart-defines="$DART_DEFINES" \
+              -Ptarget-platform=android-arm,android-arm64,android-x64 \
+              -Ptarget=lib/main.dart \
+              -Pbuild-name="$APP_VERSION_NAME" \
+              -Pbuild-number="$APP_VERSION_CODE" \
+              -Ptrack-widget-creation=false \
+              -Ptree-shake-icons=true \
+              --stacktrace 2>&1 | tee ../gradle-build.log
+            return ${PIPESTATUS[0]}
+          }
+
           set +e
-          $GRADLE_CMD bundleRelease \
-            -Pdart-defines="$DART_DEFINES" \
-            -Ptarget-platform=android-arm,android-arm64,android-x64 \
-            -Ptarget=lib/main.dart \
-            -Pbuild-name="$APP_VERSION_NAME" \
-            -Pbuild-number="$APP_VERSION_CODE" \
-            -Ptrack-widget-creation=false \
-            -Ptree-shake-icons=true \
-            --stacktrace 2>&1 | tee ../gradle-build.log
-          BUILD_STATUS=${PIPESTATUS[0]}
+          run_gradle_bundle
+          BUILD_STATUS=$?
+          if [ "$BUILD_STATUS" -ne 0 ] && grep -Eq "Read timed out|Could not download|Could not get resource" ../gradle-build.log; then
+            echo "Gradle dependency download failed, retrying once after 20 seconds..."
+            sleep 20
+            run_gradle_bundle
+            BUILD_STATUS=$?
+          fi
           set -e
 
           cd "$CM_BUILD_DIR"
