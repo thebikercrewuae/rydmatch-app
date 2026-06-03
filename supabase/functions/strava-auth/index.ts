@@ -9,7 +9,7 @@ const corsHeaders = {
 const STRAVA_OAUTH_BASE_URL = 'https://www.strava.com';
 const STRAVA_API_BASE_URL = 'https://www.api-v3.strava.com';
 
-type Action = 'exchange' | 'status' | 'refresh' | 'disconnect';
+type Action = 'exchange' | 'status' | 'refresh' | 'disconnect' | 'admin_status';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -54,6 +54,65 @@ Deno.serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
     const body = await readJsonBody(req);
     const action = parseAction(body.action);
+
+    if (action === 'admin_status') {
+      const { data: isAdmin, error: adminError } = await userClient.rpc(
+        'is_admin_user',
+      );
+
+      if (adminError || isAdmin !== true) {
+        return jsonResponse({ error: 'Admin access required' }, 403);
+      }
+
+      const { data: connections, error: connectionsError } = await adminClient
+        .from('strava_connections')
+        .select(
+          'user_id, athlete_id, athlete_username, athlete_firstname, athlete_lastname, scope, expires_at, connected_at, updated_at',
+        )
+        .order('updated_at', { ascending: false })
+        .limit(100);
+
+      if (connectionsError) {
+        console.error('Strava admin status lookup failed:', connectionsError);
+        return jsonResponse({ error: 'Could not load Strava status' }, 500);
+      }
+
+      const rows = connections ?? [];
+      const userIds = rows.map((row) => row.user_id).filter(Boolean);
+      let profilesById: Record<string, any> = {};
+
+      if (userIds.length > 0) {
+        const { data: profiles, error: profilesError } = await adminClient
+          .from('user_profiles')
+          .select('id, full_name, email')
+          .in('id', userIds);
+
+        if (!profilesError && profiles) {
+          profilesById = Object.fromEntries(
+            profiles.map((profile) => [profile.id, profile]),
+          );
+        }
+      }
+
+      return jsonResponse({
+        count: rows.length,
+        connections: rows.map((row) => ({
+          userId: row.user_id,
+          userName: profilesById[row.user_id]?.full_name ?? null,
+          userEmail: profilesById[row.user_id]?.email ?? null,
+          athleteId: row.athlete_id,
+          athleteUsername: row.athlete_username,
+          athleteName: [row.athlete_firstname, row.athlete_lastname]
+            .filter((part) => typeof part === 'string' && part.length > 0)
+            .join(' ') || null,
+          scope: row.scope,
+          expiresAt: row.expires_at,
+          connectedAt: row.connected_at,
+          updatedAt: row.updated_at,
+          tokenState: tokenState(row.expires_at),
+        })),
+      });
+    }
 
     if (action === 'exchange') {
       const code = typeof body.code === 'string' ? body.code.trim() : '';
@@ -144,7 +203,8 @@ function parseAction(value: unknown): Action {
     value === 'exchange' ||
     value === 'status' ||
     value === 'refresh' ||
-    value === 'disconnect'
+    value === 'disconnect' ||
+    value === 'admin_status'
   ) {
     return value;
   }
@@ -344,6 +404,16 @@ function numberOrNull(value: unknown): number | null {
     ? value
     : Number.parseInt(String(value), 10);
   return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function tokenState(expiresAt: unknown): string {
+  const expiry = Date.parse(String(expiresAt));
+  if (!Number.isFinite(expiry)) return 'unknown';
+
+  const msRemaining = expiry - Date.now();
+  if (msRemaining <= 0) return 'expired';
+  if (msRemaining <= 10 * 60 * 1000) return 'expires_soon';
+  return 'valid';
 }
 
 function jsonResponse(body: unknown, status = 200): Response {

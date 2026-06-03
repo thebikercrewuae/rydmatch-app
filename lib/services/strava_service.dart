@@ -19,7 +19,7 @@ class StravaService extends ChangeNotifier {
   static const String _clientId = String.fromEnvironment('STRAVA_CLIENT_ID');
   static const String _redirectUri = String.fromEnvironment(
     'STRAVA_REDIRECT_URI',
-    defaultValue: 'rydmatch://strava-callback',
+    defaultValue: 'rydmatch://rydmatch.com/strava-callback',
   );
   static const String _statePrefsKey = 'strava_oauth_state';
 
@@ -252,7 +252,9 @@ class StravaService extends ChangeNotifier {
   }
 
   bool _isStravaCallback(Uri uri) {
-    return uri.scheme == 'rydmatch' && uri.host == 'strava-callback';
+    return uri.scheme == 'rydmatch' &&
+        uri.host == 'rydmatch.com' &&
+        uri.path == '/strava-callback';
   }
 
   String _generateState() {

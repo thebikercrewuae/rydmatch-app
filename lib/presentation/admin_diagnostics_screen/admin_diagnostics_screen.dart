@@ -30,6 +30,8 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
   Map<String, Map<String, dynamic>> _profilesById = {};
   Map<String, dynamic>? _matchingHealth;
   String? _matchingHealthError;
+  Map<String, dynamic>? _stravaHealth;
+  String? _stravaHealthError;
 
   final List<String> _features = const [
     'all',
@@ -40,6 +42,7 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
     'ride_groups',
     'route_planner',
     'premium',
+    'strava',
     'emergency_sos',
     'live_ride',
     'live_ride_voice',
@@ -121,7 +124,11 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
   }
 
   Future<void> _loadDashboard() async {
-    await Future.wait([_loadErrors(), _loadMatchingHealth()]);
+    await Future.wait([
+      _loadErrors(),
+      _loadMatchingHealth(),
+      _loadStravaHealth(),
+    ]);
   }
 
   Future<void> _loadErrors() async {
@@ -289,6 +296,32 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
       setState(() {
         _matchingHealth = null;
         _matchingHealthError = e.toString();
+      });
+    }
+  }
+
+  Future<void> _loadStravaHealth() async {
+    try {
+      final response = await Supabase.instance.client.functions.invoke(
+        'strava-auth',
+        body: {'action': 'admin_status'},
+      );
+
+      final data = response.data;
+      if (data is! Map) {
+        throw Exception('Invalid Strava diagnostics response');
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _stravaHealth = Map<String, dynamic>.from(data);
+        _stravaHealthError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _stravaHealth = null;
+        _stravaHealthError = e.toString();
       });
     }
   }
@@ -544,6 +577,8 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
         children: [
           _buildHealthPanel(),
           SizedBox(height: 1.5.h),
+          _buildStravaPanel(),
+          SizedBox(height: 1.5.h),
           _buildSummaryRow(),
           SizedBox(height: 1.5.h),
           _buildFilters(),
@@ -669,6 +704,174 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
           color: _deepBlue,
           fontWeight: FontWeight.w700,
         ),
+      ),
+    );
+  }
+
+  Widget _buildStravaPanel() {
+    final health = _stravaHealth;
+    final connections = health?['connections'] is List
+        ? List<Map<String, dynamic>>.from(health!['connections'] as List)
+        : <Map<String, dynamic>>[];
+    final expired = connections
+        .where((row) => row['tokenState']?.toString() == 'expired')
+        .length;
+    final expiresSoon = connections
+        .where((row) => row['tokenState']?.toString() == 'expires_soon')
+        .length;
+    final hasTokenIssue = expired > 0 || expiresSoon > 0;
+
+    return Container(
+      padding: EdgeInsets.all(4.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: hasTokenIssue
+              ? _orange.withValues(alpha: 0.28)
+              : _green.withValues(alpha: 0.28),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                hasTokenIssue
+                    ? Icons.link_off_rounded
+                    : Icons.directions_bike_rounded,
+                color: hasTokenIssue ? _orange : _green,
+              ),
+              SizedBox(width: 2.w),
+              Expanded(
+                child: Text(
+                  'Strava Connections',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w800,
+                    color: _deepBlue,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: _loadStravaHealth,
+                child: const Text('Check'),
+              ),
+            ],
+          ),
+          if (_stravaHealthError != null) ...[
+            SizedBox(height: 0.8.h),
+            Text(
+              'Could not load Strava diagnostics. Confirm strava-auth is deployed and Supabase secrets are set.',
+              style: GoogleFonts.dmSans(fontSize: 10.sp, color: _orange),
+            ),
+          ] else if (health == null) ...[
+            SizedBox(height: 0.8.h),
+            Text(
+              'Pull to refresh or tap Check.',
+              style: GoogleFonts.dmSans(fontSize: 10.sp, color: Colors.black54),
+            ),
+          ] else ...[
+            SizedBox(height: 1.h),
+            Wrap(
+              spacing: 2.w,
+              runSpacing: 1.h,
+              children: [
+                _metricChip('Connected', health['count'] ?? connections.length),
+                _metricChip('Expired', expired),
+                _metricChip('Expiring soon', expiresSoon),
+              ],
+            ),
+            if (connections.isEmpty) ...[
+              SizedBox(height: 1.h),
+              Text(
+                'No riders have connected Strava yet.',
+                style: GoogleFonts.dmSans(
+                  fontSize: 10.5.sp,
+                  color: Colors.black54,
+                ),
+              ),
+            ] else ...[
+              SizedBox(height: 1.2.h),
+              ...connections.take(5).map(_buildStravaConnectionRow),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStravaConnectionRow(Map<String, dynamic> row) {
+    final tokenState = row['tokenState']?.toString() ?? 'unknown';
+    final tokenColor = tokenState == 'valid'
+        ? _green
+        : tokenState == 'expires_soon'
+        ? const Color(0xFFB7791F)
+        : _orange;
+    final riderName = row['userName']?.toString().trim().isNotEmpty == true
+        ? row['userName'].toString()
+        : row['userEmail']?.toString() ?? 'Unknown rider';
+    final athleteName = row['athleteName']?.toString().trim().isNotEmpty == true
+        ? row['athleteName'].toString()
+        : row['athleteUsername']?.toString() ?? 'Unknown athlete';
+
+    return Container(
+      margin: EdgeInsets.only(top: 0.8.h),
+      padding: EdgeInsets.all(3.w),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F6F8),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  riderName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 10.5.sp,
+                    fontWeight: FontWeight.w800,
+                    color: _deepBlue,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: tokenColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  tokenState.replaceAll('_', ' ').toUpperCase(),
+                  style: GoogleFonts.dmSans(
+                    fontSize: 8.5.sp,
+                    fontWeight: FontWeight.w800,
+                    color: tokenColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 0.4.h),
+          Text(
+            'Athlete: $athleteName (${row['athleteId'] ?? '-'})',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.dmSans(fontSize: 9.5.sp, color: Colors.black87),
+          ),
+          SizedBox(height: 0.3.h),
+          Text(
+            'Expires: ${_formatDate(row['expiresAt'])}  |  Last refresh: ${_formatDate(row['updatedAt'])}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.dmSans(fontSize: 9.sp, color: Colors.black54),
+          ),
+        ],
       ),
     );
   }
