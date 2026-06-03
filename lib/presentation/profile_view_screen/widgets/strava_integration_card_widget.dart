@@ -1,21 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-class StravaIntegrationCardWidget extends StatelessWidget {
+import '../../../services/strava_service.dart';
+
+class StravaIntegrationCardWidget extends StatefulWidget {
   final bool isPremium;
 
-  static const String _clientId = String.fromEnvironment('STRAVA_CLIENT_ID');
-  static const String _redirectUri =
-      String.fromEnvironment('STRAVA_REDIRECT_URI');
-
   const StravaIntegrationCardWidget({super.key, required this.isPremium});
+
+  @override
+  State<StravaIntegrationCardWidget> createState() =>
+      _StravaIntegrationCardWidgetState();
+}
+
+class _StravaIntegrationCardWidgetState
+    extends State<StravaIntegrationCardWidget> {
+  final StravaService _stravaService = StravaService.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _stravaService.addListener(_onStravaChanged);
+    _stravaService.refreshStatus();
+  }
+
+  @override
+  void dispose() {
+    _stravaService.removeListener(_onStravaChanged);
+    super.dispose();
+  }
+
+  void _onStravaChanged() {
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     const stravaOrange = Color(0xFFFC4C02);
+    final isConnected = _stravaService.isConnected;
+    final isLoading = _stravaService.isLoading;
+    final athleteName = _stravaService.athleteName;
 
     return Container(
       padding: EdgeInsets.all(4.w),
@@ -37,8 +63,8 @@ class StravaIntegrationCardWidget extends StatelessWidget {
                   color: stravaOrange,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.directions_bike_rounded,
+                child: Icon(
+                  isConnected ? Icons.check_rounded : Icons.directions_bike,
                   color: Colors.white,
                   size: 24,
                 ),
@@ -58,9 +84,7 @@ class StravaIntegrationCardWidget extends StatelessWidget {
                     ),
                     SizedBox(height: 0.4.h),
                     Text(
-                      isPremium
-                          ? 'Connect your rides and cycling stats.'
-                          : 'Premium cyclists can connect Strava.',
+                      _subtitleText(isConnected, athleteName),
                       style: GoogleFonts.dmSans(
                         fontSize: 11.sp,
                         color: theme.colorScheme.onSurfaceVariant,
@@ -70,7 +94,7 @@ class StravaIntegrationCardWidget extends StatelessWidget {
                   ],
                 ),
               ),
-              if (!isPremium)
+              if (!widget.isPremium)
                 const Icon(
                   Icons.workspace_premium_rounded,
                   color: Color(0xFFFFB347),
@@ -78,70 +102,138 @@ class StravaIntegrationCardWidget extends StatelessWidget {
                 ),
             ],
           ),
+          if (_stravaService.lastError != null) ...[
+            SizedBox(height: 1.2.h),
+            Text(
+              _stravaService.lastError!,
+              style: GoogleFonts.dmSans(
+                fontSize: 10.sp,
+                color: theme.colorScheme.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
           SizedBox(height: 2.h),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: isPremium
-                  ? () => _connectStrava(context)
-                  : () => Navigator.pushNamed(
+          if (isConnected)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: isLoading ? null : _refreshStrava,
+                    icon: isLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.sync_rounded, size: 18),
+                    label: Text(
+                      'Refresh',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 2.w),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: isLoading ? null : _disconnectStrava,
+                    icon: const Icon(Icons.link_off_rounded, size: 18),
+                    label: Text(
+                      'Disconnect',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: isLoading
+                    ? null
+                    : widget.isPremium
+                    ? _connectStrava
+                    : () => Navigator.pushNamed(
                         context,
                         '/premium-subscription-screen',
                       ),
-              icon: Icon(
-                isPremium ? Icons.link_rounded : Icons.lock_rounded,
-                size: 18,
-              ),
-              label: Text(
-                isPremium ? 'Connect Strava' : 'Unlock with Premium',
-                style: GoogleFonts.dmSans(
-                  fontSize: 12.sp,
-                  fontWeight: FontWeight.w700,
+                icon: isLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Icon(
+                        widget.isPremium
+                            ? Icons.link_rounded
+                            : Icons.lock_rounded,
+                        size: 18,
+                      ),
+                label: Text(
+                  widget.isPremium ? 'Connect Strava' : 'Unlock with Premium',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    isPremium ? stravaOrange : theme.colorScheme.primary,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: 1.5.h),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: widget.isPremium
+                      ? stravaOrange
+                      : theme.colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 1.5.h),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
   }
 
-  Future<void> _connectStrava(BuildContext context) async {
-    if (_clientId.isEmpty || _redirectUri.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Strava setup needs STRAVA_CLIENT_ID and redirect URI.'),
-        ),
-      );
-      return;
+  String _subtitleText(bool isConnected, String? athleteName) {
+    if (!widget.isPremium) return 'Premium cyclists can connect Strava.';
+    if (isConnected && athleteName != null && athleteName.isNotEmpty) {
+      return 'Connected as $athleteName.';
     }
+    if (isConnected) return 'Strava is connected.';
+    return 'Connect your rides and cycling stats.';
+  }
 
-    final authUri = Uri.https('www.strava.com', '/oauth/mobile/authorize', {
-      'client_id': _clientId,
-      'redirect_uri': _redirectUri,
-      'response_type': 'code',
-      'approval_prompt': 'auto',
-      'scope': 'read,activity:read',
-    });
-
-    final opened = await launchUrl(
-      authUri,
-      mode: LaunchMode.externalApplication,
-    );
-
-    if (!opened && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open Strava.')),
-      );
+  Future<void> _connectStrava() async {
+    final opened = await _stravaService.connect();
+    if (!opened && mounted) {
+      _showSnackBar(_stravaService.lastError ?? 'Could not open Strava.');
     }
+  }
+
+  Future<void> _refreshStrava() async {
+    final ok = await _stravaService.refreshAthlete();
+    if (!mounted) return;
+    _showSnackBar(ok ? 'Strava refreshed.' : 'Could not refresh Strava.');
+  }
+
+  Future<void> _disconnectStrava() async {
+    final ok = await _stravaService.disconnect();
+    if (!mounted) return;
+    _showSnackBar(ok ? 'Strava disconnected.' : 'Could not disconnect Strava.');
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }

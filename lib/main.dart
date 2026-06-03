@@ -12,6 +12,7 @@ import './services/offline_queue_service.dart';
 import './services/premium_service.dart';
 import './services/profile_service.dart';
 import './services/session_service.dart';
+import './services/strava_service.dart';
 import './services/supabase_service.dart';
 import './services/theme_service.dart';
 import './widgets/custom_error_widget.dart';
@@ -105,6 +106,7 @@ void main() async {
   await ThemeService().loadThemeMode();
   await HapticService.instance.init();
   await PremiumService().init();
+  await StravaService.instance.init();
 
   void launchApp() {
     runApp(MyApp(initialRoute: initialRoute));
@@ -258,11 +260,10 @@ class _MyAppState extends State<MyApp> {
                           ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
                           if (senderId != null) {
-                            _navigatorKey.currentState
-                                ?.pushNamedAndRemoveUntil(
-                                  '/main-screen',
-                                  (route) => false,
-                                );
+                            _navigatorKey.currentState?.pushNamedAndRemoveUntil(
+                              '/main-screen',
+                              (route) => false,
+                            );
 
                             _navigatorKey.currentState?.pushNamed(
                               '/chat-screen',
