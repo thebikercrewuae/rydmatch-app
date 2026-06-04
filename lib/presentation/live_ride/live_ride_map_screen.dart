@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/live_ride_service.dart';
 import '../../services/live_ride_voice_service.dart';
 import '../../services/premium_service.dart';
+import '../../services/diagnostics_service.dart';
 import '../../utils/marker_utils.dart';
 import './ride_chat_widget.dart';
 import './ride_summary_screen.dart';
@@ -18,12 +19,16 @@ class LiveRideMapScreen extends StatefulWidget {
   final String sessionId;
   final String? routeId;
   final bool isCreator;
+  final String initialRouteName;
+  final List<LatLng> initialRoutePoints;
 
   const LiveRideMapScreen({
     super.key,
     required this.sessionId,
     this.routeId,
     required this.isCreator,
+    this.initialRouteName = '',
+    this.initialRoutePoints = const [],
   });
 
   @override
@@ -48,62 +53,80 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
   int _unreadChatCount = 0;
   final Set<String> _seenChatMessageIds = {};
   void _subscribeToChatNotifications() {
-  _chatNotificationChannel?.unsubscribe();
+    _chatNotificationChannel?.unsubscribe();
 
-  _chatNotificationChannel = Supabase.instance.client
-      .channel('live_ride_chat_notifications:${widget.sessionId}')
-      .onPostgresChanges(
-        event: PostgresChangeEvent.insert,
-        schema: 'public',
-        table: 'live_ride_messages',
-        filter: PostgresChangeFilter(
-          type: PostgresChangeFilterType.eq,
-          column: 'session_id',
-          value: widget.sessionId,
-        ),
-        callback: (payload) async {
-          await _handleIncomingChatMessage(payload.newRecord);
-        },
-      )
-      .subscribe();
-}
+    _chatNotificationChannel = Supabase.instance.client
+        .channel('live_ride_chat_notifications:${widget.sessionId}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'live_ride_messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'session_id',
+            value: widget.sessionId,
+          ),
+          callback: (payload) async {
+            await _handleIncomingChatMessage(payload.newRecord);
+          },
+        )
+        .subscribe();
+  }
 
-Future<void> _handleIncomingChatMessage(Map<String, dynamic> record) async {
-  if (!mounted) return;
+  Future<void> _handleIncomingChatMessage(Map<String, dynamic> record) async {
+    if (!mounted) return;
 
-  final currentUserId = Supabase.instance.client.auth.currentUser?.id;
-  final senderId = record['user_id'] as String?;
-  final messageId = record['id']?.toString();
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    final senderId = record['user_id'] as String?;
+    final messageId = record['id']?.toString();
 
-  if (senderId == null || senderId == currentUserId) return;
-  if (messageId != null && _seenChatMessageIds.contains(messageId)) return;
-  if (messageId != null) _seenChatMessageIds.add(messageId);
+    if (senderId == null || senderId == currentUserId) return;
+    if (messageId != null && _seenChatMessageIds.contains(messageId)) return;
+    if (messageId != null) _seenChatMessageIds.add(messageId);
 
-  if (_isChatOpen) return;
+    if (_isChatOpen) return;
 
-  final senderName = await _fetchRiderName(senderId);
-  final body = record['message'] as String? ?? 'New message';
+    final senderName = await _fetchRiderName(senderId);
+    final body = record['message'] as String? ?? 'New message';
 
-  final preview = body.length > 60 ? '${body.substring(0, 60)}...' : body;
+    final preview = body.length > 60 ? '${body.substring(0, 60)}...' : body;
 
-  if (!mounted) return;
+    if (!mounted) return;
 
-  setState(() => _unreadChatCount++);
+    setState(() => _unreadChatCount++);
 
-  AppToast.show(
-    context,
-    message: '$senderName: $preview',
-    type: ToastType.info,
-  );
-}
+    AppToast.show(
+      context,
+      message: '$senderName: $preview',
+      type: ToastType.info,
+    );
+  }
 
-Future<String> _fetchRiderName(String userId) async {
-  try {
-    final profile = await Supabase.instance.client
-        .from('user_profiles')
-        .select('full_name, email')
-        .eq('id', userId)
-        .maybeSingle();
+  Future<String> _fetchRiderName(String userId) async {
+    try {
+      final profile = await Supabase.instance.client
+          .from('user_profiles')
+          .select('full_name, email')
+          .eq('id', userId)
+          .maybeSingle();
+
+      final fullName = profile?['full_name'] as String?;
+      final email = profile?['email'] as String?;
+
+      if (fullName != null && fullName.trim().isNotEmpty) {
+        return fullName.trim();
+      }
+
+      if (email != null && email.trim().isNotEmpty) {
+        return email.split('@').first;
+      }
+    } catch (_) {}
+
+    return 'Rider';
+  }
+
+  String _participantName(Map<String, dynamic> participant) {
+    final profile = participant['user_profiles'] as Map?;
 
     final fullName = profile?['full_name'] as String?;
     final email = profile?['email'] as String?;
@@ -115,111 +138,129 @@ Future<String> _fetchRiderName(String userId) async {
     if (email != null && email.trim().isNotEmpty) {
       return email.split('@').first;
     }
-  } catch (_) {}
 
-  return 'Rider';
-}
-
-String _participantName(Map<String, dynamic> participant) {
-  final profile = participant['user_profiles'] as Map?;
-
-  final fullName = profile?['full_name'] as String?;
-  final email = profile?['email'] as String?;
-
-  if (fullName != null && fullName.trim().isNotEmpty) {
-    return fullName.trim();
+    return 'Rider';
   }
 
-  if (email != null && email.trim().isNotEmpty) {
-    return email.split('@').first;
+  Future<void> _loadPlannedRoute() async {
+    try {
+      final session = await Supabase.instance.client
+          .from('live_ride_sessions')
+          .select('ride_group_id')
+          .eq('id', widget.sessionId)
+          .maybeSingle();
+
+      final rideGroupId = session?['ride_group_id'] as String?;
+      if (rideGroupId == null || rideGroupId.isEmpty) {
+        await _logMissingPlannedRoute('session_missing_ride_group');
+        return;
+      }
+
+      final group = await Supabase.instance.client
+          .from('ride_groups')
+          .select('route, route_polyline')
+          .eq('id', rideGroupId)
+          .maybeSingle();
+
+      if (group == null) {
+        await _logMissingPlannedRoute('ride_group_not_readable');
+        return;
+      }
+
+      final routePoints = _parseRoutePolyline(group['route_polyline']);
+      if (routePoints.length < 2) {
+        await _logMissingPlannedRoute('ride_group_route_empty');
+        return;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _plannedRouteName = group['route'] as String? ?? '';
+        _plannedRoutePoints = routePoints;
+      });
+      _rebuildMarkers();
+      _fitInitialView();
+    } catch (e) {
+      debugPrint('LiveRideMapScreen._loadPlannedRoute error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'live_ride',
+        action: 'load_planned_route',
+        error: e,
+        severity: 'warning',
+        context: {
+          'session_id': widget.sessionId,
+          'has_initial_route': widget.initialRoutePoints.length >= 2,
+        },
+      );
+    }
   }
 
-  return 'Rider';
-}
+  Future<void> _logMissingPlannedRoute(String reason) async {
+    if (widget.initialRoutePoints.length >= 2) return;
 
-Future<void> _loadPlannedRoute() async {
-  try {
-    final session = await Supabase.instance.client
-        .from('live_ride_sessions')
-        .select('ride_group_id')
-        .eq('id', widget.sessionId)
-        .maybeSingle();
+    await DiagnosticsService.instance.logError(
+      feature: 'live_ride',
+      action: 'planned_route_unavailable',
+      error: 'Planned route is unavailable for live ride',
+      severity: 'warning',
+      context: {'session_id': widget.sessionId, 'reason': reason},
+    );
+  }
 
-    final rideGroupId = session?['ride_group_id'] as String?;
-    if (rideGroupId == null || rideGroupId.isEmpty) return;
+  List<LatLng> _parseRoutePolyline(dynamic value) {
+    if (value is! List) return const [];
 
-    final group = await Supabase.instance.client
-        .from('ride_groups')
-        .select('route, route_polyline')
-        .eq('id', rideGroupId)
-        .maybeSingle();
+    return value
+        .whereType<Map>()
+        .map((point) {
+          final lat = point['lat'];
+          final lng = point['lng'];
+          if (lat is! num || lng is! num) return null;
+          return LatLng(lat.toDouble(), lng.toDouble());
+        })
+        .whereType<LatLng>()
+        .toList();
+  }
 
-    if (group == null) return;
+  @override
+  void initState() {
+    super.initState();
+    _plannedRouteName = widget.initialRouteName;
+    _plannedRoutePoints = List<LatLng>.from(widget.initialRoutePoints);
+    if (_plannedRoutePoints.length >= 2) {
+      unawaited(_rebuildMarkers());
+    }
+    _loadPremiumAccess();
+    _loadPlannedRoute();
+    _initMyPosition();
+    _startPositionUpdates();
+    _subscribeToChatNotifications();
+    _voiceService.addListener(_onVoiceStateChanged);
+    LiveRideService.riderLocations.addListener(_onRiderLocationsChanged);
+    LiveRideService.participants.addListener(_onParticipantsChanged);
+  }
 
-    final routePoints = _parseRoutePolyline(group['route_polyline']);
-    if (routePoints.length < 2) return;
+  @override
+  void dispose() {
+    _positionTimer?.cancel();
+    _chatNotificationChannel?.unsubscribe();
+    _voiceService.removeListener(_onVoiceStateChanged);
+    _voiceService.disconnect();
+    LiveRideService.riderLocations.removeListener(_onRiderLocationsChanged);
+    LiveRideService.participants.removeListener(_onParticipantsChanged);
+    _mapController?.dispose();
+    super.dispose();
+  }
 
+  void _onVoiceStateChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _loadPremiumAccess() async {
+    await PremiumService().refresh();
     if (!mounted) return;
-    setState(() {
-      _plannedRouteName = group['route'] as String? ?? '';
-      _plannedRoutePoints = routePoints;
-    });
-    _rebuildMarkers();
-    _fitInitialView();
-  } catch (e) {
-    debugPrint('LiveRideMapScreen._loadPlannedRoute error: $e');
+    setState(() => _isPremium = PremiumService().isPremium);
   }
-}
-
-List<LatLng> _parseRoutePolyline(dynamic value) {
-  if (value is! List) return const [];
-
-  return value
-      .whereType<Map>()
-      .map((point) {
-        final lat = point['lat'];
-        final lng = point['lng'];
-        if (lat is! num || lng is! num) return null;
-        return LatLng(lat.toDouble(), lng.toDouble());
-      })
-      .whereType<LatLng>()
-      .toList();
-}
-
-  @override
-void initState() {
-  super.initState();
-  _loadPremiumAccess();
-  _loadPlannedRoute();
-  _initMyPosition();
-  _startPositionUpdates();
-  _subscribeToChatNotifications();
-  _voiceService.addListener(_onVoiceStateChanged);
-  LiveRideService.riderLocations.addListener(_onRiderLocationsChanged);
-  LiveRideService.participants.addListener(_onParticipantsChanged);
-}
-
-  @override
-void dispose() {
-  _positionTimer?.cancel();
-  _chatNotificationChannel?.unsubscribe();
-  _voiceService.removeListener(_onVoiceStateChanged);
-  _voiceService.disconnect();
-  LiveRideService.riderLocations.removeListener(_onRiderLocationsChanged);
-  LiveRideService.participants.removeListener(_onParticipantsChanged);
-  _mapController?.dispose();
-  super.dispose();
-}
-
-void _onVoiceStateChanged() {
-  if (mounted) setState(() {});
-}
-
-Future<void> _loadPremiumAccess() async {
-  await PremiumService().refresh();
-  if (!mounted) return;
-  setState(() => _isPremium = PremiumService().isPremium);
-}
 
   Future<void> _initMyPosition() async {
     try {
@@ -315,8 +356,9 @@ Future<void> _loadPremiumAccess() async {
       _riderTrails[trailKey]!.add(LatLng(rider.latitude, rider.longitude));
 
       if (_riderTrails[trailKey]!.length > 200) {
-        _riderTrails[trailKey] = _riderTrails[trailKey]!
-            .sublist(_riderTrails[trailKey]!.length - 200);
+        _riderTrails[trailKey] = _riderTrails[trailKey]!.sublist(
+          _riderTrails[trailKey]!.length - 200,
+        );
       }
 
       final color = trailColors[colorIndex % trailColors.length];
@@ -346,9 +388,7 @@ Future<void> _loadPremiumAccess() async {
           );
         }
       } else {
-        icon = BitmapDescriptor.defaultMarkerWithHue(
-          BitmapDescriptor.hueAzure,
-        );
+        icon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
       }
 
       newMarkers.add(
@@ -463,7 +503,9 @@ Future<void> _loadPremiumAccess() async {
       northeast: LatLng(maxLat, maxLng),
     );
 
-    _mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, padding));
+    _mapController?.animateCamera(
+      CameraUpdate.newLatLngBounds(bounds, padding),
+    );
   }
 
   Future<void> _handleEndOrLeave() async {
@@ -632,7 +674,7 @@ Future<void> _loadPremiumAccess() async {
             },
           ),
 
-                   // ── Top Bar Overlay ─────────────────────────────────────────────
+          // ── Top Bar Overlay ─────────────────────────────────────────────
           Positioned(
             top: 0,
             left: 0,
@@ -746,10 +788,8 @@ Future<void> _loadPremiumAccess() async {
                   const SizedBox(width: 8),
                   // SOS button
                   GestureDetector(
-                    onTap: () => Navigator.pushNamed(
-                      context,
-                      '/emergency-sos-screen',
-                    ),
+                    onTap: () =>
+                        Navigator.pushNamed(context, '/emergency-sos-screen'),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -823,11 +863,14 @@ Future<void> _loadPremiumAccess() async {
                           itemCount: participantList.length,
                           itemBuilder: (context, index) {
                             final p = participantList[index];
-                            final name = _participantName(Map<String, dynamic>.from(p));
+                            final name = _participantName(
+                              Map<String, dynamic>.from(p),
+                            );
                             final isSharing =
                                 p['is_sharing_location'] as bool? ?? false;
-                            final initial =
-                                name.isNotEmpty ? name[0].toUpperCase() : 'R';
+                            final initial = name.isNotEmpty
+                                ? name[0].toUpperCase()
+                                : 'R';
 
                             return Padding(
                               padding: const EdgeInsets.only(right: 10),
@@ -835,8 +878,9 @@ Future<void> _loadPremiumAccess() async {
                                 children: [
                                   CircleAvatar(
                                     radius: 24,
-                                    backgroundColor:
-                                        const Color(0xFF2563EB).withAlpha(204),
+                                    backgroundColor: const Color(
+                                      0xFF2563EB,
+                                    ).withAlpha(204),
                                     child: Text(
                                       initial,
                                       style: GoogleFonts.inter(
@@ -883,8 +927,7 @@ Future<void> _loadPremiumAccess() async {
                                     ? const Color(0xFF2563EB)
                                     : Colors.white24,
                               ),
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 10),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -912,17 +955,14 @@ Future<void> _loadPremiumAccess() async {
                           child: OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.white70,
-                              side:
-                                  const BorderSide(color: Colors.white24),
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 10),
+                              side: const BorderSide(color: Colors.white24),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
                             onPressed: _fitAllMarkers,
-                            icon:
-                                const Icon(Icons.fit_screen, size: 16),
+                            icon: const Icon(Icons.fit_screen, size: 16),
                             label: Text(
                               'Fit All',
                               style: GoogleFonts.inter(fontSize: 12),
@@ -938,8 +978,7 @@ Future<void> _loadPremiumAccess() async {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red.shade700,
                           foregroundColor: Colors.white,
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -967,89 +1006,91 @@ Future<void> _loadPremiumAccess() async {
             ),
 
           // ── Chat toggle button ──────────────────────────────────────────
-if (!_isChatOpen)
-  Positioned(
-    right: 16,
-    bottom: MediaQuery.of(context).padding.bottom + 200,
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (_isPremium) ...[
-          FloatingActionButton(
-            heroTag: 'live_ride_voice',
-            mini: true,
-            backgroundColor: _voiceButtonColor,
-            tooltip: _voiceButtonTooltip,
-            onPressed: _voiceService.isConnecting
-                ? null
-                : _handleVoiceButtonPressed,
-            child: _voiceService.isConnecting
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
+          if (!_isChatOpen)
+            Positioned(
+              right: 16,
+              bottom: MediaQuery.of(context).padding.bottom + 200,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_isPremium) ...[
+                    FloatingActionButton(
+                      heroTag: 'live_ride_voice',
+                      mini: true,
+                      backgroundColor: _voiceButtonColor,
+                      tooltip: _voiceButtonTooltip,
+                      onPressed: _voiceService.isConnecting
+                          ? null
+                          : _handleVoiceButtonPressed,
+                      child: _voiceService.isConnecting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Icon(
+                              _voiceButtonIcon,
+                              color: Colors.white,
+                              size: 20,
+                            ),
                     ),
-                  )
-                : Icon(
-                    _voiceButtonIcon,
-                    color: Colors.white,
-                    size: 20,
+                    const SizedBox(height: 12),
+                  ],
+                  FloatingActionButton(
+                    heroTag: 'live_ride_chat',
+                    mini: true,
+                    backgroundColor: const Color(0xFF2563EB),
+                    tooltip: 'Open chat',
+                    onPressed: () {
+                      setState(() {
+                        _isChatOpen = true;
+                        _unreadChatCount = 0;
+                      });
+                    },
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        const Icon(
+                          Icons.chat_bubble_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        if (_unreadChatCount > 0)
+                          Positioned(
+                            top: -12,
+                            right: -12,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 18,
+                                minHeight: 18,
+                              ),
+                              child: Text(
+                                _unreadChatCount > 9
+                                    ? '9+'
+                                    : '$_unreadChatCount',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.inter(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-          ),
-          const SizedBox(height: 12),
-        ],
-        FloatingActionButton(
-          heroTag: 'live_ride_chat',
-          mini: true,
-          backgroundColor: const Color(0xFF2563EB),
-          tooltip: 'Open chat',
-          onPressed: () {
-            setState(() {
-              _isChatOpen = true;
-              _unreadChatCount = 0;
-            });
-          },
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              const Icon(
-                Icons.chat_bubble_rounded,
-                color: Colors.white,
-                size: 20,
+                ],
               ),
-              if (_unreadChatCount > 0)
-                Positioned(
-                  top: -12,
-                  right: -12,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 18,
-                      minHeight: 18,
-                    ),
-                    child: Text(
-                      _unreadChatCount > 9 ? '9+' : '$_unreadChatCount',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  ),
+            ),
 
           // ── Chat overlay ────────────────────────────────────────────────
           if (_isChatOpen)

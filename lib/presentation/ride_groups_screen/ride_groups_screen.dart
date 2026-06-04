@@ -1408,7 +1408,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
                 onPressed: isLoading
                     ? null
                     : () => hasActiveRide
-                          ? _joinLiveRide(activeSession['id'] as String)
+                          ? _joinLiveRide(activeSession['id'] as String, group)
                           : _startLiveRide(group),
                 icon: isLoading
                     ? const SizedBox(
@@ -1486,8 +1486,12 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                LiveRideMapScreen(sessionId: sessionId, isCreator: false),
+            builder: (_) => LiveRideMapScreen(
+              sessionId: sessionId,
+              isCreator: false,
+              initialRouteName: group.route,
+              initialRoutePoints: group.routePolyline,
+            ),
           ),
         );
       } else if (mounted) {
@@ -1508,8 +1512,12 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              LiveRideMapScreen(sessionId: session.id, isCreator: true),
+          builder: (_) => LiveRideMapScreen(
+            sessionId: session.id,
+            isCreator: true,
+            initialRouteName: group.route,
+            initialRoutePoints: group.routePolyline,
+          ),
         ),
       );
     } else if (mounted) {
@@ -1522,7 +1530,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
     }
   }
 
-  Future<void> _joinLiveRide(String sessionId) async {
+  Future<void> _joinLiveRide(String sessionId, RideGroup group) async {
     Navigator.of(context).pop();
 
     final success = await LiveRideService.instance.joinRide(sessionId);
@@ -1531,8 +1539,12 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              LiveRideMapScreen(sessionId: sessionId, isCreator: false),
+          builder: (_) => LiveRideMapScreen(
+            sessionId: sessionId,
+            isCreator: false,
+            initialRouteName: group.route,
+            initialRoutePoints: group.routePolyline,
+          ),
         ),
       );
     } else if (mounted) {
