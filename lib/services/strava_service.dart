@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'diagnostics_service.dart';
+import 'strava_callback.dart';
 
 class StravaService extends ChangeNotifier {
   static StravaService? _instance;
@@ -131,9 +132,10 @@ class StravaService extends ChangeNotifier {
   }
 
   Future<bool> handleUri(Uri uri) async {
-    if (!_isStravaCallback(uri)) return false;
+    final callback = StravaCallback.tryParse(uri);
+    if (callback == null) return false;
 
-    final error = uri.queryParameters['error'];
+    final error = callback.error;
     if (error != null && error.isNotEmpty) {
       _lastError = error == 'access_denied'
           ? 'Strava connection was cancelled.'
@@ -142,8 +144,8 @@ class StravaService extends ChangeNotifier {
       return true;
     }
 
-    final code = uri.queryParameters['code'];
-    final state = uri.queryParameters['state'];
+    final code = callback.code;
+    final state = callback.state;
     if (code == null || code.isEmpty) {
       _lastError = 'Strava did not return an authorization code.';
       notifyListeners();
@@ -249,12 +251,6 @@ class StravaService extends ChangeNotifier {
     if (_isLoading == value) return;
     _isLoading = value;
     notifyListeners();
-  }
-
-  bool _isStravaCallback(Uri uri) {
-    return uri.scheme == 'rydmatch' &&
-        uri.host == 'rydmatch.com' &&
-        uri.path == '/strava-callback';
   }
 
   String _generateState() {
