@@ -10,6 +10,10 @@ workflows:
         - rydmatch-prod
 
     scripts:
+      - name: Validate release configuration
+        script: |
+          bash scripts/validate_release_config.sh
+
       - name: Restore and verify release keystore
         script: |
           if [ -z "$CM_KEYSTORE_BASE64" ]; then
@@ -60,6 +64,18 @@ workflows:
       - name: Get Flutter packages
         script: |
           flutter pub get
+
+      - name: Analyze Flutter code
+        script: |
+          flutter analyze
+
+      - name: Run Flutter tests
+        script: |
+          if [ -d test ] && find test -type f -name "*_test.dart" -print -quit | grep -q .; then
+            flutter test
+          else
+            echo "No Flutter tests found yet; skipping flutter test."
+          fi
 
       - name: Generate launcher icons
         script: |
