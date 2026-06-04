@@ -1060,6 +1060,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                         _buildAdminVerificationButton(),
                         SizedBox(height: 1.5.h),
                         _buildAdminDiagnosticsButton(),
+                        SizedBox(height: 1.5.h),
+                        _buildAdminGrowthDashboardButton(),
                       ],
                       if (_rideMode != 'bicycle') ...[
                         SizedBox(height: 1.5.h),
@@ -1264,6 +1266,33 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF263238),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.0),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdminGrowthDashboardButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 6.h,
+      child: ElevatedButton.icon(
+        onPressed: () {
+          Navigator.pushNamed(context, '/admin-growth-dashboard-screen');
+        },
+        icon: const Icon(Icons.trending_up_rounded, color: Colors.white),
+        label: Text(
+          'Growth & Revenue Dashboard',
+          style: GoogleFonts.dmSans(
+            fontSize: 14.sp,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF2E7D32),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12.0),
           ),

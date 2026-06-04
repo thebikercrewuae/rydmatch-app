@@ -55,6 +55,7 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
       curve: Curves.elasticOut,
     );
     _priorityListings = PremiumService().priorityListingsEnabled;
+    AnalyticsService.instance.logPremiumScreenView();
     _loadReferralCode();
     _loadStoreProduct();
   }
@@ -103,12 +104,18 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
   }
 
   Future<void> _handleSubscribe() async {
+    final package = RevenueCatService.instance.premiumPackage;
+    await AnalyticsService.instance.logPremiumSubscribeStarted(
+      betaUnlockEnabled: _betaPremiumUnlockEnabled,
+      price: package?.storeProduct.priceString,
+      currencyCode: package?.storeProduct.currencyCode,
+    );
+
     if (_betaPremiumUnlockEnabled) {
       await _activatePremiumForBeta();
       return;
     }
 
-    final package = RevenueCatService.instance.premiumPackage;
     if (!_revenueCatAvailable || package == null) {
       _showStoreMessage(
         'Subscription is not available yet. Please try again later.',

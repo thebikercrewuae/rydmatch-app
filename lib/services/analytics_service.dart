@@ -14,6 +14,9 @@ class AnalyticsService {
   static const String eventMatchCreated = 'match_created';
   static const String eventMessageSent = 'message_sent';
   static const String eventSosTriggered = 'sos_triggered';
+  static const String eventPremiumScreenView = 'premium_screen_view';
+  static const String eventPremiumSubscribeStarted =
+      'premium_subscribe_started';
   static const String eventPremiumConverted = 'premium_converted';
 
   Future<void> logEvent(String eventType, {Map<String, dynamic>? data}) async {
@@ -87,6 +90,25 @@ class AnalyticsService {
       data: {
         if (plan != null) 'plan': plan,
         'converted_at': DateTime.now().toIso8601String(),
+      },
+    );
+  }
+
+  Future<void> logPremiumScreenView() async {
+    await logEvent(eventPremiumScreenView);
+  }
+
+  Future<void> logPremiumSubscribeStarted({
+    required bool betaUnlockEnabled,
+    String? price,
+    String? currencyCode,
+  }) async {
+    await logEvent(
+      eventPremiumSubscribeStarted,
+      data: {
+        'beta_unlock_enabled': betaUnlockEnabled,
+        if (price != null) 'price': price,
+        if (currencyCode != null) 'currency_code': currencyCode,
       },
     );
   }

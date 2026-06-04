@@ -29,6 +29,7 @@ import '../presentation/reset_password_screen/reset_password_screen.dart';
 import '../presentation/verification_screen/verification_screen.dart';
 import '../presentation/admin_verification_screen/admin_verification_screen.dart';
 import '../presentation/admin_diagnostics_screen/admin_diagnostics_screen.dart';
+import '../presentation/admin_growth_dashboard_screen/admin_growth_dashboard_screen.dart';
 
 class AppRoutes {
   static const String initial = '/';
@@ -65,6 +66,8 @@ class AppRoutes {
   static const String verificationScreen = '/verification-screen';
   static const String adminVerificationScreen = '/admin-verification-screen';
   static const String adminDiagnosticsScreen = '/admin-diagnostics-screen';
+  static const String adminGrowthDashboardScreen =
+      '/admin-growth-dashboard-screen';
 
   static Map<String, WidgetBuilder> routes = {
     initial: (context) => const RegistrationScreen(),
@@ -114,6 +117,7 @@ class AppRoutes {
     verificationScreen: (context) => const VerificationScreen(),
     adminVerificationScreen: (context) => const AdminVerificationScreen(),
     adminDiagnosticsScreen: (context) => const AdminDiagnosticsScreen(),
+    adminGrowthDashboardScreen: (context) => const AdminGrowthDashboardScreen(),
   };
 }
 
