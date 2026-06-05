@@ -1,8 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../services/notification_service.dart';
-import '../live_ride/live_ride_map_screen.dart';
+import '../live_ride/live_ride_navigation.dart';
 import '../ride_groups_screen/ride_groups_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -85,13 +87,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return '${dt.day}/${dt.month}/${dt.year}';
   }
 
-  void _onTap(AppNotification notification) {
-    _service.markAsRead(notification.id);
+  Future<void> _onTap(AppNotification notification) async {
+    await _service.markAsRead(notification.id);
 
     if (notification.type == NotificationType.rideGroupInvite) {
-      Navigator.of(context, rootNavigator: true).push(
-        MaterialPageRoute(builder: (_) => const RideGroupsScreen()),
-      );
+      if (!mounted) return;
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).push(MaterialPageRoute(builder: (_) => const RideGroupsScreen()));
       return;
     }
 
@@ -99,11 +103,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       final args = notification.actionArguments;
       final sessionId = args?['session_id'] as String?;
       if (sessionId != null && sessionId.isNotEmpty) {
-        Navigator.of(context, rootNavigator: true).push(
-          MaterialPageRoute(
-            builder: (_) =>
-                LiveRideMapScreen(sessionId: sessionId, isCreator: false),
-          ),
+        if (!mounted) return;
+        await LiveRideNavigation.open(
+          context,
+          sessionId: sessionId,
+          useRootNavigator: true,
         );
         return;
       }
@@ -111,6 +115,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     final route = notification.actionRoute;
     if (route != null && route.isNotEmpty) {
+      if (!mounted) return;
       Navigator.of(
         context,
         rootNavigator: true,
@@ -223,7 +228,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   icon: _iconForType(n.type),
                   label: _labelForType(n.type),
                   timeAgo: _timeAgo(n.createdAt),
-                  onTap: () => _onTap(n),
+                  onTap: () => unawaited(_onTap(n)),
                 );
               },
             ),

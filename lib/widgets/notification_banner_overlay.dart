@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../presentation/chat_screen/chat_screen.dart';
-import '../../presentation/live_ride/live_ride_map_screen.dart';
-import '../../services/live_ride_service.dart';
+import '../../presentation/live_ride/live_ride_navigation.dart';
 import '../../services/notification_service.dart';
 
 class NotificationBannerOverlay extends StatefulWidget {
@@ -81,13 +80,11 @@ class _NotificationBannerOverlayState extends State<NotificationBannerOverlay> {
                 if (entry.notification.type == NotificationType.rideStarted) {
                   final sessionId = args?['session_id'] as String?;
                   if (sessionId != null && sessionId.isNotEmpty) {
-                    LiveRideService.instance.joinRide(sessionId);
-                    Navigator.of(context, rootNavigator: true).push(
-                      MaterialPageRoute(
-                        builder: (_) => LiveRideMapScreen(
-                          sessionId: sessionId,
-                          isCreator: false,
-                        ),
+                    unawaited(
+                      LiveRideNavigation.open(
+                        context,
+                        sessionId: sessionId,
+                        useRootNavigator: true,
                       ),
                     );
                     return;

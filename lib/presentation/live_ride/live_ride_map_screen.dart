@@ -230,6 +230,7 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
     if (_plannedRoutePoints.length >= 2) {
       unawaited(_rebuildMarkers());
     }
+    unawaited(_ensureLiveRideSessionActive());
     _loadPremiumAccess();
     _loadPlannedRoute();
     _initMyPosition();
@@ -260,6 +261,28 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
     await PremiumService().refresh();
     if (!mounted) return;
     setState(() => _isPremium = PremiumService().isPremium);
+  }
+
+  Future<void> _ensureLiveRideSessionActive() async {
+    if (LiveRideService.instance.currentSessionId == widget.sessionId) return;
+
+    final joined = await LiveRideService.instance.joinRide(widget.sessionId);
+    if (!mounted || joined) return;
+
+    await DiagnosticsService.instance.logError(
+      feature: 'live_ride',
+      action: 'map_session_resume_failed',
+      error: LiveRideService.instance.lastError ?? 'Failed to resume live ride',
+      severity: 'warning',
+      context: {'session_id': widget.sessionId},
+    );
+
+    if (!mounted) return;
+    AppToast.show(
+      context,
+      message: LiveRideService.instance.lastError ?? 'Failed to join live ride',
+      type: ToastType.error,
+    );
   }
 
   Future<void> _initMyPosition() async {

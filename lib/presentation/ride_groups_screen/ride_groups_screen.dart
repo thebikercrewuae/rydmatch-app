@@ -11,7 +11,7 @@ import '../../services/premium_service.dart';
 import '../../widgets/app_icons.dart';
 import '../../widgets/app_logo_widget.dart';
 import '../../widgets/toast_widget.dart';
-import '../live_ride/live_ride_map_screen.dart';
+import '../live_ride/live_ride_navigation.dart';
 import './widgets/create_group_modal_widget.dart';
 import './widgets/group_card_widget.dart';
 import './widgets/premium_gate_widget.dart';
@@ -1483,16 +1483,11 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       final success = await LiveRideService.instance.joinRide(sessionId);
 
       if (success && mounted) {
-        Navigator.push(
+        await LiveRideNavigation.open(
           context,
-          MaterialPageRoute(
-            builder: (_) => LiveRideMapScreen(
-              sessionId: sessionId,
-              isCreator: false,
-              initialRouteName: group.route,
-              initialRoutePoints: group.routePolyline,
-            ),
-          ),
+          sessionId: sessionId,
+          initialRouteName: group.route,
+          initialRoutePoints: group.routePolyline,
         );
       } else if (mounted) {
         AppToast.show(
@@ -1509,16 +1504,12 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
     final session = await LiveRideService.instance.startRide(group.id, null);
 
     if (session != null && mounted) {
-      Navigator.push(
+      await LiveRideNavigation.open(
         context,
-        MaterialPageRoute(
-          builder: (_) => LiveRideMapScreen(
-            sessionId: session.id,
-            isCreator: true,
-            initialRouteName: group.route,
-            initialRoutePoints: group.routePolyline,
-          ),
-        ),
+        sessionId: session.id,
+        isCreator: true,
+        initialRouteName: group.route,
+        initialRoutePoints: group.routePolyline,
       );
     } else if (mounted) {
       AppToast.show(
@@ -1536,16 +1527,11 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
     final success = await LiveRideService.instance.joinRide(sessionId);
 
     if (success && mounted) {
-      Navigator.push(
+      await LiveRideNavigation.open(
         context,
-        MaterialPageRoute(
-          builder: (_) => LiveRideMapScreen(
-            sessionId: sessionId,
-            isCreator: false,
-            initialRouteName: group.route,
-            initialRoutePoints: group.routePolyline,
-          ),
-        ),
+        sessionId: sessionId,
+        initialRouteName: group.route,
+        initialRoutePoints: group.routePolyline,
       );
     } else if (mounted) {
       AppToast.show(
