@@ -30,6 +30,8 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
   Map<String, Map<String, dynamic>> _profilesById = {};
   Map<String, dynamic>? _matchingHealth;
   String? _matchingHealthError;
+  Map<String, dynamic>? _liveRideHealth;
+  String? _liveRideHealthError;
   Map<String, dynamic>? _stravaHealth;
   String? _stravaHealthError;
 
@@ -127,6 +129,7 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
     await Future.wait([
       _loadErrors(),
       _loadMatchingHealth(),
+      _loadLiveRideHealth(),
       _loadStravaHealth(),
     ]);
   }
@@ -326,6 +329,31 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
     }
   }
 
+  Future<void> _loadLiveRideHealth() async {
+    try {
+      final response = await Supabase.instance.client.functions.invoke(
+        'admin-growth-dashboard',
+      );
+
+      final data = response.data;
+      if (data is! Map || data['liveRide'] is! Map) {
+        throw Exception('Invalid live ride diagnostics response');
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _liveRideHealth = Map<String, dynamic>.from(data['liveRide'] as Map);
+        _liveRideHealthError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _liveRideHealth = null;
+        _liveRideHealthError = e.toString();
+      });
+    }
+  }
+
   String _pairKey(String a, String b) {
     final ids = [a, b]..sort();
     return '${ids[0]}|${ids[1]}';
@@ -347,6 +375,11 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
     final time =
         '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
     return '$date $time';
+  }
+
+  int _asInt(dynamic value) {
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   String _prettyJson(dynamic value) {
@@ -577,6 +610,8 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
         children: [
           _buildHealthPanel(),
           SizedBox(height: 1.5.h),
+          _buildLiveRidePanel(),
+          SizedBox(height: 1.5.h),
           _buildStravaPanel(),
           SizedBox(height: 1.5.h),
           _buildSummaryRow(),
@@ -704,6 +739,229 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
           color: _deepBlue,
           fontWeight: FontWeight.w700,
         ),
+      ),
+    );
+  }
+
+  Widget _buildLiveRidePanel() {
+    final health = _liveRideHealth;
+    final staleSessions = _asInt(health?['staleActiveSessions']);
+    final failedJoins = _asInt(health?['failedJoinEvents']);
+    final routeIssues = _asInt(health?['routeIssues']);
+    final locationIssues = _asInt(health?['locationIssues']);
+    final voiceIssues = _asInt(health?['voiceIssues']);
+    final errorEvents = _asInt(health?['errorEvents7d']);
+    final healthy =
+        health != null &&
+        staleSessions == 0 &&
+        failedJoins == 0 &&
+        routeIssues == 0 &&
+        locationIssues == 0 &&
+        voiceIssues == 0;
+    final recentSessions = health?['recentSessions'] is List
+        ? List<Map<String, dynamic>>.from(health!['recentSessions'] as List)
+        : <Map<String, dynamic>>[];
+    final recentErrors = health?['recentErrors'] is List
+        ? List<Map<String, dynamic>>.from(health!['recentErrors'] as List)
+        : <Map<String, dynamic>>[];
+
+    return Container(
+      padding: EdgeInsets.all(4.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: healthy
+              ? _green.withValues(alpha: 0.28)
+              : _orange.withValues(alpha: 0.28),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                healthy ? Icons.route_rounded : Icons.warning_amber_rounded,
+                color: healthy ? _green : _orange,
+              ),
+              SizedBox(width: 2.w),
+              Expanded(
+                child: Text(
+                  'Live Ride Health',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w800,
+                    color: _deepBlue,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: _loadLiveRideHealth,
+                child: const Text('Check'),
+              ),
+            ],
+          ),
+          if (_liveRideHealthError != null) ...[
+            SizedBox(height: 0.8.h),
+            Text(
+              'Could not load live ride diagnostics. Confirm admin-growth-dashboard is deployed and live ride tables exist.',
+              style: GoogleFonts.dmSans(fontSize: 10.sp, color: _orange),
+            ),
+          ] else if (health == null) ...[
+            SizedBox(height: 0.8.h),
+            Text(
+              'Pull to refresh or tap Check.',
+              style: GoogleFonts.dmSans(fontSize: 10.sp, color: Colors.black54),
+            ),
+          ] else ...[
+            SizedBox(height: 1.h),
+            Wrap(
+              spacing: 2.w,
+              runSpacing: 1.h,
+              children: [
+                _metricChip('Sessions 30d', health['sessions30d']),
+                _metricChip('Active', health['activeSessions']),
+                _metricChip('Stale active', staleSessions),
+                _metricChip('Participants', health['activeParticipants']),
+                _metricChip(
+                  'Sharing location',
+                  health['locationSharingParticipants'],
+                ),
+                _metricChip(
+                  'Sessions with GPS',
+                  health['sessionsWithLocations'],
+                ),
+                _metricChip('Failed joins', failedJoins),
+                _metricChip('Route issues', routeIssues),
+                _metricChip('Location issues', locationIssues),
+                _metricChip('Voice issues', voiceIssues),
+                _metricChip('Errors 7d', errorEvents),
+              ],
+            ),
+            if (!healthy) ...[
+              SizedBox(height: 1.h),
+              Text(
+                'Needs attention: $staleSessions stale sessions, $failedJoins failed joins, $routeIssues route issues, $locationIssues location issues, $voiceIssues voice issues.',
+                style: GoogleFonts.dmSans(
+                  fontSize: 10.5.sp,
+                  color: _orange,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+            if (recentSessions.isNotEmpty) ...[
+              SizedBox(height: 1.4.h),
+              Text(
+                'Recent sessions',
+                style: GoogleFonts.dmSans(
+                  fontSize: 11.sp,
+                  fontWeight: FontWeight.w800,
+                  color: _deepBlue,
+                ),
+              ),
+              SizedBox(height: 0.4.h),
+              ...recentSessions.take(5).map(_buildLiveRideSessionRow),
+            ],
+            if (recentErrors.isNotEmpty) ...[
+              SizedBox(height: 1.2.h),
+              Text(
+                'Latest live ride warning: ${recentErrors.first['action'] ?? 'unknown'}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.dmSans(
+                  fontSize: 10.sp,
+                  color: Colors.black54,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLiveRideSessionRow(Map<String, dynamic> row) {
+    final isPastAutoStop = row['isPastAutoStop'] == true;
+    final hasRoute = row['hasPlannedRoute'] == true;
+    final status = row['status']?.toString() ?? 'unknown';
+    final statusColor = isPastAutoStop
+        ? _orange
+        : status == 'active'
+        ? _green
+        : _deepBlue;
+    final groupName = row['groupName']?.toString().trim().isNotEmpty == true
+        ? row['groupName'].toString()
+        : 'Unnamed ride';
+
+    return Container(
+      margin: EdgeInsets.only(top: 0.8.h),
+      padding: EdgeInsets.all(3.w),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F6F8),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  groupName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 10.5.sp,
+                    fontWeight: FontWeight.w800,
+                    color: _deepBlue,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  isPastAutoStop ? 'STALE' : status.toUpperCase(),
+                  style: GoogleFonts.dmSans(
+                    fontSize: 8.5.sp,
+                    fontWeight: FontWeight.w800,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 0.4.h),
+          Text(
+            'Route: ${hasRoute ? 'planned route available' : 'no planned route found'}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.dmSans(
+              fontSize: 9.5.sp,
+              color: hasRoute ? Colors.black87 : _orange,
+              fontWeight: hasRoute ? FontWeight.w500 : FontWeight.w800,
+            ),
+          ),
+          SizedBox(height: 0.3.h),
+          Text(
+            'Active riders: ${row['activeParticipants'] ?? 0}/${row['totalParticipants'] ?? 0}  |  Sharing: ${row['locationSharers'] ?? 0}  |  GPS riders: ${row['ridersWithLocation'] ?? 0}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.dmSans(fontSize: 9.sp, color: Colors.black54),
+          ),
+          SizedBox(height: 0.3.h),
+          Text(
+            'Started: ${_formatDate(row['startedAt'])}  |  Last GPS: ${_formatDate(row['lastLocationAt']).isEmpty ? '-' : _formatDate(row['lastLocationAt'])}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.dmSans(fontSize: 9.sp, color: Colors.black54),
+          ),
+        ],
       ),
     );
   }

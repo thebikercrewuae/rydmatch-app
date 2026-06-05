@@ -55,6 +55,10 @@ Deno.serve(async (req) => {
       messagesResult,
       groupsResult,
       stravaCountResult,
+      liveSessionsResult,
+      liveParticipantsResult,
+      liveLocationsResult,
+      liveErrorsResult,
     ] = await Promise.all([
       admin
         .from('user_profiles')
@@ -78,10 +82,34 @@ Deno.serve(async (req) => {
         .limit(10000),
       admin
         .from('ride_groups')
-        .select('id, creator_id, created_at')
+        .select('id, creator_id, name, route, route_polyline, created_at')
         .gte('created_at', since30)
         .limit(10000),
       admin.from('strava_connections').select('*', { count: 'exact', head: true }),
+      admin
+        .from('live_ride_sessions')
+        .select('id, ride_group_id, started_by, status, started_at, ended_at, auto_stop_at')
+        .gte('started_at', since30)
+        .order('started_at', { ascending: false })
+        .limit(250),
+      admin
+        .from('live_ride_participants')
+        .select('session_id, user_id, status, is_sharing_location, joined_at, left_at')
+        .gte('joined_at', since30)
+        .limit(10000),
+      admin
+        .from('live_ride_locations')
+        .select('session_id, user_id, created_at')
+        .gte('created_at', since30)
+        .order('created_at', { ascending: false })
+        .limit(10000),
+      admin
+        .from('app_errors')
+        .select('feature, action, severity, message, context, created_at, user_id')
+        .in('feature', ['live_ride', 'live_ride_voice'])
+        .gte('created_at', since7)
+        .order('created_at', { ascending: false })
+        .limit(250),
     ]);
 
     for (const [name, result] of [
@@ -90,6 +118,10 @@ Deno.serve(async (req) => {
       ['matches', matchesResult],
       ['messages', messagesResult],
       ['groups', groupsResult],
+      ['live sessions', liveSessionsResult],
+      ['live participants', liveParticipantsResult],
+      ['live locations', liveLocationsResult],
+      ['live diagnostics', liveErrorsResult],
     ] as const) {
       if (result.error) {
         console.error(`admin-growth-dashboard ${name} error:`, result.error);
@@ -102,6 +134,10 @@ Deno.serve(async (req) => {
     const matches = matchesResult.data ?? [];
     const messages = messagesResult.data ?? [];
     const groups = groupsResult.data ?? [];
+    const liveSessions = liveSessionsResult.data ?? [];
+    const liveParticipants = liveParticipantsResult.data ?? [];
+    const liveLocations = liveLocationsResult.data ?? [];
+    const liveErrors = liveErrorsResult.data ?? [];
 
     const metrics7 = periodMetrics({
       since: since7,
@@ -145,6 +181,14 @@ Deno.serve(async (req) => {
         '7d': metrics7,
         '30d': metrics30,
       },
+      liveRide: liveRideDiagnostics({
+        now,
+        sessions: liveSessions,
+        participants: liveParticipants,
+        locations: liveLocations,
+        errors: liveErrors,
+        groups,
+      }),
       notes: [
         'Active users are riders who generated a tracked analytics event.',
         'Premium conversions include beta unlocks and store activations.',
@@ -215,6 +259,155 @@ function periodMetrics({
     uniqueSubscribeStarters: eventUsers.premium_subscribe_started?.size ?? 0,
     uniqueConverters: eventUsers.premium_converted?.size ?? 0,
   };
+}
+
+function liveRideDiagnostics({
+  now,
+  sessions,
+  participants,
+  locations,
+  errors,
+  groups,
+}: {
+  now: Date;
+  sessions: any[];
+  participants: any[];
+  locations: any[];
+  errors: any[];
+  groups: any[];
+}) {
+  const participantsBySession = new Map<string, any[]>();
+  for (const participant of participants) {
+    if (!participant.session_id) continue;
+    const list = participantsBySession.get(participant.session_id) ?? [];
+    list.push(participant);
+    participantsBySession.set(participant.session_id, list);
+  }
+
+  const latestLocationBySession = new Map<string, string>();
+  const locationUsersBySession = new Map<string, Set<string>>();
+  for (const location of locations) {
+    if (!location.session_id) continue;
+    if (!latestLocationBySession.has(location.session_id)) {
+      latestLocationBySession.set(location.session_id, location.created_at);
+    }
+    if (location.user_id) {
+      const users = locationUsersBySession.get(location.session_id) ?? new Set();
+      users.add(location.user_id);
+      locationUsersBySession.set(location.session_id, users);
+    }
+  }
+
+  const groupsById = new Map<string, any>();
+  for (const group of groups) {
+    if (group.id) groupsById.set(group.id, group);
+  }
+
+  const activeSessions = sessions.filter((session) => session.status === 'active');
+  const completedSessions = sessions.filter(
+    (session) => session.status === 'completed',
+  );
+  const staleActiveSessions = activeSessions.filter((session) => {
+    if (!session.auto_stop_at) return false;
+    return new Date(session.auto_stop_at).getTime() < now.getTime();
+  });
+
+  const actionCounts = countBy(errors, 'action');
+  const routeIssueActions = new Set([
+    'planned_route_unavailable',
+    'load_planned_route',
+    'map_session_resume_failed',
+  ]);
+  const locationIssueActions = new Set([
+    'send_location',
+    'load_latest_locations',
+    'location_service_disabled',
+    'location_permission_denied',
+    'location_permission_denied_forever',
+  ]);
+
+  const routeIssues = errors.filter(
+    (error) => error.feature === 'live_ride' && routeIssueActions.has(error.action),
+  );
+  const locationIssues = errors.filter(
+    (error) =>
+      error.feature === 'live_ride' && locationIssueActions.has(error.action),
+  );
+  const failedJoinEvents = errors.filter(
+    (error) =>
+      error.feature === 'live_ride' &&
+      ['join_ride', 'map_session_resume_failed'].includes(error.action),
+  );
+  const voiceIssues = errors.filter((error) => error.feature === 'live_ride_voice');
+
+  const activeParticipants = participants.filter(
+    (participant) => participant.status === 'active',
+  );
+  const sharingParticipants = activeParticipants.filter(
+    (participant) => participant.is_sharing_location === true,
+  );
+
+  const recentSessions = sessions.slice(0, 8).map((session) => {
+    const group = session.ride_group_id ? groupsById.get(session.ride_group_id) : null;
+    const sessionParticipants = participantsBySession.get(session.id) ?? [];
+    const activeSessionParticipants = sessionParticipants.filter(
+      (participant) => participant.status === 'active',
+    );
+    const locationUsers = locationUsersBySession.get(session.id);
+    const routePolyline = Array.isArray(group?.route_polyline)
+      ? group.route_polyline
+      : [];
+
+    return {
+      id: session.id,
+      status: session.status,
+      startedAt: session.started_at,
+      endedAt: session.ended_at,
+      autoStopAt: session.auto_stop_at,
+      groupId: session.ride_group_id,
+      groupName: group?.name ?? null,
+      routeName: group?.route ?? null,
+      hasPlannedRoute: routePolyline.length >= 2,
+      activeParticipants: activeSessionParticipants.length,
+      totalParticipants: sessionParticipants.length,
+      locationSharers: activeSessionParticipants.filter(
+        (participant) => participant.is_sharing_location === true,
+      ).length,
+      ridersWithLocation: locationUsers?.size ?? 0,
+      lastLocationAt: latestLocationBySession.get(session.id) ?? null,
+      isPastAutoStop:
+        session.status === 'active' &&
+        session.auto_stop_at &&
+        new Date(session.auto_stop_at).getTime() < now.getTime(),
+    };
+  });
+
+  return {
+    sessions30d: sessions.length,
+    activeSessions: activeSessions.length,
+    completedSessions: completedSessions.length,
+    staleActiveSessions: staleActiveSessions.length,
+    activeParticipants: activeParticipants.length,
+    locationSharingParticipants: sharingParticipants.length,
+    sessionsWithLocations: latestLocationBySession.size,
+    failedJoinEvents: failedJoinEvents.length,
+    routeIssues: routeIssues.length,
+    locationIssues: locationIssues.length,
+    voiceIssues: voiceIssues.length,
+    errorEvents7d: errors.length,
+    actionCounts,
+    recentErrors: errors.slice(0, 6),
+    recentSessions,
+  };
+}
+
+function countBy(rows: any[], key: string): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const row of rows) {
+    const value = String(row[key] ?? 'unknown');
+    counts[value] = (counts[value] ?? 0) + 1;
+  }
+  return counts;
 }
 
 function countSince(rows: any[], since: string): number {
