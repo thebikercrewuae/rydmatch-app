@@ -245,8 +245,23 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       return <String>[];
     }
 
-    final preferredIsMetric =
-        (await ProfileService.loadProfile())['isMetric'] as bool? ?? true;
+    Map<String, List<String>> rideTimesMap(dynamic value) {
+      if (value is Map) {
+        return value.map(
+          (day, times) => MapEntry(
+            day.toString(),
+            times is List
+                ? times.map((time) => time.toString()).toList()
+                : <String>[],
+          ),
+        )..removeWhere((_, times) => times.isEmpty);
+      }
+      return <String, List<String>>{};
+    }
+
+    final localProfile = await ProfileService.loadProfile();
+    final preferredIsMetric = localProfile['isMetric'] as bool? ?? true;
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
 
     if (isOtherUser && otherUserId != null && otherUserId.isNotEmpty) {
       try {
@@ -254,7 +269,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             .from('user_profiles')
             .select(
               'id, full_name, email, avatar_url, bio, skill_levels, bike_types, '
-              'preferred_roads, riding_speed, gender, is_verified, '
+              'preferred_roads, ride_times, riding_speed, gender, is_verified, '
               'verification_status, ride_mode, mixed_community_matching, '
               'bike_photo_urls',
             )
@@ -296,6 +311,11 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         final bikePhotoUrls = await ProfileService.resolvePhotoUrls(
           stringList(profile['bike_photo_urls']),
         );
+        final canUseLocalFallback = otherUserId == currentUserId;
+        final skillLevels = stringList(profile['skill_levels']);
+        final bikeTypes = stringList(profile['bike_types']);
+        final preferredRoads = stringList(profile['preferred_roads']);
+        final rideTimes = rideTimesMap(profile['ride_times']);
 
         setState(() {
           _riderName = fullName?.trim().isNotEmpty == true
@@ -310,10 +330,20 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
               ? avatarUrl
               : fallbackAvatarUrl;
 
-          _skillLevels = stringList(profile['skill_levels']);
-          _bikeTypes = stringList(profile['bike_types']);
-          _preferredRoads = stringList(profile['preferred_roads']);
-          _rideTimes = {};
+          _skillLevels = skillLevels.isNotEmpty || !canUseLocalFallback
+              ? skillLevels
+              : List<String>.from(localProfile['skillLevels'] as List);
+          _bikeTypes = bikeTypes.isNotEmpty || !canUseLocalFallback
+              ? bikeTypes
+              : List<String>.from(localProfile['bikeTypes'] as List);
+          _preferredRoads = preferredRoads.isNotEmpty || !canUseLocalFallback
+              ? preferredRoads
+              : List<String>.from(localProfile['preferredRoads'] as List);
+          _rideTimes = rideTimes.isNotEmpty || !canUseLocalFallback
+              ? rideTimes
+              : Map<String, List<String>>.from(
+                  localProfile['rideTimes'] as Map<String, List<String>>,
+                );
 
           _ridingSpeed = (profile['riding_speed'] as num?)?.toDouble() ?? 60.0;
           _isMetric = preferredIsMetric;
@@ -381,7 +411,6 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       });
     }
 
-    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
     final isVerified = currentUserId == null
         ? false
         : await VerificationService.instance.isUserVerified(currentUserId);

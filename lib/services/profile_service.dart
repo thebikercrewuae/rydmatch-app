@@ -384,6 +384,7 @@ class ProfileService {
         skillLevels: skillLevels,
         bikeTypes: bikeTypes,
         preferredRoads: preferredRoads,
+        rideTimes: rideTimes,
         riderName: riderName,
         riderBio: riderBio,
         gender: gender,
@@ -407,6 +408,7 @@ class ProfileService {
     required List<String> skillLevels,
     required List<String> bikeTypes,
     required List<String> preferredRoads,
+    required Map<String, List<String>> rideTimes,
     String riderName = '',
     String riderBio = '',
     String? gender,
@@ -474,6 +476,7 @@ class ProfileService {
         'skill_levels': skillLevels,
         'bike_types': bikeTypes,
         'preferred_roads': preferredRoads,
+        'ride_times': rideTimes,
         'riding_speed': ridingSpeed,
         'ride_mode': rideMode,
         'mixed_community_matching': mixedCommunityMatching,
@@ -508,6 +511,10 @@ class ProfileService {
         }
         if (e.message.contains('same_gender_matching')) {
           updates.remove('same_gender_matching');
+          shouldRetry = true;
+        }
+        if (e.message.contains('ride_times')) {
+          updates.remove('ride_times');
           shouldRetry = true;
         }
 
@@ -639,6 +646,20 @@ class ProfileService {
           _keyPreferredRoads,
           List<String>.from(preferredRoads as List),
         );
+      }
+
+      // Restore ride times
+      final rideTimes = response['ride_times'];
+      if (rideTimes is Map) {
+        final normalizedRideTimes = rideTimes.map(
+          (day, times) => MapEntry(
+            day.toString(),
+            times is List
+                ? times.map((time) => time.toString()).toList()
+                : <String>[],
+          ),
+        )..removeWhere((_, times) => times.isEmpty);
+        await prefs.setString(_keyRideTimes, jsonEncode(normalizedRideTimes));
       }
 
       // Restore name and bio
