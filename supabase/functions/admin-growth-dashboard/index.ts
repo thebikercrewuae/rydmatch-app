@@ -59,6 +59,8 @@ Deno.serve(async (req) => {
       liveParticipantsResult,
       liveLocationsResult,
       liveErrorsResult,
+      notificationsResult,
+      notificationErrorsResult,
     ] = await Promise.all([
       admin
         .from('user_profiles')
@@ -110,6 +112,19 @@ Deno.serve(async (req) => {
         .gte('created_at', since7)
         .order('created_at', { ascending: false })
         .limit(250),
+      admin
+        .from('notifications')
+        .select('id, user_id, notification_type, title, message, is_read, action_route, action_arguments, created_at')
+        .gte('created_at', since30)
+        .order('created_at', { ascending: false })
+        .limit(10000),
+      admin
+        .from('app_errors')
+        .select('feature, action, severity, message, context, created_at, user_id')
+        .or('feature.eq.notifications,and(feature.eq.ride_groups,action.eq.create_invite_notifications),and(feature.eq.live_ride,action.eq.notify_group_members)')
+        .gte('created_at', since7)
+        .order('created_at', { ascending: false })
+        .limit(250),
     ]);
 
     for (const [name, result] of [
@@ -122,6 +137,8 @@ Deno.serve(async (req) => {
       ['live participants', liveParticipantsResult],
       ['live locations', liveLocationsResult],
       ['live diagnostics', liveErrorsResult],
+      ['notifications', notificationsResult],
+      ['notification diagnostics', notificationErrorsResult],
     ] as const) {
       if (result.error) {
         console.error(`admin-growth-dashboard ${name} error:`, result.error);
@@ -138,6 +155,8 @@ Deno.serve(async (req) => {
     const liveParticipants = liveParticipantsResult.data ?? [];
     const liveLocations = liveLocationsResult.data ?? [];
     const liveErrors = liveErrorsResult.data ?? [];
+    const notifications = notificationsResult.data ?? [];
+    const notificationErrors = notificationErrorsResult.data ?? [];
 
     const metrics7 = periodMetrics({
       since: since7,
@@ -188,6 +207,11 @@ Deno.serve(async (req) => {
         locations: liveLocations,
         errors: liveErrors,
         groups,
+      }),
+      notifications: notificationDiagnostics({
+        now,
+        notifications,
+        errors: notificationErrors,
       }),
       notes: [
         'Active users are riders who generated a tracked analytics event.',
@@ -258,6 +282,61 @@ function periodMetrics({
     uniquePremiumViewers: eventUsers.premium_screen_view?.size ?? 0,
     uniqueSubscribeStarters: eventUsers.premium_subscribe_started?.size ?? 0,
     uniqueConverters: eventUsers.premium_converted?.size ?? 0,
+  };
+}
+
+function notificationDiagnostics({
+  now,
+  notifications,
+  errors,
+}: {
+  now: Date;
+  notifications: any[];
+  errors: any[];
+}) {
+  const unread = notifications.filter((row) => row.is_read === false);
+  const olderThan7 = new Date(now.getTime() - 7 * 86400000).toISOString();
+  const staleUnread = unread.filter((row) => row.created_at < olderThan7);
+  const byType = countBy(notifications, 'notification_type');
+  const unreadByType = countBy(unread, 'notification_type');
+  const actionCounts = countBy(errors, 'action');
+  const missingRoute = notifications.filter((row) => {
+    const type = String(row.notification_type ?? '');
+    if (type === 'urgent_alert') return false;
+    return !row.action_route;
+  });
+  const invalidLiveRideTargets = notifications.filter((row) => {
+    if (row.notification_type !== 'ride_started') return false;
+    const args = row.action_arguments ?? {};
+    return !args.session_id || !args.ride_group_id;
+  });
+  const highUnreadUsers = topCounts(unread, 'user_id', 5).filter(
+    (row) => row.count >= 10,
+  );
+
+  return {
+    notifications30d: notifications.length,
+    unread: unread.length,
+    staleUnread: staleUnread.length,
+    missingRoute: missingRoute.length,
+    invalidLiveRideTargets: invalidLiveRideTargets.length,
+    highUnreadUsers,
+    byType,
+    unreadByType,
+    errorEvents7d: errors.length,
+    actionCounts,
+    recentErrors: errors.slice(0, 6),
+    recentNotifications: notifications.slice(0, 8).map((row) => ({
+      id: row.id,
+      userId: row.user_id,
+      type: row.notification_type,
+      title: row.title,
+      isRead: row.is_read,
+      actionRoute: row.action_route,
+      createdAt: row.created_at,
+      hasActionArguments:
+        row.action_arguments && Object.keys(row.action_arguments).length > 0,
+    })),
   };
 }
 
@@ -408,6 +487,14 @@ function countBy(rows: any[], key: string): Record<string, number> {
     counts[value] = (counts[value] ?? 0) + 1;
   }
   return counts;
+}
+
+function topCounts(rows: any[], key: string, limit: number) {
+  return Object.entries(countBy(rows, key))
+    .filter(([value]) => value !== 'unknown')
+    .map(([value, count]) => ({ value, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
 }
 
 function countSince(rows: any[], since: string): number {

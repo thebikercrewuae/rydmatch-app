@@ -32,6 +32,8 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
   String? _matchingHealthError;
   Map<String, dynamic>? _liveRideHealth;
   String? _liveRideHealthError;
+  Map<String, dynamic>? _notificationHealth;
+  String? _notificationHealthError;
   Map<String, dynamic>? _stravaHealth;
   String? _stravaHealthError;
 
@@ -41,6 +43,7 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
     'profile_media',
     'discovery',
     'matches',
+    'notifications',
     'ride_groups',
     'route_planner',
     'premium',
@@ -130,6 +133,7 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
       _loadErrors(),
       _loadMatchingHealth(),
       _loadLiveRideHealth(),
+      _loadNotificationHealth(),
       _loadStravaHealth(),
     ]);
   }
@@ -350,6 +354,33 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
       setState(() {
         _liveRideHealth = null;
         _liveRideHealthError = e.toString();
+      });
+    }
+  }
+
+  Future<void> _loadNotificationHealth() async {
+    try {
+      final response = await Supabase.instance.client.functions.invoke(
+        'admin-growth-dashboard',
+      );
+
+      final data = response.data;
+      if (data is! Map || data['notifications'] is! Map) {
+        throw Exception('Invalid notification diagnostics response');
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _notificationHealth = Map<String, dynamic>.from(
+          data['notifications'] as Map,
+        );
+        _notificationHealthError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _notificationHealth = null;
+        _notificationHealthError = e.toString();
       });
     }
   }
@@ -611,6 +642,8 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
           _buildHealthPanel(),
           SizedBox(height: 1.5.h),
           _buildLiveRidePanel(),
+          SizedBox(height: 1.5.h),
+          _buildNotificationPanel(),
           SizedBox(height: 1.5.h),
           _buildStravaPanel(),
           SizedBox(height: 1.5.h),
@@ -958,6 +991,214 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
           Text(
             'Started: ${_formatDate(row['startedAt'])}  |  Last GPS: ${_formatDate(row['lastLocationAt']).isEmpty ? '-' : _formatDate(row['lastLocationAt'])}',
             maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.dmSans(fontSize: 9.sp, color: Colors.black54),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationPanel() {
+    final health = _notificationHealth;
+    final staleUnread = _asInt(health?['staleUnread']);
+    final missingRoute = _asInt(health?['missingRoute']);
+    final invalidLiveRideTargets = _asInt(health?['invalidLiveRideTargets']);
+    final errorEvents = _asInt(health?['errorEvents7d']);
+    final healthy =
+        health != null &&
+        staleUnread == 0 &&
+        missingRoute == 0 &&
+        invalidLiveRideTargets == 0 &&
+        errorEvents == 0;
+    final recentNotifications = health?['recentNotifications'] is List
+        ? List<Map<String, dynamic>>.from(
+            health!['recentNotifications'] as List,
+          )
+        : <Map<String, dynamic>>[];
+    final recentErrors = health?['recentErrors'] is List
+        ? List<Map<String, dynamic>>.from(health!['recentErrors'] as List)
+        : <Map<String, dynamic>>[];
+
+    return Container(
+      padding: EdgeInsets.all(4.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: healthy
+              ? _green.withValues(alpha: 0.28)
+              : _orange.withValues(alpha: 0.28),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                healthy
+                    ? Icons.notifications_active_rounded
+                    : Icons.notification_important_rounded,
+                color: healthy ? _green : _orange,
+              ),
+              SizedBox(width: 2.w),
+              Expanded(
+                child: Text(
+                  'Notification Health',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w800,
+                    color: _deepBlue,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: _loadNotificationHealth,
+                child: const Text('Check'),
+              ),
+            ],
+          ),
+          if (_notificationHealthError != null) ...[
+            SizedBox(height: 0.8.h),
+            Text(
+              'Could not load notification diagnostics. Confirm admin-growth-dashboard is deployed and the notification schema is up to date.',
+              style: GoogleFonts.dmSans(fontSize: 10.sp, color: _orange),
+            ),
+          ] else if (health == null) ...[
+            SizedBox(height: 0.8.h),
+            Text(
+              'Pull to refresh or tap Check.',
+              style: GoogleFonts.dmSans(fontSize: 10.sp, color: Colors.black54),
+            ),
+          ] else ...[
+            SizedBox(height: 1.h),
+            Wrap(
+              spacing: 2.w,
+              runSpacing: 1.h,
+              children: [
+                _metricChip('Sent 30d', health['notifications30d']),
+                _metricChip('Unread', health['unread']),
+                _metricChip('Stale unread', staleUnread),
+                _metricChip('Missing route', missingRoute),
+                _metricChip('Bad live ride target', invalidLiveRideTargets),
+                _metricChip('Errors 7d', errorEvents),
+              ],
+            ),
+            if (!healthy) ...[
+              SizedBox(height: 1.h),
+              Text(
+                'Needs attention: $staleUnread stale unread, $missingRoute missing routes, $invalidLiveRideTargets bad live ride targets, $errorEvents recent failures.',
+                style: GoogleFonts.dmSans(
+                  fontSize: 10.5.sp,
+                  color: _orange,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+            if (recentNotifications.isNotEmpty) ...[
+              SizedBox(height: 1.4.h),
+              Text(
+                'Recent notifications',
+                style: GoogleFonts.dmSans(
+                  fontSize: 11.sp,
+                  fontWeight: FontWeight.w800,
+                  color: _deepBlue,
+                ),
+              ),
+              SizedBox(height: 0.4.h),
+              ...recentNotifications.take(5).map(_buildNotificationRow),
+            ],
+            if (recentErrors.isNotEmpty) ...[
+              SizedBox(height: 1.2.h),
+              Text(
+                'Latest notification warning: ${recentErrors.first['action'] ?? 'unknown'}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.dmSans(
+                  fontSize: 10.sp,
+                  color: Colors.black54,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationRow(Map<String, dynamic> row) {
+    final isRead = row['isRead'] == true;
+    final type = row['type']?.toString() ?? 'unknown';
+    final hasRoute =
+        row['actionRoute']?.toString().isNotEmpty == true ||
+        row['referenceId']?.toString().isNotEmpty == true;
+    final title = row['title']?.toString().trim().isNotEmpty == true
+        ? row['title'].toString()
+        : 'Untitled notification';
+    final stateColor = !hasRoute
+        ? _orange
+        : isRead
+        ? _deepBlue
+        : _green;
+
+    return Container(
+      margin: EdgeInsets.only(top: 0.8.h),
+      padding: EdgeInsets.all(3.w),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F6F8),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 10.5.sp,
+                    fontWeight: FontWeight.w800,
+                    color: _deepBlue,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: stateColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  !hasRoute
+                      ? 'NO ROUTE'
+                      : isRead
+                      ? 'READ'
+                      : 'UNREAD',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 8.5.sp,
+                    fontWeight: FontWeight.w800,
+                    color: stateColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 0.4.h),
+          Text(
+            'Type: $type  |  Route: ${row['actionRoute'] ?? '-'}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.dmSans(fontSize: 9.5.sp, color: Colors.black87),
+          ),
+          SizedBox(height: 0.3.h),
+          Text(
+            'Created: ${_formatDate(row['createdAt'])}',
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: GoogleFonts.dmSans(fontSize: 9.sp, color: Colors.black54),
           ),

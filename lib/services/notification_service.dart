@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'diagnostics_service.dart';
+
 enum NotificationType {
   newMatch,
   newMessage,
@@ -50,7 +52,7 @@ class AppNotification {
   final String message;
   final bool isRead;
 
-  /// The raw action_url from the DB (e.g. "/chat-screen?otherUserId=abc&otherUserName=John")
+  /// The raw action route/url from the DB (e.g. "/chat-screen?otherUserId=abc&otherUserName=John")
   final String? actionUrl;
 
   /// Parsed Flutter route derived from actionUrl (e.g. "/chat-screen")
@@ -73,7 +75,7 @@ class AppNotification {
     required this.createdAt,
   });
 
-  /// Parse action_url (e.g. "/chat-screen?otherUserId=abc&otherUserName=John")
+  /// Parse action route/url (e.g. "/chat-screen?otherUserId=abc&otherUserName=John")
   /// into a route string and arguments map.
   static ({String? route, Map<String, dynamic>? args}) _parseActionUrl(
     String? url,
@@ -99,8 +101,9 @@ class AppNotification {
   }
 
   factory AppNotification.fromJson(Map<String, dynamic> json) {
-    final rawUrl = json['action_url'] as String?;
-    final parsed = _parseActionUrl(rawUrl);
+    final rawAction =
+        json['action_route'] as String? ?? json['action_url'] as String?;
+    final parsed = _parseActionUrl(rawAction);
     final type = NotificationType.fromString(
       json['notification_type'] as String,
     );
@@ -108,6 +111,15 @@ class AppNotification {
     // For new_message notifications, build chat route from reference_id
     String? actionRoute = parsed.route;
     Map<String, dynamic>? actionArguments = parsed.args;
+    final rawArgs = json['action_arguments'];
+    if (rawArgs is Map<String, dynamic>) {
+      actionArguments = {...?actionArguments, ...rawArgs};
+    } else if (rawArgs is Map) {
+      actionArguments = {
+        ...?actionArguments,
+        ...Map<String, dynamic>.from(rawArgs),
+      };
+    }
 
     if (type == NotificationType.newMessage) {
       final referenceId = json['reference_id'] as String?;
@@ -119,12 +131,11 @@ class AppNotification {
 
     // Handle live ride started notifications
     if (type == NotificationType.rideStarted) {
-      final rawArgs = json['action_arguments'];
-      if (rawArgs is Map<String, dynamic>) {
+      if (actionArguments != null) {
         actionRoute = '/live-ride';
         actionArguments = {
-          'session_id': rawArgs['session_id'] as String? ?? '',
-          'ride_group_id': rawArgs['ride_group_id'] as String? ?? '',
+          'session_id': actionArguments['session_id'] as String? ?? '',
+          'ride_group_id': actionArguments['ride_group_id'] as String? ?? '',
         };
       }
     }
@@ -136,7 +147,7 @@ class AppNotification {
       title: json['title'] as String? ?? '',
       message: json['message'] as String? ?? '',
       isRead: json['is_read'] as bool? ?? false,
-      actionUrl: rawUrl,
+      actionUrl: rawAction,
       actionRoute: actionRoute,
       actionArguments: actionArguments,
       createdAt: DateTime.parse(json['created_at'] as String),
@@ -211,6 +222,13 @@ class NotificationService extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('NotificationService: failed to load notifications: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'notifications',
+        action: 'load_notifications',
+        error: e,
+        severity: 'warning',
+        context: {'limit': 50},
+      );
     }
   }
 
@@ -241,6 +259,18 @@ class NotificationService extends ChangeNotifier {
               }
             } catch (e) {
               debugPrint('NotificationService: realtime parse error: $e');
+              unawaited(
+                DiagnosticsService.instance.logError(
+                  feature: 'notifications',
+                  action: 'realtime_parse',
+                  error: e,
+                  severity: 'warning',
+                  context: {
+                    'record_keys': payload.newRecord.keys.toList(),
+                    'notification_type': payload.newRecord['notification_type'],
+                  },
+                ),
+              );
             }
           },
         )
@@ -261,6 +291,13 @@ class NotificationService extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('NotificationService: markAsRead error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'notifications',
+        action: 'mark_as_read',
+        error: e,
+        severity: 'warning',
+        context: {'notification_id': notificationId},
+      );
     }
   }
 
@@ -289,6 +326,12 @@ class NotificationService extends ChangeNotifier {
       debugPrint(
         'NotificationService: markNewMessageNotificationsAsRead error: $e',
       );
+      await DiagnosticsService.instance.logError(
+        feature: 'notifications',
+        action: 'mark_new_message_notifications_as_read',
+        error: e,
+        severity: 'warning',
+      );
     }
   }
 
@@ -311,22 +354,34 @@ class NotificationService extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('NotificationService: markAllAsRead error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'notifications',
+        action: 'mark_all_as_read',
+        error: e,
+        severity: 'warning',
+      );
     }
   }
 
   Future<void> clearAllNotifications() async {
-  try {
-    final user = _client.auth.currentUser;
-    if (user == null) return;
+    try {
+      final user = _client.auth.currentUser;
+      if (user == null) return;
 
-    await _client.from('notifications').delete().eq('user_id', user.id);
+      await _client.from('notifications').delete().eq('user_id', user.id);
 
-    _notifications.clear();
-    notifyListeners();
-  } catch (e) {
-    debugPrint('NotificationService: clearAllNotifications error: $e');
+      _notifications.clear();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('NotificationService: clearAllNotifications error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'notifications',
+        action: 'clear_all_notifications',
+        error: e,
+        severity: 'warning',
+      );
+    }
   }
-}
 
   void reset() {
     _channel?.unsubscribe();
