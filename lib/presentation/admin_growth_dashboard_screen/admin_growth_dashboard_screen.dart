@@ -35,6 +35,9 @@ class _AdminGrowthDashboardScreenState
   Map<String, dynamic> get _onboardingMetrics =>
       Map<String, dynamic>.from(_periodMetrics['onboarding'] as Map? ?? {});
 
+  Map<String, dynamic> get _activationMetrics =>
+      Map<String, dynamic>.from(_periodMetrics['activation'] as Map? ?? {});
+
   @override
   void initState() {
     super.initState();
@@ -133,6 +136,8 @@ class _AdminGrowthDashboardScreenState
                   ),
                   SizedBox(height: 1.5.h),
                   _buildOnboardingSection(),
+                  SizedBox(height: 1.5.h),
+                  _buildActivationSection(),
                   SizedBox(height: 1.5.h),
                   _buildSection(
                     title: 'Matching & Engagement',
@@ -455,6 +460,74 @@ class _AdminGrowthDashboardScreenState
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildActivationSection() {
+    final weakestMoment = Map<String, dynamic>.from(
+      _activationMetrics['weakestMoment'] as Map? ?? {},
+    );
+    final strongestMoment = Map<String, dynamic>.from(
+      _activationMetrics['strongestMoment'] as Map? ?? {},
+    );
+
+    return _buildSection(
+      title: 'Activation & Retention',
+      icon: Icons.insights_rounded,
+      accent: _green,
+      children: [
+        _metricRow(
+          'Activated riders',
+          _activationMetrics['activatedUsers'],
+          note: 'Profile-complete riders who reached a tracked value moment',
+        ),
+        _metricRow(
+          'Activation rate',
+          _formatPercent(_activationMetrics['activationRate']),
+        ),
+        _metricRow(
+          'Returning riders',
+          _activationMetrics['returningUsers'],
+          note: 'Active on at least two different days in this period',
+        ),
+        _metricRow(
+          'Multi-day active rate',
+          _formatPercent(_activationMetrics['multiDayActiveRate']),
+        ),
+        _metricRow(
+          'New rider activation',
+          _formatPercent(_activationMetrics['newUserValueRate']),
+          note:
+              '${_activationMetrics['newValueUsers'] ?? 0} new rider(s) reached a value moment',
+        ),
+        _metricRow('First swipe riders', _activationMetrics['firstSwipeUsers']),
+        _metricRow('First match riders', _activationMetrics['firstMatchUsers']),
+        _metricRow(
+          'First message riders',
+          _activationMetrics['firstMessageUsers'],
+        ),
+        _metricRow(
+          'Ride group creators',
+          _activationMetrics['rideGroupCreators'],
+        ),
+        _metricRow(
+          'Live ride starters',
+          _activationMetrics['liveRideStarters'],
+        ),
+        _metricRow('Premium viewers', _activationMetrics['premiumViewers']),
+        if (strongestMoment.isNotEmpty)
+          _metricRow(
+            'Strongest value moment',
+            strongestMoment['label'] ?? '-',
+            note: '${strongestMoment['users'] ?? 0} rider(s)',
+          ),
+        if (weakestMoment.isNotEmpty)
+          _metricRow(
+            'Weakest value moment',
+            weakestMoment['label'] ?? '-',
+            note: '${weakestMoment['users'] ?? 0} rider(s)',
+          ),
+      ],
     );
   }
 

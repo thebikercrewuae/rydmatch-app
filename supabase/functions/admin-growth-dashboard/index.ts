@@ -158,22 +158,27 @@ Deno.serve(async (req) => {
     const notifications = notificationsResult.data ?? [];
     const notificationErrors = notificationErrorsResult.data ?? [];
 
+    const nonAdminProfiles = profiles.filter((profile) => profile.is_admin !== true);
+
     const metrics7 = periodMetrics({
       since: since7,
+      profiles: nonAdminProfiles,
       events,
       matches,
       messages,
       groups,
+      liveSessions,
     });
     const metrics30 = periodMetrics({
       since: since30,
+      profiles: nonAdminProfiles,
       events,
       matches,
       messages,
       groups,
+      liveSessions,
     });
 
-    const nonAdminProfiles = profiles.filter((profile) => profile.is_admin !== true);
     const totalUsers = nonAdminProfiles.length;
     const completeProfiles = nonAdminProfiles.filter(
       (profile) => profile.is_profile_complete === true,
@@ -227,21 +232,26 @@ Deno.serve(async (req) => {
 
 function periodMetrics({
   since,
+  profiles,
   events,
   matches,
   messages,
   groups,
+  liveSessions,
 }: {
   since: string;
+  profiles: any[];
   events: any[];
   matches: any[];
   messages: any[];
   groups: any[];
+  liveSessions: any[];
 }) {
   const periodEvents = events.filter((row) => row.created_at >= since);
   const periodMatches = matches.filter((row) => row.created_at >= since);
   const periodMessages = messages.filter((row) => row.created_at >= since);
   const periodGroups = groups.filter((row) => row.created_at >= since);
+  const periodLiveSessions = liveSessions.filter((row) => row.started_at >= since);
   const eventCounts: Record<string, number> = {};
   const eventUsers: Record<string, Set<string>> = {};
   const activeUsers = new Set<string>();
@@ -261,6 +271,17 @@ function periodMetrics({
   const rightSwipes = eventCounts.swipe_right ?? 0;
   const matchEvents = eventCounts.match_created ?? periodMatches.length;
   const onboarding = onboardingFunnel(periodEvents, eventCounts);
+  const activation = activationMetrics({
+    since,
+    profiles,
+    events: periodEvents,
+    matches: periodMatches,
+    messages: periodMessages,
+    groups: periodGroups,
+    liveSessions: periodLiveSessions,
+    activeUsers,
+    eventUsers,
+  });
 
   return {
     activeUsers: activeUsers.size,
@@ -284,6 +305,93 @@ function periodMetrics({
     uniqueSubscribeStarters: eventUsers.premium_subscribe_started?.size ?? 0,
     uniqueConverters: eventUsers.premium_converted?.size ?? 0,
     onboarding,
+    activation,
+  };
+}
+
+function activationMetrics({
+  since,
+  profiles,
+  events,
+  matches,
+  messages,
+  groups,
+  liveSessions,
+  activeUsers,
+  eventUsers,
+}: {
+  since: string;
+  profiles: any[];
+  events: any[];
+  matches: any[];
+  messages: any[];
+  groups: any[];
+  liveSessions: any[];
+  activeUsers: Set<string>;
+  eventUsers: Record<string, Set<string>>;
+}) {
+  const periodProfiles = profiles.filter((profile) => profile.created_at >= since);
+  const completedProfiles = new Set(
+    profiles
+      .filter((profile) => profile.is_profile_complete === true)
+      .map((profile) => profile.id)
+      .filter(Boolean),
+  );
+  const swipeUsers = unionSets([
+    eventUsers.swipe_right,
+    eventUsers.swipe_left,
+    eventUsers.super_like,
+  ]);
+  const matchUsers = uniqueMatchUsers(matches);
+  const messageUsers = uniqueByKey(messages, 'sender_id');
+  const groupCreators = uniqueByKey(groups, 'creator_id');
+  const liveRideStarters = uniqueByKey(liveSessions, 'started_by');
+  const premiumViewers = eventUsers.premium_screen_view ?? new Set<string>();
+  const valueUsers = unionSets([
+    swipeUsers,
+    matchUsers,
+    messageUsers,
+    groupCreators,
+    liveRideStarters,
+    premiumViewers,
+  ]);
+  const activatedUsers = intersectionSize(completedProfiles, valueUsers);
+  const returningUsers = multiDayActiveUsers(events);
+  const newUserIds = new Set(
+    periodProfiles.map((profile) => profile.id).filter(Boolean),
+  );
+  const newActiveUsers = intersectionSize(newUserIds, activeUsers);
+  const newActivatedUsers = intersectionSize(newUserIds, valueUsers);
+  const moments = [
+    { label: 'First swipe', users: swipeUsers.size },
+    { label: 'First match', users: matchUsers.size },
+    { label: 'First message', users: messageUsers.size },
+    { label: 'Ride group created', users: groupCreators.size },
+    { label: 'Live ride started', users: liveRideStarters.size },
+    { label: 'Premium viewed', users: premiumViewers.size },
+  ];
+  const weakestMoment = [...moments].sort((a, b) => a.users - b.users)[0] ?? null;
+  const strongestMoment = [...moments].sort((a, b) => b.users - a.users)[0] ?? null;
+
+  return {
+    activeUsers: activeUsers.size,
+    returningUsers: returningUsers.size,
+    multiDayActiveRate: percent(returningUsers.size, activeUsers.size),
+    newUsers: periodProfiles.length,
+    newActiveUsers,
+    newUserActivationRate: percent(newActiveUsers, periodProfiles.length),
+    newValueUsers: newActivatedUsers,
+    newUserValueRate: percent(newActivatedUsers, periodProfiles.length),
+    activatedUsers,
+    activationRate: percent(activatedUsers, completedProfiles.size),
+    firstSwipeUsers: swipeUsers.size,
+    firstMatchUsers: matchUsers.size,
+    firstMessageUsers: messageUsers.size,
+    rideGroupCreators: groupCreators.size,
+    liveRideStarters: liveRideStarters.size,
+    premiumViewers: premiumViewers.size,
+    weakestMoment,
+    strongestMoment,
   };
 }
 
@@ -573,6 +681,55 @@ function topCounts(rows: any[], key: string, limit: number) {
     .map(([value, count]) => ({ value, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, limit);
+}
+
+function uniqueByKey(rows: any[], key: string): Set<string> {
+  return new Set(
+    rows.map((row) => row[key]).filter((value) => typeof value === 'string'),
+  );
+}
+
+function uniqueMatchUsers(matches: any[]): Set<string> {
+  const users = new Set<string>();
+  for (const match of matches) {
+    if (match.user1_id) users.add(match.user1_id);
+    if (match.user2_id) users.add(match.user2_id);
+  }
+  return users;
+}
+
+function unionSets(sets: Array<Set<string> | undefined>): Set<string> {
+  const merged = new Set<string>();
+  for (const set of sets) {
+    if (!set) continue;
+    for (const value of set) merged.add(value);
+  }
+  return merged;
+}
+
+function intersectionSize(left: Set<string>, right: Set<string>): number {
+  let count = 0;
+  for (const value of left) {
+    if (right.has(value)) count += 1;
+  }
+  return count;
+}
+
+function multiDayActiveUsers(events: any[]): Set<string> {
+  const daysByUser = new Map<string, Set<string>>();
+  for (const event of events) {
+    if (!event.user_id || !event.created_at) continue;
+    const day = String(event.created_at).slice(0, 10);
+    const days = daysByUser.get(event.user_id) ?? new Set<string>();
+    days.add(day);
+    daysByUser.set(event.user_id, days);
+  }
+
+  const users = new Set<string>();
+  for (const [userId, days] of daysByUser.entries()) {
+    if (days.size >= 2) users.add(userId);
+  }
+  return users;
 }
 
 function countSince(rows: any[], since: string): number {
