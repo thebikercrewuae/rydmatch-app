@@ -48,6 +48,8 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
   bool _isSharingLocation = true;
   bool _isChatOpen = false;
   bool _isPremium = false;
+  MapType _mapType = MapType.normal;
+  bool _trafficEnabled = false;
   final LiveRideVoiceService _voiceService = LiveRideVoiceService.instance;
   RealtimeChannel? _chatNotificationChannel;
   int _unreadChatCount = 0;
@@ -666,6 +668,172 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
     return 'Join voice';
   }
 
+  String get _mapTypeLabel {
+    switch (_mapType) {
+      case MapType.satellite:
+        return 'Satellite';
+      case MapType.terrain:
+        return 'Terrain';
+      case MapType.hybrid:
+        return 'Hybrid';
+      case MapType.normal:
+      case MapType.none:
+        return 'Normal';
+    }
+  }
+
+  void _showMapLayersSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF111827),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            void updateMapType(MapType type) {
+              setState(() => _mapType = type);
+              setSheetState(() {});
+            }
+
+            void updateTraffic(bool value) {
+              setState(() => _trafficEnabled = value);
+              setSheetState(() {});
+            }
+
+            return SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 42,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Map layers',
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        _buildMapLayerChoice(
+                          label: 'Normal',
+                          icon: Icons.map_rounded,
+                          selected: _mapType == MapType.normal,
+                          onTap: () => updateMapType(MapType.normal),
+                        ),
+                        _buildMapLayerChoice(
+                          label: 'Satellite',
+                          icon: Icons.satellite_alt_rounded,
+                          selected: _mapType == MapType.satellite,
+                          onTap: () => updateMapType(MapType.satellite),
+                        ),
+                        _buildMapLayerChoice(
+                          label: 'Terrain',
+                          icon: Icons.terrain_rounded,
+                          selected: _mapType == MapType.terrain,
+                          onTap: () => updateMapType(MapType.terrain),
+                        ),
+                        _buildMapLayerChoice(
+                          label: 'Hybrid',
+                          icon: Icons.layers_rounded,
+                          selected: _mapType == MapType.hybrid,
+                          onTap: () => updateMapType(MapType.hybrid),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SwitchListTile.adaptive(
+                      value: _trafficEnabled,
+                      onChanged: updateTraffic,
+                      activeThumbColor: const Color(0xFF2563EB),
+                      activeTrackColor: const Color(0xFF93C5FD),
+                      contentPadding: EdgeInsets.zero,
+                      secondary: const Icon(
+                        Icons.traffic_rounded,
+                        color: Colors.white,
+                      ),
+                      title: Text(
+                        'Traffic',
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildMapLayerChoice({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        width: 136,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFF2563EB)
+              : Colors.white.withAlpha(20),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? const Color(0xFF60A5FA) : Colors.white24,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final participantList = LiveRideService.participants.value;
@@ -684,7 +852,8 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
             myLocationButtonEnabled: false,
             markers: _markers,
             polylines: _polylines,
-            mapType: MapType.normal,
+            mapType: _mapType,
+            trafficEnabled: _trafficEnabled,
             onMapCreated: (controller) {
               _mapController = controller;
               if (_plannedRoutePoints.isNotEmpty) {
@@ -1036,6 +1205,38 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  FloatingActionButton(
+                    heroTag: 'live_ride_layers',
+                    mini: true,
+                    backgroundColor: Colors.white.withAlpha(230),
+                    foregroundColor: const Color(0xFF111827),
+                    tooltip: 'Map layers: $_mapTypeLabel',
+                    onPressed: _showMapLayersSheet,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        const Icon(Icons.layers_rounded, size: 20),
+                        if (_trafficEnabled)
+                          Positioned(
+                            right: -3,
+                            bottom: -3,
+                            child: Container(
+                              width: 9,
+                              height: 9,
+                              decoration: BoxDecoration(
+                                color: Colors.green,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   if (_isPremium) ...[
                     FloatingActionButton(
                       heroTag: 'live_ride_voice',
