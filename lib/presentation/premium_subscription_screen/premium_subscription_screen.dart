@@ -9,7 +9,6 @@ import '../../services/diagnostics_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/revenuecat_service.dart';
 import './widgets/feature_card_widget.dart';
-import './widgets/payment_option_widget.dart';
 import '../../widgets/app_icons.dart';
 
 class PremiumSubscriptionScreen extends StatefulWidget {
@@ -474,8 +473,6 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
                 SizedBox(height: 3.h),
                 _buildPricingSection(),
                 SizedBox(height: 2.h),
-                _buildPaymentOptions(),
-                SizedBox(height: 2.h),
                 _buildSubscribeButton(),
                 SizedBox(height: 1.5.h),
                 _buildRestoreLink(),
@@ -501,7 +498,7 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(),
+              Icon(Icons.workspace_premium_rounded, color: _gold, size: 18),
               SizedBox(width: 2.w),
               Text(
                 'RydMatch Premium',
@@ -541,7 +538,11 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
             ),
             shape: BoxShape.circle,
           ),
-          child: SizedBox(),
+          child: const Icon(
+            Icons.workspace_premium_rounded,
+            color: _gold,
+            size: 44,
+          ),
         ),
         SizedBox(height: 1.5.h),
         Text(
@@ -555,7 +556,7 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
         ),
         SizedBox(height: 0.8.h),
         Text(
-          'Unlock group rides, deep analytics, and\nboosted visibility in the RydMatch community.',
+          'Unlock the tools that help riders plan, coordinate, and stand out in the RydMatch community.',
           style: GoogleFonts.dmSans(
             fontSize: 12.sp,
             color: Colors.white.withValues(alpha: 0.65),
@@ -590,34 +591,18 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
         ),
         SizedBox(height: 1.2.h),
         FeatureCardWidget(
-          icon: AppIcons.help,
-          title: 'Ride Analytics',
-          description:
-              'Track total distance, riding streaks, favourite routes, and weekly activity insights.',
-          accentColor: const Color(0xFF81C784),
-        ),
-        SizedBox(height: 1.2.h),
-        FeatureCardWidget(
           icon: AppIcons.analytics,
           title: 'Ride Analytics',
           description:
-              'Track total distance, riding streaks, favourite routes, and weekly activity insights.',
+              'Track distance, riding streaks, favourite routes, and weekly activity insights.',
           accentColor: const Color(0xFF81C784),
         ),
         SizedBox(height: 1.2.h),
         FeatureCardWidget(
-          icon: AppIcons.help,
+          icon: Icons.rocket_launch_rounded,
           title: 'Priority Listings',
           description:
-              'Boost your profile to appear higher in other riders\' discovery feeds.',
-          accentColor: _gold,
-        ),
-        SizedBox(height: 1.2.h),
-        FeatureCardWidget(
-          icon: AppIcons.help,
-          title: 'Priority Listings',
-          description:
-              'Boost your profile to appear higher in other riders\' discovery feeds.',
+              'Boost your profile so nearby riders are more likely to discover you.',
           accentColor: _gold,
         ),
         SizedBox(height: 1.2.h),
@@ -631,9 +616,9 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
         SizedBox(height: 1.2.h),
         FeatureCardWidget(
           icon: Icons.cloud_outlined,
-          title: 'Weather Conditions',
+          title: 'Route Weather',
           description:
-              'Live weather data for your route — temperature warnings, wind speed, rain alerts, and ride condition rating.',
+              'Check route conditions, wind, rain, and ride readiness before you go.',
           accentColor: const Color(0xFF4FC3F7),
         ),
         SizedBox(height: 1.2.h),
@@ -641,16 +626,8 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
           icon: Icons.emoji_events_rounded,
           title: 'Leaderboard',
           description:
-              'See weekly rankings among your matched riders — distance covered, rides completed, and badges earned.',
+              'Compare riding activity, completed rides, badges, and progress.',
           accentColor: _gold,
-        ),
-        SizedBox(height: 1.2.h),
-        FeatureCardWidget(
-          icon: Icons.rocket_launch_rounded,
-          title: 'Boost Profile',
-          description:
-              'Put your card at the front of Discovery for 30 minutes with a one-tap boost. Stand out and get more matches.',
-          accentColor: const Color(0xFF7B2FBE),
         ),
       ],
     );
@@ -713,9 +690,9 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
         : 'See store price';
     final detailText = _betaPremiumUnlockEnabled
         ? hasStorePrice
-              ? 'Beta access active - Store price loaded: $priceText/month'
+              ? 'Beta access is open. Store price loaded: $priceText/month'
               : _loadingStoreProduct
-              ? 'Beta access active - Loading store price'
+              ? 'Beta access is open. Loading store price'
               : 'Tap Subscribe to unlock all Premium features for testing'
         : 'Billed monthly via your app store - Cancel anytime';
 
@@ -763,6 +740,7 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
           SizedBox(height: 0.8.h),
           Text(
             detailText,
+            textAlign: TextAlign.center,
             style: GoogleFonts.dmSans(
               fontSize: 11.sp,
               color: Colors.white.withValues(alpha: 0.75),
@@ -778,7 +756,9 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
             child: Text(
               _betaPremiumUnlockEnabled
                   ? 'Beta tester access'
-                  : '7-day free trial included',
+                  : _revenueCatAvailable
+                  ? 'Secure checkout via app store'
+                  : 'Store connection unavailable',
               style: GoogleFonts.dmSans(
                 fontSize: 11.sp,
                 fontWeight: FontWeight.w600,
@@ -788,24 +768,6 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildPaymentOptions() {
-    return Row(
-      children: [
-        PaymentOptionWidget(
-          label: 'Apple Pay',
-          icon: AppIcons.apple,
-          onTap: _handleSubscribe,
-        ),
-        SizedBox(width: 3.w),
-        PaymentOptionWidget(
-          label: 'Google Pay',
-          icon: Icons.g_mobiledata_rounded,
-          onTap: _handleSubscribe,
-        ),
-      ],
     );
   }
 
@@ -840,7 +802,9 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
                   Text(
                     _betaPremiumUnlockEnabled
                         ? 'Unlock Premium'
-                        : 'Subscribe Now',
+                        : _revenueCatAvailable
+                        ? 'Subscribe Securely'
+                        : 'Store Unavailable',
                     style: GoogleFonts.dmSans(
                       fontSize: 14.sp,
                       fontWeight: FontWeight.w700,
@@ -891,7 +855,7 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
             ),
           ),
           Text(
-            '·',
+            '-',
             style: GoogleFonts.dmSans(
               fontSize: 10.sp,
               color: Colors.white.withValues(alpha: 0.3),
@@ -947,7 +911,7 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
           ),
           SizedBox(height: 1.h),
           Text(
-            'Share with friends — you both get a 7-day free Premium trial!',
+            'Share with friends - you both get a 7-day free Premium trial.',
             style: GoogleFonts.dmSans(
               fontSize: 11.sp,
               color: Colors.white.withValues(alpha: 0.65),
@@ -1050,7 +1014,7 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
                         GestureDetector(
                           onTap: () {
                             final shareText =
-                                'Join me on RydMatch! Use my referral code $_referralCode to sign up and we both get a 7-day free Premium trial! 🏍️🔥';
+                                'Join me on RydMatch. Use my referral code $_referralCode to sign up and we both get a 7-day free Premium trial.';
                             SharePlus.instance.share(
                               ShareParams(
                                 text: shareText,

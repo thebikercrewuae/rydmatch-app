@@ -60,7 +60,7 @@ class FeatureCardWidget extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.7),
                     height: 1.4,
                   ),
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
