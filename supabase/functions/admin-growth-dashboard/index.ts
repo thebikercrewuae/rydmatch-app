@@ -267,6 +267,11 @@ function periodMetrics({
 
   const premiumViews = eventCounts.premium_screen_view ?? 0;
   const subscribeStarts = eventCounts.premium_subscribe_started ?? 0;
+  const purchaseResultCounts = eventDataCounts(
+    periodEvents,
+    'premium_purchase_result',
+    'status',
+  );
   const conversions = eventCounts.premium_converted ?? 0;
   const rightSwipes = eventCounts.swipe_right ?? 0;
   const matchEvents = eventCounts.match_created ?? periodMatches.length;
@@ -294,9 +299,22 @@ function periodMetrics({
     matchRows: periodMatches.length,
     messageEvents: eventCounts.message_sent ?? 0,
     messageRows: periodMessages.length,
+    rideGroupCreatedEvents: eventCounts.ride_group_created ?? 0,
+    rideGroupJoinedEvents: eventCounts.ride_group_joined ?? 0,
     rideGroupsCreated: periodGroups.length,
+    liveRideStartedEvents: eventCounts.live_ride_started ?? 0,
+    liveRideJoinedEvents: eventCounts.live_ride_joined ?? 0,
     premiumViews,
     premiumSubscribeStarts: subscribeStarts,
+    premiumPurchaseResults: eventCounts.premium_purchase_result ?? 0,
+    premiumPurchaseSuccesses: purchaseResultCounts.success ?? 0,
+    premiumPurchaseErrors: purchaseResultCounts.error ?? 0,
+    premiumPurchaseStoreUnavailable:
+      purchaseResultCounts.store_unavailable ?? 0,
+    premiumPurchaseMissingEntitlement:
+      purchaseResultCounts.missing_entitlement ?? 0,
+    premiumPurchaseNoActiveSubscription:
+      purchaseResultCounts.no_active_subscription ?? 0,
     premiumConversions: conversions,
     premiumViewToStartRate: percent(subscribeStarts, premiumViews),
     premiumStartToConversionRate: percent(conversions, subscribeStarts),
@@ -344,15 +362,25 @@ function activationMetrics({
   ]);
   const matchUsers = uniqueMatchUsers(matches);
   const messageUsers = uniqueByKey(messages, 'sender_id');
-  const groupCreators = uniqueByKey(groups, 'creator_id');
-  const liveRideStarters = uniqueByKey(liveSessions, 'started_by');
+  const groupCreators = unionSets([
+    uniqueByKey(groups, 'creator_id'),
+    eventUsers.ride_group_created,
+  ]);
+  const groupJoiners = eventUsers.ride_group_joined ?? new Set<string>();
+  const liveRideStarters = unionSets([
+    uniqueByKey(liveSessions, 'started_by'),
+    eventUsers.live_ride_started,
+  ]);
+  const liveRideJoiners = eventUsers.live_ride_joined ?? new Set<string>();
   const premiumViewers = eventUsers.premium_screen_view ?? new Set<string>();
   const valueUsers = unionSets([
     swipeUsers,
     matchUsers,
     messageUsers,
     groupCreators,
+    groupJoiners,
     liveRideStarters,
+    liveRideJoiners,
     premiumViewers,
   ]);
   const activatedUsers = intersectionSize(completedProfiles, valueUsers);
@@ -388,7 +416,9 @@ function activationMetrics({
     firstMatchUsers: matchUsers.size,
     firstMessageUsers: messageUsers.size,
     rideGroupCreators: groupCreators.size,
+    rideGroupJoiners: groupJoiners.size,
     liveRideStarters: liveRideStarters.size,
+    liveRideJoiners: liveRideJoiners.size,
     premiumViewers: premiumViewers.size,
     weakestMoment,
     strongestMoment,
@@ -670,6 +700,21 @@ function countBy(rows: any[], key: string): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const row of rows) {
     const value = String(row[key] ?? 'unknown');
+    counts[value] = (counts[value] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function eventDataCounts(
+  events: any[],
+  eventType: string,
+  dataKey: string,
+): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const event of events) {
+    if (event.event_type !== eventType) continue;
+    const data = event.event_data ?? {};
+    const value = String(data[dataKey] ?? 'unknown');
     counts[value] = (counts[value] ?? 0) + 1;
   }
   return counts;

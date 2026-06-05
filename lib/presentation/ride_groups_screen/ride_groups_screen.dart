@@ -5,6 +5,7 @@ import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/ride_group_model.dart';
+import '../../services/analytics_service.dart';
 import '../../services/diagnostics_service.dart';
 import '../../services/live_ride_service.dart';
 import '../../services/premium_service.dart';
@@ -576,6 +577,13 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
               }
             }
 
+            await AnalyticsService.instance.logRideGroupCreated(
+              groupId: groupId,
+              inviteeCount: invitees.length,
+              hasPlannedRoute: group.routePolyline.length >= 2,
+              rideCommunity: group.rideCommunity,
+            );
+
             await _loadGroups();
 
             if (mounted) {
@@ -638,6 +646,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
         );
       }
 
+      await AnalyticsService.instance.logRideGroupJoined(groupId: group.id);
       await _loadGroups();
 
       if (mounted) {

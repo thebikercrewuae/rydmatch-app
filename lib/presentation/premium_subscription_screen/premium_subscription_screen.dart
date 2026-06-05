@@ -117,6 +117,13 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
     }
 
     if (!_revenueCatAvailable || package == null) {
+      await AnalyticsService.instance.logPremiumPurchaseResult(
+        status: 'store_unavailable',
+        source: 'subscribe_button',
+        productId: package?.storeProduct.identifier,
+        price: package?.storeProduct.priceString,
+        currencyCode: package?.storeProduct.currencyCode,
+      );
       _showStoreMessage(
         'Subscription is not available yet. Please try again later.',
       );
@@ -127,6 +134,13 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
     try {
       final active = await RevenueCatService.instance.purchasePremiumPackage();
       if (!active) {
+        await AnalyticsService.instance.logPremiumPurchaseResult(
+          status: 'missing_entitlement',
+          source: 'revenuecat_purchase',
+          productId: package.storeProduct.identifier,
+          price: package.storeProduct.priceString,
+          currencyCode: package.storeProduct.currencyCode,
+        );
         await DiagnosticsService.instance.logError(
           feature: 'premium',
           action: 'revenuecat_purchase_without_entitlement',
@@ -142,6 +156,13 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
         return;
       }
 
+      await AnalyticsService.instance.logPremiumPurchaseResult(
+        status: 'success',
+        source: 'revenuecat_purchase',
+        productId: package.storeProduct.identifier,
+        price: package.storeProduct.priceString,
+        currencyCode: package.storeProduct.currencyCode,
+      );
       await _finishPremiumActivation(
         source: 'revenuecat_purchase',
         productId: package.storeProduct.identifier,
@@ -150,6 +171,14 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
       );
     } on PlatformException catch (e) {
       if (!mounted) return;
+      await AnalyticsService.instance.logPremiumPurchaseResult(
+        status: 'error',
+        source: 'revenuecat_purchase',
+        productId: package.storeProduct.identifier,
+        price: package.storeProduct.priceString,
+        currencyCode: package.storeProduct.currencyCode,
+        errorCode: e.code,
+      );
       await DiagnosticsService.instance.logError(
         feature: 'premium',
         action: 'revenuecat_purchase_error',
@@ -165,6 +194,13 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
       _showStoreMessage('Purchase could not be completed.');
     } catch (e) {
       if (!mounted) return;
+      await AnalyticsService.instance.logPremiumPurchaseResult(
+        status: 'error',
+        source: 'revenuecat_purchase',
+        productId: package.storeProduct.identifier,
+        price: package.storeProduct.priceString,
+        currencyCode: package.storeProduct.currencyCode,
+      );
       await DiagnosticsService.instance.logError(
         feature: 'premium',
         action: 'revenuecat_purchase_error',
@@ -197,6 +233,11 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
     }
 
     await PremiumService().refresh(reason: 'beta_subscribe_button');
+    await AnalyticsService.instance.logPremiumPurchaseResult(
+      status: 'success',
+      source: 'beta_subscribe_button',
+      productId: _premiumProductId,
+    );
     await AnalyticsService.instance.logPremiumConverted(plan: 'beta_premium');
 
     if (!mounted) return;
@@ -219,6 +260,15 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
     try {
       final active = await RevenueCatService.instance.restorePurchases();
       if (!active) {
+        await AnalyticsService.instance.logPremiumPurchaseResult(
+          status: 'no_active_subscription',
+          source: 'revenuecat_restore',
+          productId: RevenueCatService
+              .instance
+              .premiumPackage
+              ?.storeProduct
+              .identifier,
+        );
         if (mounted) {
           setState(() => _isProcessing = false);
           _showStoreMessage('No active Premium subscription was found.');
@@ -226,6 +276,12 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
         return;
       }
 
+      await AnalyticsService.instance.logPremiumPurchaseResult(
+        status: 'success',
+        source: 'revenuecat_restore',
+        productId:
+            RevenueCatService.instance.premiumPackage?.storeProduct.identifier,
+      );
       await _finishPremiumActivation(
         source: 'revenuecat_restore',
         productId:
@@ -235,6 +291,12 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
       );
     } catch (e) {
       if (!mounted) return;
+      await AnalyticsService.instance.logPremiumPurchaseResult(
+        status: 'error',
+        source: 'revenuecat_restore',
+        productId:
+            RevenueCatService.instance.premiumPackage?.storeProduct.identifier,
+      );
       await DiagnosticsService.instance.logError(
         feature: 'premium',
         action: 'revenuecat_restore_error',

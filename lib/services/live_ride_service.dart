@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'analytics_service.dart';
 import 'diagnostics_service.dart';
 import 'profile_service.dart';
 
@@ -142,6 +143,11 @@ class LiveRideService {
       if (existingSession != null) {
         _currentSessionId = existingSession.id;
         await _joinAsParticipant(existingSession.id, userId);
+        await AnalyticsService.instance.logLiveRideJoined(
+          sessionId: existingSession.id,
+          rideGroupId: rideGroupId,
+          reusedExistingSession: true,
+        );
         await _activateRealtime(existingSession.id);
         return existingSession;
       }
@@ -174,6 +180,10 @@ class LiveRideService {
 
       await _joinAsParticipant(session.id, userId);
       await _notifyGroupMembers(rideGroupId, session.id);
+      await AnalyticsService.instance.logLiveRideStarted(
+        sessionId: session.id,
+        rideGroupId: rideGroupId,
+      );
 
       await _activateRealtime(session.id);
       return session;
@@ -211,6 +221,11 @@ class LiveRideService {
       _currentSessionId = session.id;
 
       await _joinAsParticipant(session.id, userId);
+      await AnalyticsService.instance.logLiveRideJoined(
+        sessionId: session.id,
+        rideGroupId: session.rideGroupId,
+        reusedExistingSession: false,
+      );
 
       await _activateRealtime(session.id);
       return true;

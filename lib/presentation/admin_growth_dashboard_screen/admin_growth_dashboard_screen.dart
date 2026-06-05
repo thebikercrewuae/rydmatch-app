@@ -179,6 +179,20 @@ class _AdminGrowthDashboardScreenState
                         note: 'Includes beta unlocks and store activations',
                       ),
                       _metricRow(
+                        'Purchase successes',
+                        _periodMetrics['premiumPurchaseSuccesses'],
+                      ),
+                      _metricRow(
+                        'Purchase issues',
+                        (_periodMetrics['premiumPurchaseErrors'] ?? 0) +
+                            (_periodMetrics['premiumPurchaseStoreUnavailable'] ??
+                                0) +
+                            (_periodMetrics['premiumPurchaseMissingEntitlement'] ??
+                                0),
+                        note:
+                            'Errors, unavailable store, or missing entitlement',
+                      ),
+                      _metricRow(
                         'View to subscribe',
                         _formatPercent(
                           _periodMetrics['premiumViewToStartRate'],
@@ -511,9 +525,14 @@ class _AdminGrowthDashboardScreenState
           _activationMetrics['rideGroupCreators'],
         ),
         _metricRow(
+          'Ride group joiners',
+          _activationMetrics['rideGroupJoiners'],
+        ),
+        _metricRow(
           'Live ride starters',
           _activationMetrics['liveRideStarters'],
         ),
+        _metricRow('Live ride joiners', _activationMetrics['liveRideJoiners']),
         _metricRow('Premium viewers', _activationMetrics['premiumViewers']),
         if (strongestMoment.isNotEmpty)
           _metricRow(

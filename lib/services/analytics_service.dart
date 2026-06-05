@@ -19,10 +19,15 @@ class AnalyticsService {
   static const String eventSuperLike = 'super_like';
   static const String eventMatchCreated = 'match_created';
   static const String eventMessageSent = 'message_sent';
+  static const String eventRideGroupCreated = 'ride_group_created';
+  static const String eventRideGroupJoined = 'ride_group_joined';
+  static const String eventLiveRideStarted = 'live_ride_started';
+  static const String eventLiveRideJoined = 'live_ride_joined';
   static const String eventSosTriggered = 'sos_triggered';
   static const String eventPremiumScreenView = 'premium_screen_view';
   static const String eventPremiumSubscribeStarted =
       'premium_subscribe_started';
+  static const String eventPremiumPurchaseResult = 'premium_purchase_result';
   static const String eventPremiumConverted = 'premium_converted';
 
   Future<void> logEvent(String eventType, {Map<String, dynamic>? data}) async {
@@ -144,6 +149,55 @@ class AnalyticsService {
     );
   }
 
+  Future<void> logRideGroupCreated({
+    required String groupId,
+    required int inviteeCount,
+    required bool hasPlannedRoute,
+    String? rideCommunity,
+  }) async {
+    await logEvent(
+      eventRideGroupCreated,
+      data: {
+        'group_id': groupId,
+        'invitee_count': inviteeCount,
+        'has_planned_route': hasPlannedRoute,
+        if (rideCommunity != null) 'ride_community': rideCommunity,
+      },
+    );
+  }
+
+  Future<void> logRideGroupJoined({required String groupId}) async {
+    await logEvent(eventRideGroupJoined, data: {'group_id': groupId});
+  }
+
+  Future<void> logLiveRideStarted({
+    required String sessionId,
+    String? rideGroupId,
+  }) async {
+    await logEvent(
+      eventLiveRideStarted,
+      data: {
+        'session_id': sessionId,
+        if (rideGroupId != null) 'ride_group_id': rideGroupId,
+      },
+    );
+  }
+
+  Future<void> logLiveRideJoined({
+    required String sessionId,
+    String? rideGroupId,
+    required bool reusedExistingSession,
+  }) async {
+    await logEvent(
+      eventLiveRideJoined,
+      data: {
+        'session_id': sessionId,
+        if (rideGroupId != null) 'ride_group_id': rideGroupId,
+        'reused_existing_session': reusedExistingSession,
+      },
+    );
+  }
+
   Future<void> logSosTriggered({double? latitude, double? longitude}) async {
     await logEvent(
       eventSosTriggered,
@@ -180,6 +234,27 @@ class AnalyticsService {
         'beta_unlock_enabled': betaUnlockEnabled,
         if (price != null) 'price': price,
         if (currencyCode != null) 'currency_code': currencyCode,
+      },
+    );
+  }
+
+  Future<void> logPremiumPurchaseResult({
+    required String status,
+    required String source,
+    String? productId,
+    String? price,
+    String? currencyCode,
+    String? errorCode,
+  }) async {
+    await logEvent(
+      eventPremiumPurchaseResult,
+      data: {
+        'status': status,
+        'source': source,
+        if (productId != null) 'product_id': productId,
+        if (price != null) 'price': price,
+        if (currencyCode != null) 'currency_code': currencyCode,
+        if (errorCode != null) 'error_code': errorCode,
       },
     );
   }
