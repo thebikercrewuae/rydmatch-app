@@ -260,6 +260,7 @@ function periodMetrics({
   const conversions = eventCounts.premium_converted ?? 0;
   const rightSwipes = eventCounts.swipe_right ?? 0;
   const matchEvents = eventCounts.match_created ?? periodMatches.length;
+  const onboarding = onboardingFunnel(periodEvents, eventCounts);
 
   return {
     activeUsers: activeUsers.size,
@@ -282,6 +283,83 @@ function periodMetrics({
     uniquePremiumViewers: eventUsers.premium_screen_view?.size ?? 0,
     uniqueSubscribeStarters: eventUsers.premium_subscribe_started?.size ?? 0,
     uniqueConverters: eventUsers.premium_converted?.size ?? 0,
+    onboarding,
+  };
+}
+
+function onboardingFunnel(
+  events: any[],
+  eventCounts: Record<string, number>,
+) {
+  const stepViews = new Map<number, { name: string; users: Set<string>; events: number }>();
+  const stepCompletions = new Map<number, { name: string; users: Set<string>; events: number }>();
+
+  for (const event of events) {
+    if (
+      event.event_type !== 'profile_setup_step_viewed' &&
+      event.event_type !== 'profile_setup_step_completed'
+    ) {
+      continue;
+    }
+
+    const data = event.event_data ?? {};
+    const stepIndex =
+      typeof data.step_index === 'number'
+        ? data.step_index
+        : Number.parseInt(String(data.step_index ?? ''), 10);
+    if (Number.isNaN(stepIndex)) continue;
+
+    const target =
+      event.event_type === 'profile_setup_step_viewed'
+        ? stepViews
+        : stepCompletions;
+    const entry = target.get(stepIndex) ?? {
+      name: String(data.step_name ?? `Step ${stepIndex + 1}`),
+      users: new Set<string>(),
+      events: 0,
+    };
+    entry.events += 1;
+    if (event.user_id) entry.users.add(event.user_id);
+    target.set(stepIndex, entry);
+  }
+
+  const allStepIndexes = Array.from(
+    new Set([...stepViews.keys(), ...stepCompletions.keys()]),
+  ).sort((a, b) => a - b);
+  const steps = allStepIndexes.map((index) => {
+    const viewed = stepViews.get(index);
+    const completed = stepCompletions.get(index);
+    const viewedUsers = viewed?.users.size ?? 0;
+    const completedUsers = completed?.users.size ?? 0;
+    return {
+      stepIndex: index,
+      stepNumber: index + 1,
+      stepName: viewed?.name ?? completed?.name ?? `Step ${index + 1}`,
+      viewedUsers,
+      completedUsers,
+      completionRate: percent(completedUsers, viewedUsers),
+      dropOffUsers: Math.max(viewedUsers - completedUsers, 0),
+    };
+  });
+  const weakestStep = [...steps].sort(
+    (a, b) => b.dropOffUsers - a.dropOffUsers,
+  )[0] ?? null;
+
+  const registrationCompleted = eventCounts.registration_completed ?? 0;
+  const setupStarted = eventCounts.profile_setup_started ?? 0;
+  const profileCreated = eventCounts.profile_created ?? 0;
+  const skipped = eventCounts.profile_setup_skipped ?? 0;
+
+  return {
+    registrationCompleted,
+    setupStarted,
+    profileCreated,
+    skipped,
+    registrationToProfileRate: percent(profileCreated, registrationCompleted),
+    setupStartToProfileRate: percent(profileCreated, setupStarted),
+    skipRate: percent(skipped, setupStarted),
+    weakestStep,
+    steps,
   };
 }
 

@@ -8,6 +8,12 @@ class AnalyticsService {
 
   static const String eventProfileCreated = 'profile_created';
   static const String eventProfileUpdated = 'profile_updated';
+  static const String eventRegistrationCompleted = 'registration_completed';
+  static const String eventProfileSetupStarted = 'profile_setup_started';
+  static const String eventProfileSetupStepViewed = 'profile_setup_step_viewed';
+  static const String eventProfileSetupStepCompleted =
+      'profile_setup_step_completed';
+  static const String eventProfileSetupSkipped = 'profile_setup_skipped';
   static const String eventSwipeRight = 'swipe_right';
   static const String eventSwipeLeft = 'swipe_left';
   static const String eventSuperLike = 'super_like';
@@ -41,6 +47,71 @@ class AnalyticsService {
 
   Future<void> logProfileUpdated() async {
     await logEvent(eventProfileUpdated);
+  }
+
+  Future<void> logRegistrationCompleted({
+    required bool referralCodeEntered,
+    required bool referralApplied,
+  }) async {
+    await logEvent(
+      eventRegistrationCompleted,
+      data: {
+        'referral_code_entered': referralCodeEntered,
+        'referral_applied': referralApplied,
+      },
+    );
+  }
+
+  Future<void> logProfileSetupStarted({required int totalSteps}) async {
+    await logEvent(eventProfileSetupStarted, data: {'total_steps': totalSteps});
+  }
+
+  Future<void> logProfileSetupStepViewed({
+    required int stepIndex,
+    required String stepName,
+    required int totalSteps,
+  }) async {
+    await logEvent(
+      eventProfileSetupStepViewed,
+      data: {
+        'step_index': stepIndex,
+        'step_number': stepIndex + 1,
+        'step_name': stepName,
+        'total_steps': totalSteps,
+      },
+    );
+  }
+
+  Future<void> logProfileSetupStepCompleted({
+    required int stepIndex,
+    required String stepName,
+    required int totalSteps,
+  }) async {
+    await logEvent(
+      eventProfileSetupStepCompleted,
+      data: {
+        'step_index': stepIndex,
+        'step_number': stepIndex + 1,
+        'step_name': stepName,
+        'total_steps': totalSteps,
+      },
+    );
+  }
+
+  Future<void> logProfileSetupSkipped({
+    required int stepIndex,
+    required String stepName,
+    required int totalSteps,
+  }) async {
+    await logEvent(
+      eventProfileSetupSkipped,
+      data: {
+        'step_index': stepIndex,
+        'step_number': stepIndex + 1,
+        'step_name': stepName,
+        'total_steps': totalSteps,
+      },
+    );
   }
 
   Future<void> logSwipe({

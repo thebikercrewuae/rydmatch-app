@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../services/analytics_service.dart';
 import '../../services/referral_service.dart';
 import '../../widgets/app_icons.dart';
 import '../../widgets/app_logo_widget.dart';
@@ -173,6 +174,11 @@ class _RegistrationScreenState extends State<RegistrationScreen>
       if (referralCode.isNotEmpty) {
         applied = await ReferralService().applyReferralCode(referralCode);
       }
+
+      await AnalyticsService.instance.logRegistrationCompleted(
+        referralCodeEntered: referralCode.isNotEmpty,
+        referralApplied: applied,
+      );
 
       if (mounted) {
         setState(() {

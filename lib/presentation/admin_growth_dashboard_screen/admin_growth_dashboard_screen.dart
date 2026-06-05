@@ -32,6 +32,9 @@ class _AdminGrowthDashboardScreenState
     return Map<String, dynamic>.from(periods[_period] as Map? ?? {});
   }
 
+  Map<String, dynamic> get _onboardingMetrics =>
+      Map<String, dynamic>.from(_periodMetrics['onboarding'] as Map? ?? {});
+
   @override
   void initState() {
     super.initState();
@@ -128,6 +131,8 @@ class _AdminGrowthDashboardScreenState
                       ),
                     ],
                   ),
+                  SizedBox(height: 1.5.h),
+                  _buildOnboardingSection(),
                   SizedBox(height: 1.5.h),
                   _buildSection(
                     title: 'Matching & Engagement',
@@ -358,6 +363,96 @@ class _AdminGrowthDashboardScreenState
           ),
           const Divider(height: 1),
           ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOnboardingSection() {
+    final weakestStep = Map<String, dynamic>.from(
+      _onboardingMetrics['weakestStep'] as Map? ?? {},
+    );
+    final steps = _onboardingMetrics['steps'] is List
+        ? List<Map<String, dynamic>>.from(_onboardingMetrics['steps'] as List)
+        : <Map<String, dynamic>>[];
+
+    return _buildSection(
+      title: 'Onboarding Funnel',
+      icon: Icons.route_rounded,
+      accent: _orange,
+      children: [
+        _metricRow(
+          'Registrations completed',
+          _onboardingMetrics['registrationCompleted'],
+        ),
+        _metricRow('Profile setup started', _onboardingMetrics['setupStarted']),
+        _metricRow('Profiles completed', _onboardingMetrics['profileCreated']),
+        _metricRow(
+          'Registration to profile',
+          _formatPercent(_onboardingMetrics['registrationToProfileRate']),
+        ),
+        _metricRow(
+          'Setup completion',
+          _formatPercent(_onboardingMetrics['setupStartToProfileRate']),
+        ),
+        _metricRow(
+          'Skipped setup',
+          _onboardingMetrics['skipped'],
+          note: 'Skip rate: ${_formatPercent(_onboardingMetrics['skipRate'])}',
+        ),
+        if (weakestStep.isNotEmpty)
+          _metricRow(
+            'Weakest step',
+            weakestStep['stepName'] ?? '-',
+            note:
+                '${weakestStep['dropOffUsers'] ?? 0} rider(s) viewed but did not continue',
+          ),
+        if (steps.isNotEmpty)
+          Padding(
+            padding: EdgeInsets.fromLTRB(4.w, 0.5.h, 4.w, 1.25.h),
+            child: Column(
+              children: steps.take(9).map(_buildOnboardingStepRow).toList(),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildOnboardingStepRow(Map<String, dynamic> step) {
+    final viewed = step['viewedUsers'] ?? 0;
+    final completed = step['completedUsers'] ?? 0;
+    final rate = _formatPercent(step['completionRate']);
+
+    return Container(
+      margin: EdgeInsets.only(top: 0.8.h),
+      padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.h),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F6F8),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '${step['stepNumber'] ?? '-'} - ${step['stepName'] ?? 'Step'}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.dmSans(
+                fontSize: 9.8.sp,
+                fontWeight: FontWeight.w700,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+          SizedBox(width: 2.w),
+          Text(
+            '$completed/$viewed - $rate',
+            style: GoogleFonts.dmSans(
+              fontSize: 9.5.sp,
+              fontWeight: FontWeight.w800,
+              color: _deepBlue,
+            ),
+          ),
         ],
       ),
     );

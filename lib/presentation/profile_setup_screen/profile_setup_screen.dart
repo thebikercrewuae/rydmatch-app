@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -32,6 +34,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final int _totalPages = 9;
   bool _isEditMode = false;
   bool _isLoading = true;
+  bool _hasLoggedProfileSetupStart = false;
+  final Set<int> _loggedStepViews = {};
 
   static const String _contactNameKey = 'sos_contact_name';
   static const String _contactPhoneKey = 'sos_contact_phone';
@@ -227,6 +231,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             _isMetric = data['isMetric'] as bool? ?? true;
             _isLoading = false;
           });
+          _logProfileSetupStartIfNeeded();
         }
       }
     } catch (e) {
@@ -243,6 +248,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   void _nextPage() {
+    if (!_isEditMode) {
+      unawaited(
+        AnalyticsService.instance.logProfileSetupStepCompleted(
+          stepIndex: _currentPage,
+          stepName: _pageTitles[_currentPage],
+          totalSteps: _totalPages,
+        ),
+      );
+    }
+
     if (_currentPage < _totalPages - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 350),
@@ -517,11 +532,39 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     if (_isEditMode) {
       Navigator.of(context).pop();
     } else {
+      unawaited(
+        AnalyticsService.instance.logProfileSetupSkipped(
+          stepIndex: _currentPage,
+          stepName: _pageTitles[_currentPage],
+          totalSteps: _totalPages,
+        ),
+      );
       Navigator.of(
         context,
         rootNavigator: true,
       ).pushNamedAndRemoveUntil('/discovery-screen', (route) => false);
     }
+  }
+
+  void _logProfileSetupStartIfNeeded() {
+    if (_isEditMode || _hasLoggedProfileSetupStart) return;
+    _hasLoggedProfileSetupStart = true;
+    unawaited(
+      AnalyticsService.instance.logProfileSetupStarted(totalSteps: _totalPages),
+    );
+    _logProfileSetupStepView(0);
+  }
+
+  void _logProfileSetupStepView(int index) {
+    if (_isEditMode || _loggedStepViews.contains(index)) return;
+    _loggedStepViews.add(index);
+    unawaited(
+      AnalyticsService.instance.logProfileSetupStepViewed(
+        stepIndex: index,
+        stepName: _pageTitles[index],
+        totalSteps: _totalPages,
+      ),
+    );
   }
 
   @override
@@ -562,8 +605,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                   child: PageView(
                     controller: _pageController,
                     physics: const NeverScrollableScrollPhysics(),
-                    onPageChanged: (index) =>
-                        setState(() => _currentPage = index),
+                    onPageChanged: (index) {
+                      setState(() => _currentPage = index);
+                      _logProfileSetupStepView(index);
+                    },
                     children: [
                       _buildNameInputPage(theme),
                       SpeedSelectionWidget(
