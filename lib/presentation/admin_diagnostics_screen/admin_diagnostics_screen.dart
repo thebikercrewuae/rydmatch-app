@@ -347,9 +347,12 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
       }
 
       if (!mounted) return;
+      final health = Map<String, dynamic>.from(data['liveRide'] as Map);
       setState(() {
-        _liveRideHealth = Map<String, dynamic>.from(data['liveRide'] as Map);
-        _liveRideHealthError = null;
+        _liveRideHealth = health;
+        _liveRideHealthError = health['available'] == false
+            ? health['error']?.toString() ?? 'Live ride diagnostics unavailable'
+            : null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -372,11 +375,13 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
       }
 
       if (!mounted) return;
+      final health = Map<String, dynamic>.from(data['notifications'] as Map);
       setState(() {
-        _notificationHealth = Map<String, dynamic>.from(
-          data['notifications'] as Map,
-        );
-        _notificationHealthError = null;
+        _notificationHealth = health;
+        _notificationHealthError = health['available'] == false
+            ? health['error']?.toString() ??
+                  'Notification diagnostics unavailable'
+            : null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -852,7 +857,7 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
           if (_liveRideHealthError != null) ...[
             SizedBox(height: 0.8.h),
             Text(
-              'Could not load live ride diagnostics. Confirm admin-growth-dashboard is deployed and live ride tables exist.',
+              'Could not load live ride diagnostics: $_liveRideHealthError',
               style: GoogleFonts.dmSans(fontSize: 10.sp, color: _orange),
             ),
           ] else if (health == null) ...[
@@ -1076,7 +1081,7 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
           if (_notificationHealthError != null) ...[
             SizedBox(height: 0.8.h),
             Text(
-              'Could not load notification diagnostics. Confirm admin-growth-dashboard is deployed and the notification schema is up to date.',
+              'Could not load notification diagnostics: $_notificationHealthError',
               style: GoogleFonts.dmSans(fontSize: 10.sp, color: _orange),
             ),
           ] else if (health == null) ...[
@@ -1276,7 +1281,7 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
           if (_stravaHealthError != null) ...[
             SizedBox(height: 0.8.h),
             Text(
-              'Could not load Strava diagnostics. Confirm strava-auth is deployed and Supabase secrets are set.',
+              'Could not load Strava diagnostics: $_stravaHealthError',
               style: GoogleFonts.dmSans(fontSize: 10.sp, color: _orange),
             ),
           ] else if (health == null) ...[

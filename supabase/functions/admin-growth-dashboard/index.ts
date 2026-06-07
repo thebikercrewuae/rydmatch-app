@@ -133,18 +133,23 @@ Deno.serve(async (req) => {
       ['matches', matchesResult],
       ['messages', messagesResult],
       ['groups', groupsResult],
-      ['live sessions', liveSessionsResult],
-      ['live participants', liveParticipantsResult],
-      ['live locations', liveLocationsResult],
-      ['live diagnostics', liveErrorsResult],
-      ['notifications', notificationsResult],
-      ['notification diagnostics', notificationErrorsResult],
     ] as const) {
       if (result.error) {
         console.error(`admin-growth-dashboard ${name} error:`, result.error);
         return jsonResponse({ error: `Could not load ${name} metrics` }, 500);
       }
     }
+
+    const liveRideQueryError = firstQueryError([
+      ['live sessions', liveSessionsResult],
+      ['live participants', liveParticipantsResult],
+      ['live locations', liveLocationsResult],
+      ['live diagnostics', liveErrorsResult],
+    ]);
+    const notificationQueryError = firstQueryError([
+      ['notifications', notificationsResult],
+      ['notification diagnostics', notificationErrorsResult],
+    ]);
 
     const profiles = profilesResult.data ?? [];
     const events = eventsResult.data ?? [];
@@ -205,19 +210,29 @@ Deno.serve(async (req) => {
         '7d': metrics7,
         '30d': metrics30,
       },
-      liveRide: liveRideDiagnostics({
-        now,
-        sessions: liveSessions,
-        participants: liveParticipants,
-        locations: liveLocations,
-        errors: liveErrors,
-        groups,
-      }),
-      notifications: notificationDiagnostics({
-        now,
-        notifications,
-        errors: notificationErrors,
-      }),
+      liveRide: liveRideQueryError
+        ? unavailableDiagnostics(liveRideQueryError)
+        : {
+          available: true,
+          ...liveRideDiagnostics({
+            now,
+            sessions: liveSessions,
+            participants: liveParticipants,
+            locations: liveLocations,
+            errors: liveErrors,
+            groups,
+          }),
+        },
+      notifications: notificationQueryError
+        ? unavailableDiagnostics(notificationQueryError)
+        : {
+          available: true,
+          ...notificationDiagnostics({
+            now,
+            notifications,
+            errors: notificationErrors,
+          }),
+        },
       notes: [
         'Active users are riders who generated a tracked analytics event.',
         'Premium conversions include beta unlocks and store activations.',
@@ -229,6 +244,24 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Internal server error' }, 500);
   }
 });
+
+function firstQueryError(
+  results: Array<[string, { error: { message?: string } | null }]>,
+): string | null {
+  for (const [name, result] of results) {
+    if (!result.error) continue;
+    console.error(`admin-growth-dashboard ${name} error:`, result.error);
+    return `${name}: ${result.error.message ?? 'query failed'}`;
+  }
+  return null;
+}
+
+function unavailableDiagnostics(error: string) {
+  return {
+    available: false,
+    error,
+  };
+}
 
 function periodMetrics({
   since,
