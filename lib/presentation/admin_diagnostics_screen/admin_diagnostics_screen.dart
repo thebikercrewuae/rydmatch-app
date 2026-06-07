@@ -17,6 +17,8 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
   static const Color _deepBlue = Color(0xFF1B365D);
   static const Color _orange = Color(0xFFE85A4F);
   static const Color _green = Color(0xFF2E7D32);
+  static const Color _screenBackground = Color(0xFFF1F5F9);
+  static const Color _bodyText = Color(0xFF172033);
 
   final _searchController = TextEditingController();
 
@@ -589,10 +591,8 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: _screenBackground,
       appBar: AppBar(
         title: Text(
           'Admin Diagnostics',
@@ -612,7 +612,21 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
           ? const Center(child: CircularProgressIndicator())
           : !_isAdmin
           ? _buildAccessDenied()
-          : _buildDiagnosticsList(),
+          : Theme(
+              data: ThemeData.light(useMaterial3: true).copyWith(
+                scaffoldBackgroundColor: _screenBackground,
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: _deepBlue,
+                  brightness: Brightness.light,
+                  surface: Colors.white,
+                ),
+                textTheme: ThemeData.light().textTheme.apply(
+                  bodyColor: _bodyText,
+                  displayColor: _bodyText,
+                ),
+              ),
+              child: _buildDiagnosticsList(),
+            ),
     );
   }
 
@@ -1456,6 +1470,8 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
             Expanded(
               child: DropdownButtonFormField<String>(
                 initialValue: _selectedFeature,
+                dropdownColor: Colors.white,
+                style: GoogleFonts.dmSans(color: _bodyText, fontSize: 10.sp),
                 decoration: _filterDecoration('Feature'),
                 items: _features
                     .map(
@@ -1464,7 +1480,10 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
                         child: Text(
                           feature == 'all' ? 'All features' : feature,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.dmSans(fontSize: 10.sp),
+                          style: GoogleFonts.dmSans(
+                            fontSize: 10.sp,
+                            color: _bodyText,
+                          ),
                         ),
                       ),
                     )
@@ -1480,6 +1499,8 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
             Expanded(
               child: DropdownButtonFormField<String>(
                 initialValue: _selectedSeverity,
+                dropdownColor: Colors.white,
+                style: GoogleFonts.dmSans(color: _bodyText, fontSize: 10.sp),
                 decoration: _filterDecoration('Severity'),
                 items: _severities
                     .map(
@@ -1488,7 +1509,10 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
                         child: Text(
                           severity == 'all' ? 'All severities' : severity,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.dmSans(fontSize: 10.sp),
+                          style: GoogleFonts.dmSans(
+                            fontSize: 10.sp,
+                            color: _bodyText,
+                          ),
                         ),
                       ),
                     )
@@ -1505,6 +1529,7 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
         SizedBox(height: 1.h),
         TextField(
           controller: _searchController,
+          style: GoogleFonts.dmSans(color: _bodyText),
           onChanged: (value) => setState(() => _searchQuery = value),
           decoration: _filterDecoration('Search diagnostics').copyWith(
             prefixIcon: const Icon(Icons.search_rounded),
@@ -1543,6 +1568,9 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
     final repeatCount = _signatureCounts[_errorSignature(error)] ?? 1;
 
     return Card(
+      color: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      elevation: 1,
       margin: EdgeInsets.only(bottom: 1.5.h),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
@@ -1612,7 +1640,7 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
                 (error['message'] ?? '').toString(),
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.dmSans(fontSize: 10.sp),
+                style: GoogleFonts.dmSans(fontSize: 10.sp, color: _bodyText),
               ),
             ],
           ),
