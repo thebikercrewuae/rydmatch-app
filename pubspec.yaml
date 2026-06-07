@@ -10,7 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  supabase_flutter: ^2.9.1
+  supabase_flutter: ^2.14.1
   sizer: ^2.0.15
   flutter_svg: ^2.0.9
   google_fonts: ^6.1.0

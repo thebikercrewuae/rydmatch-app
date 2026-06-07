@@ -23,7 +23,10 @@ class SupabaseService {
       );
     }
 
-    await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+    await Supabase.initialize(
+      url: supabaseUrl,
+      publishableKey: supabaseAnonKey,
+    );
   }
 
   // Get Supabase client
