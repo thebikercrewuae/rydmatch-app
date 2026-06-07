@@ -30,6 +30,23 @@ class ProfileService {
   static const String _keyMixedCommunityMatching =
       'profile_mixed_community_matching';
 
+  static List<String> _normalizeStringList(dynamic value) {
+    if (value is! List) return <String>[];
+    return value
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+  }
+
+  static Map<String, List<String>> _normalizeRideTimes(dynamic value) {
+    if (value is! Map) return <String, List<String>>{};
+    final normalized = value.map(
+      (day, times) => MapEntry(day.toString(), _normalizeStringList(times)),
+    );
+    normalized.removeWhere((_, times) => times.isEmpty);
+    return normalized;
+  }
+
   static Future<bool> isProfileComplete() async {
     final prefs = await SharedPreferences.getInstance();
     _lastUploadError = null;
@@ -521,8 +538,12 @@ class ProfileService {
         if (!shouldRetry) rethrow;
         await supabase.from('user_profiles').upsert(updates, onConflict: 'id');
       }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('_pending_supabase_sync', false);
       debugPrint('✅ Profile synced successfully');
     } catch (e) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('_pending_supabase_sync', true);
       debugPrint('❌ SYNC FAILED: $e');
       await DiagnosticsService.instance.logError(
         feature: 'profile',
@@ -614,6 +635,21 @@ class ProfileService {
       if (!isComplete) return;
 
       final prefs = await SharedPreferences.getInstance();
+      final localSkillLevels =
+          prefs.getStringList(_keySkillLevels) ?? <String>[];
+      final localBikeTypes = prefs.getStringList(_keyBikeTypes) ?? <String>[];
+      final localPreferredRoads =
+          prefs.getStringList(_keyPreferredRoads) ?? <String>[];
+      Map<String, List<String>> localRideTimes = {};
+      final localRideTimesJson = prefs.getString(_keyRideTimes);
+      if (localRideTimesJson != null) {
+        try {
+          localRideTimes = _normalizeRideTimes(jsonDecode(localRideTimesJson));
+        } catch (_) {
+          // Ignore malformed legacy local data.
+        }
+      }
+      final repairUpdates = <String, dynamic>{};
 
       // Restore riding speed
       final ridingSpeed = (response['riding_speed'] as num?)?.toDouble();
@@ -621,45 +657,34 @@ class ProfileService {
         await prefs.setDouble(_keyRidingSpeed, ridingSpeed);
       }
 
-      // Restore skill levels
-      final skillLevels = response['skill_levels'];
-      if (skillLevels != null) {
-        await prefs.setStringList(
-          _keySkillLevels,
-          List<String>.from(skillLevels as List),
-        );
+      // Preserve valid local preferences when the shared profile is empty,
+      // then repair the shared profile so matches can see them.
+      final skillLevels = _normalizeStringList(response['skill_levels']);
+      if (skillLevels.isNotEmpty) {
+        await prefs.setStringList(_keySkillLevels, skillLevels);
+      } else if (localSkillLevels.isNotEmpty) {
+        repairUpdates['skill_levels'] = localSkillLevels;
       }
 
-      // Restore bike types
-      final bikeTypes = response['bike_types'];
-      if (bikeTypes != null) {
-        await prefs.setStringList(
-          _keyBikeTypes,
-          List<String>.from(bikeTypes as List),
-        );
+      final bikeTypes = _normalizeStringList(response['bike_types']);
+      if (bikeTypes.isNotEmpty) {
+        await prefs.setStringList(_keyBikeTypes, bikeTypes);
+      } else if (localBikeTypes.isNotEmpty) {
+        repairUpdates['bike_types'] = localBikeTypes;
       }
 
-      // Restore preferred roads
-      final preferredRoads = response['preferred_roads'];
-      if (preferredRoads != null) {
-        await prefs.setStringList(
-          _keyPreferredRoads,
-          List<String>.from(preferredRoads as List),
-        );
+      final preferredRoads = _normalizeStringList(response['preferred_roads']);
+      if (preferredRoads.isNotEmpty) {
+        await prefs.setStringList(_keyPreferredRoads, preferredRoads);
+      } else if (localPreferredRoads.isNotEmpty) {
+        repairUpdates['preferred_roads'] = localPreferredRoads;
       }
 
-      // Restore ride times
-      final rideTimes = response['ride_times'];
-      if (rideTimes is Map) {
-        final normalizedRideTimes = rideTimes.map(
-          (day, times) => MapEntry(
-            day.toString(),
-            times is List
-                ? times.map((time) => time.toString()).toList()
-                : <String>[],
-          ),
-        )..removeWhere((_, times) => times.isEmpty);
-        await prefs.setString(_keyRideTimes, jsonEncode(normalizedRideTimes));
+      final rideTimes = _normalizeRideTimes(response['ride_times']);
+      if (rideTimes.isNotEmpty) {
+        await prefs.setString(_keyRideTimes, jsonEncode(rideTimes));
+      } else if (localRideTimes.isNotEmpty) {
+        repairUpdates['ride_times'] = localRideTimes;
       }
 
       // Restore name and bio
@@ -711,9 +736,39 @@ class ProfileService {
         );
       }
 
+      if (repairUpdates.isNotEmpty) {
+        try {
+          repairUpdates['updated_at'] = DateTime.now().toIso8601String();
+          await supabase
+              .from('user_profiles')
+              .update(repairUpdates)
+              .eq('id', currentUser.id);
+          await prefs.setBool('_pending_supabase_sync', false);
+        } catch (e) {
+          await prefs.setBool('_pending_supabase_sync', true);
+          await DiagnosticsService.instance.logError(
+            feature: 'profile',
+            action: 'repair_missing_shared_preferences',
+            error: e,
+            context: {
+              'fields': repairUpdates.keys
+                  .where((field) => field != 'updated_at')
+                  .toList(),
+            },
+            severity: 'warning',
+          );
+        }
+      }
+
       // Mark profile as complete locally
       await prefs.setBool(_keyIsProfileComplete, true);
-    } catch (_) {
+    } catch (e) {
+      await DiagnosticsService.instance.logError(
+        feature: 'profile',
+        action: 'restore_from_supabase',
+        error: e,
+        severity: 'warning',
+      );
       // Non-critical — local state remains unchanged
     }
   }
