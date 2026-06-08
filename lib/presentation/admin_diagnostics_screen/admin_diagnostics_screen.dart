@@ -59,9 +59,17 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
 
   List<Map<String, dynamic>> get _visibleErrors {
     final q = _searchQuery.trim().toLowerCase();
-    if (q.isEmpty) return _errors;
-
     return _errors.where((error) {
+      if (_selectedFeature != 'all' &&
+          error['feature']?.toString() != _selectedFeature) {
+        return false;
+      }
+      if (_selectedSeverity != 'all' &&
+          error['severity']?.toString() != _selectedSeverity) {
+        return false;
+      }
+      if (q.isEmpty) return true;
+
       final user = _profileFor(error);
       final text = [
         error['feature'],
@@ -145,21 +153,11 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final query = Supabase.instance.client
+      final data = await Supabase.instance.client
           .from('app_errors')
           .select(
             'id, user_id, feature, action, severity, message, stack_trace, context, platform, is_debug, created_at',
-          );
-
-      dynamic filteredQuery = query;
-      if (_selectedFeature != 'all') {
-        filteredQuery = filteredQuery.eq('feature', _selectedFeature);
-      }
-      if (_selectedSeverity != 'all') {
-        filteredQuery = filteredQuery.eq('severity', _selectedSeverity);
-      }
-
-      final data = await filteredQuery
+          )
           .order('created_at', ascending: false)
           .limit(150);
 
@@ -1407,16 +1405,32 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
     return Row(
       children: [
         Expanded(
-          child: _summaryCard('Loaded', _errors.length.toString(), _deepBlue),
+          child: _summaryCard(
+            'Loaded',
+            _errors.length.toString(),
+            _deepBlue,
+            selected: _selectedSeverity == 'all',
+            onTap: () => _applySeverityFilter('all'),
+          ),
         ),
         SizedBox(width: 2.w),
-        Expanded(child: _summaryCard('Errors', errors.toString(), _orange)),
+        Expanded(
+          child: _summaryCard(
+            'Errors',
+            errors.toString(),
+            _orange,
+            selected: _selectedSeverity == 'error',
+            onTap: () => _applySeverityFilter('error'),
+          ),
+        ),
         SizedBox(width: 2.w),
         Expanded(
           child: _summaryCard(
             'Warnings',
             warnings.toString(),
             const Color(0xFFB7791F),
+            selected: _selectedSeverity == 'warning',
+            onTap: () => _applySeverityFilter('warning'),
           ),
         ),
         SizedBox(width: 2.w),
@@ -1437,34 +1451,53 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
     String value,
     Color color, {
     bool small = false,
+    bool selected = false,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      padding: EdgeInsets.all(3.w),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: GoogleFonts.dmSans(fontSize: 9.sp, color: Colors.black54),
+        child: Container(
+          padding: EdgeInsets.all(3.w),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: selected ? 0.18 : 0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: selected ? Border.all(color: color, width: 1.5) : null,
           ),
-          SizedBox(height: 0.4.h),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.dmSans(
-              fontSize: small ? 9.5.sp : 14.sp,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.dmSans(
+                  fontSize: 9.sp,
+                  color: selected ? color : Colors.black54,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                ),
+              ),
+              SizedBox(height: 0.4.h),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.dmSans(
+                  fontSize: small ? 9.5.sp : 14.sp,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
+  }
+
+  Future<void> _applySeverityFilter(String severity) async {
+    if (_selectedSeverity == severity) return;
+    setState(() => _selectedSeverity = severity);
   }
 
   Widget _buildFilters() {
@@ -1496,13 +1529,13 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
                 onChanged: (value) async {
                   if (value == null) return;
                   setState(() => _selectedFeature = value);
-                  await _loadErrors();
                 },
               ),
             ),
             SizedBox(width: 2.w),
             Expanded(
               child: DropdownButtonFormField<String>(
+                key: ValueKey(_selectedSeverity),
                 initialValue: _selectedSeverity,
                 dropdownColor: Colors.white,
                 style: GoogleFonts.dmSans(color: _bodyText, fontSize: 10.sp),
@@ -1525,7 +1558,6 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
                 onChanged: (value) async {
                   if (value == null) return;
                   setState(() => _selectedSeverity = value);
-                  await _loadErrors();
                 },
               ),
             ),

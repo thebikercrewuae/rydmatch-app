@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
         .limit(250),
       admin
         .from('notifications')
-        .select('id, user_id, notification_type, title, message, is_read, action_route, action_arguments, created_at')
+        .select('*')
         .gte('created_at', since30)
         .order('created_at', { ascending: false })
         .limit(10000),

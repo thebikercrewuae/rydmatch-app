@@ -534,6 +534,12 @@ class ProfileService {
           updates.remove('ride_times');
           shouldRetry = true;
         }
+        if (e.message.contains('minimum_age_confirmed') ||
+            e.message.contains('age_verified_at')) {
+          updates.remove('minimum_age_confirmed');
+          updates.remove('age_verified_at');
+          shouldRetry = true;
+        }
 
         if (!shouldRetry) rethrow;
         await supabase.from('user_profiles').upsert(updates, onConflict: 'id');
