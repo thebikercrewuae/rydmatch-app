@@ -77,9 +77,18 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         child: NotificationBannerOverlay(
           child: Scaffold(
             appBar: AppBar(
-              backgroundColor: Theme.of(context).colorScheme.primary,
+              backgroundColor: const Color(0xFF1B365D),
               elevation: 0,
               automaticallyImplyLeading: false,
+              flexibleSpace: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF1B365D), Color(0xFF2A4A7A)],
+                  ),
+                ),
+              ),
               title: Text(
                 'RydMatch',
                 style: GoogleFonts.dmSans(
