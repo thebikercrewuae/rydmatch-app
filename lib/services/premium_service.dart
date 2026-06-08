@@ -68,16 +68,17 @@ class PremiumService extends ChangeNotifier {
         storedUserId == currentUser.id;
 
     if (rawLocalPremium && storedUserId != currentUser.id) {
-      await DiagnosticsService.instance.logError(
-        feature: 'premium',
-        action: 'ignored_local_entitlement_for_different_user',
-        error: 'Local premium cache belongs to a different user',
-        severity: 'warning',
-        context: {
-          'reason': reason,
-          'stored_user_id_present': storedUserId != null,
-        },
-      );
+      await _clearStoredEntitlement(prefs);
+
+      if (storedUserId != null) {
+        await DiagnosticsService.instance.logError(
+          feature: 'premium',
+          action: 'cleared_local_entitlement_for_different_user',
+          error: 'Cleared local premium cache belonging to a different user',
+          severity: 'info',
+          context: {'reason': reason},
+        );
+      }
     }
 
     try {

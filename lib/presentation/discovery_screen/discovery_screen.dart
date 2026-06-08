@@ -223,6 +223,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   }
 
   Future<void> _fetchAndStoreLocation() async {
+    var locationAttempts = 0;
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) return;
@@ -237,12 +238,24 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         return;
       }
 
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 10),
-        ),
-      );
+      Position position;
+      try {
+        locationAttempts = 1;
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 15),
+          ),
+        );
+      } on TimeoutException {
+        locationAttempts = 2;
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.low,
+            timeLimit: Duration(seconds: 15),
+          ),
+        );
+      }
 
       _myLat = position.latitude;
       _myLng = position.longitude;
@@ -264,6 +277,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         action: 'fetch_and_store_location',
         error: e,
         severity: 'warning',
+        context: {'location_attempts': locationAttempts},
       );
     }
   }

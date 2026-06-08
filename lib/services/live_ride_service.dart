@@ -555,6 +555,13 @@ class LiveRideService {
       });
     } catch (e) {
       debugPrint('LiveRideService._sendLocation error: $e');
+      final errorText = e.toString().toLowerCase();
+      final isTransientNetworkFailure =
+          errorText.contains('failed host lookup') ||
+          errorText.contains('socketexception') ||
+          errorText.contains('connection reset') ||
+          errorText.contains('connection timed out') ||
+          errorText.contains('network is unreachable');
       final shouldLog =
           _lastLocationErrorLogAt == null ||
           DateTime.now().difference(_lastLocationErrorLogAt!) >
@@ -565,8 +572,11 @@ class LiveRideService {
           feature: 'live_ride',
           action: 'send_location',
           error: e,
-          severity: 'warning',
-          context: {'session_id': _currentSessionId},
+          severity: isTransientNetworkFailure ? 'info' : 'warning',
+          context: {
+            'session_id': _currentSessionId,
+            if (isTransientNetworkFailure) 'transient_network_failure': true,
+          },
         );
       }
     }
