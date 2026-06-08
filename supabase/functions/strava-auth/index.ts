@@ -23,13 +23,7 @@ Deno.serve(async (req) => {
     const stravaClientId = Deno.env.get('STRAVA_CLIENT_ID');
     const stravaClientSecret = Deno.env.get('STRAVA_CLIENT_SECRET');
 
-    if (
-      !supabaseUrl ||
-      !anonKey ||
-      !serviceRoleKey ||
-      !stravaClientId ||
-      !stravaClientSecret
-    ) {
+    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
       return jsonResponse({ error: 'Strava service is not configured' }, 500);
     }
 
@@ -115,6 +109,9 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'exchange') {
+      if (!stravaClientId || !stravaClientSecret) {
+        return jsonResponse({ error: 'Strava OAuth secrets are not configured' }, 503);
+      }
       const code = typeof body.code === 'string' ? body.code.trim() : '';
       if (!code) return jsonResponse({ error: 'Missing Strava code' }, 400);
 
@@ -152,6 +149,9 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'refresh') {
+      if (!stravaClientId || !stravaClientSecret) {
+        return jsonResponse({ error: 'Strava OAuth secrets are not configured' }, 503);
+      }
       const token = await ensureFreshAccessToken({
         adminClient,
         connection,
@@ -185,7 +185,9 @@ Deno.serve(async (req) => {
     return jsonResponse({ connected: false });
   } catch (error) {
     console.error('strava-auth error:', error);
-    return jsonResponse({ error: 'Internal server error' }, 500);
+    return jsonResponse({
+      error: error instanceof Error ? error.message : 'Internal server error',
+    }, 500);
   }
 });
 
