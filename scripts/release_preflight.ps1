@@ -145,8 +145,16 @@ if ($CheckSupabase) {
         Add-Error "Supabase CLI was not found"
     } else {
         Write-Host "`nChecking deployed Supabase functions..." -ForegroundColor Cyan
-        $functionList = (& $supabaseExe functions list --project-ref $SupabaseProjectRef 2>&1) -join "`n"
-        if ($LASTEXITCODE -ne 0) {
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $functionList = (& $supabaseExe functions list --project-ref $SupabaseProjectRef 2>&1) -join "`n"
+            $supabaseExitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
+
+        if ($supabaseExitCode -ne 0) {
             Add-Error "Could not list deployed Supabase functions"
         } else {
             @("strava-auth", "admin-growth-dashboard", "livekit-token") |
