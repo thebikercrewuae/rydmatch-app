@@ -36,7 +36,8 @@ class LiveRideMapScreen extends StatefulWidget {
   State<LiveRideMapScreen> createState() => _LiveRideMapScreenState();
 }
 
-class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
+class _LiveRideMapScreenState extends State<LiveRideMapScreen>
+    with WidgetsBindingObserver {
   GoogleMapController? _mapController;
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
@@ -228,6 +229,7 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _plannedRouteName = widget.initialRouteName;
     _plannedRoutePoints = List<LatLng>.from(widget.initialRoutePoints);
     if (_plannedRoutePoints.length >= 2) {
@@ -246,6 +248,7 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _positionTimer?.cancel();
     _chatNotificationChannel?.unsubscribe();
     _voiceService.removeListener(_onVoiceStateChanged);
@@ -254,6 +257,13 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
     LiveRideService.participants.removeListener(_onParticipantsChanged);
     _mapController?.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_voiceService.ensureConnected());
+    }
   }
 
   void _onVoiceStateChanged() {
@@ -516,7 +526,7 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
     });
   }
 
-  Future<void> _startTurnByTurnNavigation() async {
+  Future<void> _showNavigationChooser() async {
     if (_plannedRoutePoints.length < 2) {
       AppToast.show(
         context,
@@ -526,6 +536,139 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
       return;
     }
 
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF111827),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Choose navigation',
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _voiceService.isConnected
+                    ? 'Group voice will remain active while navigating.'
+                    : 'Join group voice before navigating to keep talking.',
+                style: GoogleFonts.inter(color: Colors.white60, fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _launchWazeNavigation();
+                },
+                leading: const Icon(
+                  Icons.navigation_rounded,
+                  color: Color(0xFF60A5FA),
+                ),
+                title: Text(
+                  'Waze',
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                subtitle: Text(
+                  'Uses your Waze vehicle and route preferences',
+                  style: GoogleFonts.inter(color: Colors.white54, fontSize: 12),
+                ),
+                trailing: const Icon(
+                  Icons.open_in_new_rounded,
+                  color: Colors.white54,
+                ),
+              ),
+              ListTile(
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _launchGoogleMapsNavigation();
+                },
+                leading: const Icon(
+                  Icons.map_rounded,
+                  color: Color(0xFF34D399),
+                ),
+                title: Text(
+                  'Google Maps',
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                subtitle: Text(
+                  'Includes planned-route shaping points',
+                  style: GoogleFonts.inter(color: Colors.white54, fontSize: 12),
+                ),
+                trailing: const Icon(
+                  Icons.open_in_new_rounded,
+                  color: Colors.white54,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _launchWazeNavigation() async {
+    final destination = _plannedRoutePoints.last;
+    final appUri = Uri.parse(
+      'waze://?ll=${destination.latitude},${destination.longitude}'
+      '&navigate=yes',
+    );
+    final webUri = Uri.https('waze.com', '/ul', {
+      'll': '${destination.latitude},${destination.longitude}',
+      'navigate': 'yes',
+      'utm_source': 'rydmatch',
+    });
+
+    try {
+      final openedApp = await launchUrl(
+        appUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (openedApp) return;
+    } catch (_) {
+      // Fall back to Waze's universal link when the app is not installed.
+    }
+
+    try {
+      final openedWeb = await launchUrl(
+        webUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (openedWeb) return;
+      throw StateError('Waze could not open the live ride destination');
+    } catch (error, stackTrace) {
+      await _logNavigationLaunchFailure('waze', error, stackTrace);
+    }
+  }
+
+  Future<void> _launchGoogleMapsNavigation() async {
     final destination = _plannedRoutePoints.last;
     final params = <String, String>{
       'api': '1',
@@ -555,27 +698,35 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
       if (opened) return;
       throw StateError('No navigation app could open the planned route');
     } catch (error, stackTrace) {
-      await DiagnosticsService.instance.logError(
-        feature: 'live_ride',
-        action: 'launch_navigation',
-        error: error,
-        stackTrace: stackTrace,
-        severity: 'warning',
-        context: {
-          'session_id': widget.sessionId,
-          'has_current_position': _myPosition != null,
-          'route_point_count': _plannedRoutePoints.length,
-          'waypoint_count': waypoints.length,
-        },
-      );
-
-      if (!mounted) return;
-      AppToast.show(
-        context,
-        message: 'Could not open turn-by-turn navigation.',
-        type: ToastType.error,
-      );
+      await _logNavigationLaunchFailure('google_maps', error, stackTrace);
     }
+  }
+
+  Future<void> _logNavigationLaunchFailure(
+    String provider,
+    Object error,
+    StackTrace stackTrace,
+  ) async {
+    await DiagnosticsService.instance.logError(
+      feature: 'live_ride',
+      action: 'launch_navigation',
+      error: error,
+      stackTrace: stackTrace,
+      severity: 'warning',
+      context: {
+        'session_id': widget.sessionId,
+        'provider': provider,
+        'has_current_position': _myPosition != null,
+        'route_point_count': _plannedRoutePoints.length,
+      },
+    );
+
+    if (!mounted) return;
+    AppToast.show(
+      context,
+      message: 'Could not open turn-by-turn navigation.',
+      type: ToastType.error,
+    );
   }
 
   Future<void> _fitPositions(
@@ -1257,7 +1408,7 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
                             ),
                             elevation: 0,
                           ),
-                          onPressed: _startTurnByTurnNavigation,
+                          onPressed: _showNavigationChooser,
                           icon: const Icon(Icons.navigation_rounded, size: 18),
                           label: Text(
                             'Navigate Route',

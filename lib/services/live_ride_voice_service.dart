@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'background_voice_service.dart';
 import 'diagnostics_service.dart';
 import 'premium_service.dart';
 
@@ -14,6 +15,7 @@ class LiveRideVoiceService extends ChangeNotifier {
 
   Room? _room;
   String? _sessionId;
+  String? _desiredSessionId;
   bool _isConnecting = false;
   bool _isConnected = false;
   bool _isMuted = false;
@@ -123,9 +125,21 @@ class LiveRideVoiceService extends ChangeNotifier {
       room.addListener(() => _syncRoomState(room));
 
       _room = room;
+      _desiredSessionId = sessionId;
       _isConnected = true;
       _isMuted = false;
       _isConnecting = false;
+      try {
+        await BackgroundVoiceService.start();
+      } catch (e) {
+        await DiagnosticsService.instance.logError(
+          feature: 'live_ride_voice',
+          action: 'start_background_service',
+          error: e,
+          context: {'session_id': sessionId},
+          severity: 'warning',
+        );
+      }
       notifyListeners();
       return true;
     } catch (e, stack) {
@@ -163,9 +177,15 @@ class LiveRideVoiceService extends ChangeNotifier {
     _isConnected = isConnected;
     if (!isConnected) {
       _isMuted = false;
-      _sessionId = null;
     }
     notifyListeners();
+  }
+
+  Future<bool> ensureConnected() async {
+    final desiredSessionId = _desiredSessionId;
+    if (desiredSessionId == null || desiredSessionId.isEmpty) return false;
+    if (_isConnected || _isConnecting) return true;
+    return connect(desiredSessionId);
   }
 
   Future<void> toggleMute() async {
@@ -210,9 +230,15 @@ class LiveRideVoiceService extends ChangeNotifier {
     }
 
     _sessionId = null;
+    _desiredSessionId = null;
     _isConnecting = false;
     _isConnected = false;
     _isMuted = false;
+    try {
+      await BackgroundVoiceService.stop();
+    } catch (e) {
+      debugPrint('LiveRideVoiceService background service stop error: $e');
+    }
     notifyListeners();
   }
 }
