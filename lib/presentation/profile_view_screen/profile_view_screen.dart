@@ -940,29 +940,6 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                     ],
                     SizedBox(height: 2.h),
                     if (!isOtherUser) ...[
-                      SizedBox(
-                        width: double.infinity,
-                        height: 6.h,
-                        child: ElevatedButton.icon(
-                          onPressed: _openEditProfile,
-                          icon: const Icon(Icons.edit, color: Colors.white),
-                          label: Text(
-                            'Edit Profile',
-                            style: GoogleFonts.dmSans(
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: theme.colorScheme.secondary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12.0),
-                            ),
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 1.5.h),
                       _buildBoostButton(theme),
                       SizedBox(height: 1.5.h),
                       SizedBox(
