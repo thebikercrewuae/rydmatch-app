@@ -4,9 +4,15 @@ import 'package:sizer/sizer.dart';
 
 class ImageUploadWidget extends StatelessWidget {
   final String? imageUrl;
-  final VoidCallback onTap;
+  final bool isUploading;
+  final VoidCallback? onTap;
 
-  const ImageUploadWidget({super.key, this.imageUrl, required this.onTap});
+  const ImageUploadWidget({
+    super.key,
+    this.imageUrl,
+    this.isUploading = false,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +30,9 @@ class ImageUploadWidget extends StatelessWidget {
             width: 1.5,
           ),
         ),
-        child: imageUrl != null
+        child: isUploading
+            ? _uploading(theme)
+            : imageUrl != null
             ? ClipRRect(
                 borderRadius: BorderRadius.circular(14.0),
                 child: Stack(
@@ -60,6 +68,24 @@ class ImageUploadWidget extends StatelessWidget {
     );
   }
 
+  Widget _uploading(ThemeData theme) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        CircularProgressIndicator(color: theme.colorScheme.primary),
+        const SizedBox(height: 12),
+        Text(
+          'Uploading photo...',
+          style: GoogleFonts.dmSans(
+            fontSize: 12.sp,
+            fontWeight: FontWeight.w600,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _placeholder(ThemeData theme) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -80,7 +106,7 @@ class ImageUploadWidget extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Tap to enter a photo URL',
+          'Take a photo or choose from your gallery',
           style: GoogleFonts.dmSans(
             fontSize: 10.sp,
             color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:sizer/sizer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
@@ -30,6 +31,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   String _distanceUnit = 'km';
   bool _isMetric = true;
   bool _isPosting = false;
+  bool _isUploadingPhoto = false;
   bool _showSuccess = false;
 
   bool _instagramConnected = false;
@@ -94,7 +96,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool get _canPost {
     final hasCaption = _captionController.text.trim().isNotEmpty;
     final hasPhoto = _photoUrlController.text.trim().isNotEmpty;
-    return (hasCaption || hasPhoto) && !_isPosting;
+    return (hasCaption || hasPhoto) && !_isPosting && !_isUploadingPhoto;
   }
 
   Future<void> _handlePost() async {
@@ -215,11 +217,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
 
     _showDestinationSheet(
-  platform: 'YouTube',
-  feedLabel: 'Post to Channel',
-  storyLabel: 'Post as Short',
-  );
-}
+      platform: 'YouTube',
+      feedLabel: 'Post to Channel',
+      storyLabel: 'Post as Short',
+    );
+  }
 
   void _showConnectSocialSheet(String platform) {
     final theme = Theme.of(context);
@@ -487,9 +489,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         await launchUrl(instagramUrl, mode: LaunchMode.externalApplication);
       }
 
-      await SharePlus.instance.share(
-        ShareParams(text: text, subject: subject),
-      );
+      await SharePlus.instance.share(ShareParams(text: text, subject: subject));
       return;
     }
 
@@ -505,29 +505,25 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         }
       }
 
-      await SharePlus.instance.share(
-        ShareParams(text: text, subject: subject),
-      );
+      await SharePlus.instance.share(ShareParams(text: text, subject: subject));
       return;
     }
 
     if (platform == 'YouTube') {
-  final youtubeUrl = Uri.parse('youtube://');
+      final youtubeUrl = Uri.parse('youtube://');
 
-  if (await canLaunchUrl(youtubeUrl)) {
-    await launchUrl(youtubeUrl, mode: LaunchMode.externalApplication);
-  } else {
-    final webUrl = Uri.parse('https://www.youtube.com/upload');
-    if (await canLaunchUrl(webUrl)) {
-      await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+      if (await canLaunchUrl(youtubeUrl)) {
+        await launchUrl(youtubeUrl, mode: LaunchMode.externalApplication);
+      } else {
+        final webUrl = Uri.parse('https://www.youtube.com/upload');
+        if (await canLaunchUrl(webUrl)) {
+          await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+        }
+      }
+
+      await SharePlus.instance.share(ShareParams(text: text, subject: subject));
     }
   }
-
-  await SharePlus.instance.share(
-    ShareParams(text: text, subject: subject),
-  );
-}
-}
 
   @override
   Widget build(BuildContext context) {
@@ -665,7 +661,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             imageUrl: _photoUrlController.text.trim().isEmpty
                 ? null
                 : _photoUrlController.text.trim(),
-            onTap: _showPhotoUrlDialog,
+            isUploading: _isUploadingPhoto,
+            onTap: _isUploadingPhoto ? null : _showPhotoSourceSheet,
           ),
           SizedBox(height: 2.h),
 
@@ -758,7 +755,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: [_unitButton(theme, 'km'), _unitButton(theme, 'mi')],
+                  children: [
+                    _unitButton(theme, 'km'),
+                    _unitButton(theme, 'mi'),
+                  ],
                 ),
               ),
             ],
@@ -876,8 +876,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [Color(0xFFFF0000), Color(0xFFB00000)],
-                ),
-                onTap: () => _handleSocialTap('YouTube'),
+              ),
+              onTap: () => _handleSocialTap('YouTube'),
             ),
           ),
         ],
@@ -999,42 +999,108 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
-  void _showPhotoUrlDialog() {
-    final controller = TextEditingController(text: _photoUrlController.text);
+  void _showPhotoSourceSheet() {
+    final hasPhoto = _photoUrlController.text.trim().isNotEmpty;
+    final theme = Theme.of(context);
 
-    showDialog(
+    showModalBottomSheet<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          'Photo URL',
-          style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(4.w, 0, 4.w, 2.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                hasPhoto ? 'Change Ride Photo' : 'Add Ride Photo',
+                style: GoogleFonts.dmSans(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(height: 1.h),
+              ListTile(
+                leading: Icon(
+                  Icons.camera_alt_rounded,
+                  color: theme.colorScheme.primary,
+                ),
+                title: const Text('Take Photo'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _pickRidePhoto(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.photo_library_rounded,
+                  color: theme.colorScheme.primary,
+                ),
+                title: const Text('Choose from Gallery'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _pickRidePhoto(ImageSource.gallery);
+                },
+              ),
+              if (hasPhoto)
+                ListTile(
+                  leading: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: _orange,
+                  ),
+                  title: const Text('Remove Photo'),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    setState(() => _photoUrlController.clear());
+                  },
+                ),
+            ],
+          ),
         ),
-        content: TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: 'https://...',
-            hintStyle: GoogleFonts.dmSans(fontSize: 12.sp),
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() => _photoUrlController.text = controller.text.trim());
-              Navigator.of(ctx).pop();
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: _orange),
-            child: const Text(
-              'Set Photo',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
       ),
     );
+  }
+
+  Future<void> _pickRidePhoto(ImageSource source) async {
+    try {
+      final photo = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 2048,
+      );
+      if (photo == null || !mounted) return;
+
+      setState(() => _isUploadingPhoto = true);
+      final photoUrl = await ProfileService.uploadPhoto(photo, 'ride-feed');
+
+      if (!mounted) return;
+      if (photoUrl == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not upload the photo. Please try again.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      setState(() => _photoUrlController.text = photoUrl);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            source == ImageSource.camera
+                ? 'Could not open the camera. Please try again.'
+                : 'Could not open the gallery. Please try again.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingPhoto = false);
+      }
+    }
   }
 }
