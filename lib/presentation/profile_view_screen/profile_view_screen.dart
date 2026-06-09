@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/diagnostics_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/premium_service.dart';
 import '../../services/verification_service.dart';
@@ -267,12 +268,10 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       try {
         final profile = await Supabase.instance.client
             .from('user_profiles')
-            .select(
-              'id, full_name, email, avatar_url, bio, skill_levels, bike_types, '
-              'preferred_roads, ride_times, riding_speed, gender, is_verified, '
-              'verification_status, ride_mode, mixed_community_matching, '
-              'bike_photo_urls',
-            )
+            // Fetch the available profile row instead of naming optional
+            // columns. A missing optional column must not make the whole
+            // matched profile fall back to empty placeholder data.
+            .select()
             .eq('id', otherUserId)
             .maybeSingle();
 
@@ -348,7 +347,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
           _ridingSpeed = (profile['riding_speed'] as num?)?.toDouble() ?? 60.0;
           _isMetric = preferredIsMetric;
           _gender = profile['gender'] as String?;
-          _sameGenderMatching = false;
+          _sameGenderMatching =
+              (profile['same_gender_matching'] as bool?) ?? false;
           _rideMode = profile['ride_mode'] as String? ?? 'motorcycle';
           _mixedCommunityMatching =
               (profile['mixed_community_matching'] as bool?) ?? false;
@@ -364,6 +364,13 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         return;
       } catch (e) {
         debugPrint('ProfileViewScreen: failed to load other profile: $e');
+        await DiagnosticsService.instance.logError(
+          feature: 'matches',
+          action: 'load_matched_profile',
+          error: e,
+          severity: 'warning',
+          context: {'other_user_id': otherUserId},
+        );
 
         if (!mounted) return;
 

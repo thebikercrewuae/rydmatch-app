@@ -516,33 +516,37 @@ class ProfileService {
         updates['age_verified_at'] = DateTime.now().toIso8601String();
       }
 
-      try {
-        await supabase.from('user_profiles').upsert(updates, onConflict: 'id');
-      } catch (e) {
-        if (e is! PostgrestException) rethrow;
+      const optionalColumns = <String>[
+        'bike_photo_urls',
+        'same_gender_matching',
+        'ride_times',
+        'minimum_age_confirmed',
+        'age_verified_at',
+        'mixed_community_matching',
+        'ride_mode',
+      ];
 
-        var shouldRetry = false;
-        if (e.message.contains('bike_photo_urls')) {
-          updates.remove('bike_photo_urls');
-          shouldRetry = true;
-        }
-        if (e.message.contains('same_gender_matching')) {
-          updates.remove('same_gender_matching');
-          shouldRetry = true;
-        }
-        if (e.message.contains('ride_times')) {
-          updates.remove('ride_times');
-          shouldRetry = true;
-        }
-        if (e.message.contains('minimum_age_confirmed') ||
-            e.message.contains('age_verified_at')) {
-          updates.remove('minimum_age_confirmed');
-          updates.remove('age_verified_at');
-          shouldRetry = true;
-        }
+      while (true) {
+        try {
+          await supabase
+              .from('user_profiles')
+              .upsert(updates, onConflict: 'id');
+          break;
+        } catch (e) {
+          if (e is! PostgrestException) rethrow;
 
-        if (!shouldRetry) rethrow;
-        await supabase.from('user_profiles').upsert(updates, onConflict: 'id');
+          final missingColumns = optionalColumns
+              .where(
+                (column) =>
+                    updates.containsKey(column) && e.message.contains(column),
+              )
+              .toList();
+          if (missingColumns.isEmpty) rethrow;
+
+          for (final column in missingColumns) {
+            updates.remove(column);
+          }
+        }
       }
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('_pending_supabase_sync', false);
@@ -637,15 +641,50 @@ class ProfileService {
 
       if (response == null) return;
 
-      final isComplete = response['is_profile_complete'] as bool? ?? false;
-      if (!isComplete) return;
-
       final prefs = await SharedPreferences.getInstance();
+      final isComplete = response['is_profile_complete'] as bool? ?? false;
+      final localIsComplete = prefs.getBool(_keyIsProfileComplete) ?? false;
+
+      // Older builds could save a complete profile locally while the remote
+      // upsert failed on a missing optional column. Repair that profile from
+      // the device instead of leaving matches with an empty remote row.
+      if (!isComplete) {
+        if (localIsComplete) {
+          final localProfile = await loadProfile();
+          await _syncToSupabase(
+            ridingSpeed: localProfile['ridingSpeed'] as double,
+            skillLevels: List<String>.from(localProfile['skillLevels'] as List),
+            bikeTypes: List<String>.from(localProfile['bikeTypes'] as List),
+            preferredRoads: List<String>.from(
+              localProfile['preferredRoads'] as List,
+            ),
+            rideTimes: Map<String, List<String>>.from(
+              localProfile['rideTimes'] as Map<String, List<String>>,
+            ),
+            riderName: localProfile['riderName'] as String,
+            riderBio: localProfile['riderBio'] as String,
+            gender: localProfile['gender'] as String?,
+            sameGenderMatching:
+                (localProfile['sameGenderMatching'] as bool?) ?? false,
+            minimumAgeConfirmed: localProfile['minimumAgeConfirmed'] as int?,
+            rideMode: localProfile['rideMode'] as String? ?? 'motorcycle',
+            mixedCommunityMatching:
+                (localProfile['mixedCommunityMatching'] as bool?) ?? false,
+            avatarUrl: localProfile['riderPhotoPath'] as String?,
+            bikePhotoUrls: List<String>.from(
+              localProfile['bikePhotoPaths'] as List,
+            ),
+          );
+        }
+        return;
+      }
+
       final localSkillLevels =
           prefs.getStringList(_keySkillLevels) ?? <String>[];
       final localBikeTypes = prefs.getStringList(_keyBikeTypes) ?? <String>[];
       final localPreferredRoads =
           prefs.getStringList(_keyPreferredRoads) ?? <String>[];
+      final localRidingSpeed = prefs.getDouble(_keyRidingSpeed);
       Map<String, List<String>> localRideTimes = {};
       final localRideTimesJson = prefs.getString(_keyRideTimes);
       if (localRideTimesJson != null) {
@@ -656,12 +695,6 @@ class ProfileService {
         }
       }
       final repairUpdates = <String, dynamic>{};
-
-      // Restore riding speed
-      final ridingSpeed = (response['riding_speed'] as num?)?.toDouble();
-      if (ridingSpeed != null) {
-        await prefs.setDouble(_keyRidingSpeed, ridingSpeed);
-      }
 
       // Preserve valid local preferences when the shared profile is empty,
       // then repair the shared profile so matches can see them.
@@ -691,6 +724,20 @@ class ProfileService {
         await prefs.setString(_keyRideTimes, jsonEncode(rideTimes));
       } else if (localRideTimes.isNotEmpty) {
         repairUpdates['ride_times'] = localRideTimes;
+      }
+
+      final remotePreferencesAreEmpty =
+          skillLevels.isEmpty &&
+          bikeTypes.isEmpty &&
+          preferredRoads.isEmpty &&
+          rideTimes.isEmpty;
+      final ridingSpeed = (response['riding_speed'] as num?)?.toDouble();
+      if (remotePreferencesAreEmpty &&
+          localRidingSpeed != null &&
+          localRidingSpeed != ridingSpeed) {
+        repairUpdates['riding_speed'] = localRidingSpeed;
+      } else if (ridingSpeed != null) {
+        await prefs.setDouble(_keyRidingSpeed, ridingSpeed);
       }
 
       // Restore name and bio
