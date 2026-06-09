@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/live_ride_service.dart';
 import '../../services/live_ride_voice_service.dart';
@@ -496,6 +497,85 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
     ];
 
     await _fitPositions(allPositions, padding: 80);
+  }
+
+  List<LatLng> _navigationWaypoints() {
+    if (_plannedRoutePoints.length < 2) return const [];
+
+    final candidates = _plannedRoutePoints.sublist(
+      0,
+      _plannedRoutePoints.length - 1,
+    );
+    const maxWaypoints = 6;
+    if (candidates.length <= maxWaypoints) return candidates;
+
+    return List.generate(maxWaypoints, (index) {
+      final candidateIndex =
+          (index * (candidates.length - 1) / (maxWaypoints - 1)).round();
+      return candidates[candidateIndex];
+    });
+  }
+
+  Future<void> _startTurnByTurnNavigation() async {
+    if (_plannedRoutePoints.length < 2) {
+      AppToast.show(
+        context,
+        message: 'This live ride does not have a planned route yet.',
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    final destination = _plannedRoutePoints.last;
+    final params = <String, String>{
+      'api': '1',
+      'destination': '${destination.latitude},${destination.longitude}',
+      'travelmode': 'driving',
+      'dir_action': 'navigate',
+    };
+
+    if (_myPosition != null) {
+      params['origin'] = '${_myPosition!.latitude},${_myPosition!.longitude}';
+    }
+
+    final waypoints = _navigationWaypoints();
+    if (waypoints.isNotEmpty) {
+      params['waypoints'] = waypoints
+          .map((point) => '${point.latitude},${point.longitude}')
+          .join('|');
+    }
+
+    final navigationUri = Uri.https('www.google.com', '/maps/dir/', params);
+
+    try {
+      final opened = await launchUrl(
+        navigationUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (opened) return;
+      throw StateError('No navigation app could open the planned route');
+    } catch (error, stackTrace) {
+      await DiagnosticsService.instance.logError(
+        feature: 'live_ride',
+        action: 'launch_navigation',
+        error: error,
+        stackTrace: stackTrace,
+        severity: 'warning',
+        context: {
+          'session_id': widget.sessionId,
+          'has_current_position': _myPosition != null,
+          'route_point_count': _plannedRoutePoints.length,
+          'waypoint_count': waypoints.length,
+        },
+      );
+
+      if (!mounted) return;
+      AppToast.show(
+        context,
+        message: 'Could not open turn-by-turn navigation.',
+        type: ToastType.error,
+      );
+    }
   }
 
   Future<void> _fitPositions(
@@ -1164,6 +1244,32 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
+                    if (_plannedRoutePoints.length >= 2) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: _startTurnByTurnNavigation,
+                          icon: const Icon(Icons.navigation_rounded, size: 18),
+                          label: Text(
+                            'Navigate Route',
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -1201,7 +1307,9 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen> {
           if (!_isChatOpen)
             Positioned(
               right: 16,
-              bottom: MediaQuery.of(context).padding.bottom + 200,
+              bottom:
+                  MediaQuery.of(context).padding.bottom +
+                  (_plannedRoutePoints.length >= 2 ? 264 : 200),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
