@@ -225,6 +225,42 @@ class _MyAppState extends State<MyApp> {
           callback: (payload) {
             final row = payload.newRecord;
 
+            if (row['notification_type'] == 'emergency_sos' &&
+                row['is_read'] == false) {
+              final rawArgs = row['action_arguments'];
+              final args = rawArgs is Map
+                  ? Map<String, dynamic>.from(rawArgs)
+                  : <String, dynamic>{};
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                final context = _navigatorKey.currentContext;
+                if (context == null) return;
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      row['message'] as String? ??
+                          'A RydMatch rider needs immediate assistance.',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    action: SnackBarAction(
+                      label: 'VIEW',
+                      textColor: Colors.white,
+                      onPressed: () => _navigatorKey.currentState?.pushNamed(
+                        '/emergency-alert-screen',
+                        arguments: args,
+                      ),
+                    ),
+                    backgroundColor: const Color(0xFFB3261E),
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 15),
+                  ),
+                );
+              });
+            }
+
             if (row['notification_type'] == 'new_message' &&
                 row['is_read'] == false) {
               final senderId = row['reference_id'] as String?;

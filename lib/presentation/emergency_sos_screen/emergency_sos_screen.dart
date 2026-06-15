@@ -10,6 +10,7 @@ import '../../services/haptic_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/analytics_service.dart';
 import '../../services/diagnostics_service.dart';
+import '../../services/live_ride_service.dart';
 import './widgets/sos_button_widget.dart';
 import './widgets/emergency_contact_widget.dart';
 import './widgets/location_display_widget.dart';
@@ -43,6 +44,8 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
   bool _locationLoading = true;
 
   DateTime? _sentAt;
+  String? _activeAlertId;
+  int _recipientCount = 0;
 
   String _normalizePhoneNumber(String value) {
     final trimmed = value.trim();
@@ -56,10 +59,6 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
     }
 
     return digits;
-  }
-
-  bool _looksLikeInternationalPhone(String value) {
-    return RegExp(r'^\+[1-9]\d{7,14}$').hasMatch(value);
   }
 
   String _functionErrorMessage(FunctionException error) {
@@ -124,6 +123,7 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
             _locationLoading = false;
           });
         }
+        await _updateActiveAlertLocation(position);
       } catch (_) {
         if (mounted) setState(() => _locationLoading = false);
       }
@@ -160,8 +160,28 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
           _locationLoading = false;
         });
       }
+      await _updateActiveAlertLocation(position);
     } catch (_) {
       if (mounted) setState(() => _locationLoading = false);
+    }
+  }
+
+  Future<void> _updateActiveAlertLocation(Position position) async {
+    final alertId = _activeAlertId;
+    if (alertId == null) return;
+    try {
+      await Supabase.instance.client
+          .from('emergency_alerts')
+          .update({
+            'latitude': position.latitude,
+            'longitude': position.longitude,
+            'accuracy': position.accuracy,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', alertId)
+          .eq('status', 'active');
+    } catch (error) {
+      debugPrint('Emergency alert location update failed: $error');
     }
   }
 
@@ -172,10 +192,6 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
   }
 
   void _startCountdown() {
-    if (_contactPhone.isEmpty) {
-      _showNoContactDialog();
-      return;
-    }
     if (_latitude == null || _longitude == null) {
       _showNoLocationDialog();
       return;
@@ -215,11 +231,6 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
       _showNoLocationDialog();
       return;
     }
-    final contactPhone = _normalizePhoneNumber(_contactPhone);
-    if (!_looksLikeInternationalPhone(contactPhone)) {
-      _showInvalidPhoneDialog();
-      return;
-    }
     setState(() {
       _isCountingDown = false;
       _isSending = true;
@@ -230,9 +241,10 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
         'emergency-sos',
         body: {
           'riderName': _riderName.isNotEmpty ? _riderName : 'RydMatch Rider',
-          'contactPhone': contactPhone,
           'latitude': _latitude,
           'longitude': _longitude,
+          'accuracy': _accuracy,
+          'liveRideSessionId': LiveRideService.instance.currentSessionId,
           'isTest': false,
         },
       );
@@ -250,12 +262,29 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
         longitude: _longitude,
       );
       if (mounted) {
+        final recipientCount = responseData is Map
+            ? (responseData['recipientCount'] as num?)?.toInt() ?? 0
+            : 0;
         setState(() {
           _isSending = false;
           _smsSent = true;
           _sentAt = DateTime.now();
+          _activeAlertId = responseData is Map
+              ? responseData['alertId'] as String?
+              : null;
+          _recipientCount = recipientCount;
         });
         HapticService.instance.heavy();
+        if (recipientCount == 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Alert created, but no active ride participants or matches could be notified. Contact emergency services directly.',
+              ),
+              backgroundColor: Color(0xFFB3261E),
+            ),
+          );
+        }
       }
     } on FunctionException catch (e) {
       debugPrint('SOS FunctionException: ${e.status} - ${e.details}');
@@ -266,9 +295,6 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
         context: {
           'status': e.status,
           'details': e.details?.toString(),
-          'contact_last4': contactPhone.length >= 4
-              ? contactPhone.substring(contactPhone.length - 4)
-              : contactPhone,
           'has_location': _latitude != null && _longitude != null,
         },
       );
@@ -291,12 +317,7 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
         feature: 'emergency_sos',
         action: 'send_sos',
         error: e,
-        context: {
-          'contact_last4': contactPhone.length >= 4
-              ? contactPhone.substring(contactPhone.length - 4)
-              : contactPhone,
-          'has_location': _latitude != null && _longitude != null,
-        },
+        context: {'has_location': _latitude != null && _longitude != null},
       );
       if (mounted) {
         setState(() => _isSending = false);
@@ -315,15 +336,6 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
   }
 
   Future<void> _triggerTestSMS() async {
-    if (_contactPhone.isEmpty) {
-      _showNoContactDialog();
-      return;
-    }
-    final contactPhone = _normalizePhoneNumber(_contactPhone);
-    if (!_looksLikeInternationalPhone(contactPhone)) {
-      _showInvalidPhoneDialog();
-      return;
-    }
     setState(() => _isSendingTest = true);
     HapticService.instance.medium();
 
@@ -338,9 +350,9 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
         body: {
           'riderName':
               '${_riderName.isNotEmpty ? _riderName : 'RydMatch Rider'} [TEST]',
-          'contactPhone': contactPhone,
           'latitude': lat,
           'longitude': lng,
+          'accuracy': _accuracy,
           'isTest': true,
         },
       );
@@ -358,10 +370,10 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
         _showTestResultDialog(
           success: true,
           message: usingFallback
-              ? 'Test SMS sent to $_contactName!\n\n⚠️ GPS was unavailable — San Francisco coordinates were used as a fallback.'
-              : 'Test SMS sent to $_contactName with your live GPS location.',
+              ? 'Test RydMatch alert delivered to your own notification inbox using fallback coordinates.'
+              : 'Test RydMatch alert delivered to your own notification inbox with your live GPS location.',
           messageSid: responseData is Map
-              ? responseData['messageSid'] as String?
+              ? responseData['alertId'] as String?
               : null,
         );
       }
@@ -374,9 +386,6 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
         context: {
           'status': e.status,
           'details': e.details?.toString(),
-          'contact_last4': contactPhone.length >= 4
-              ? contactPhone.substring(contactPhone.length - 4)
-              : contactPhone,
           'using_fallback_location': usingFallback,
         },
       );
@@ -384,7 +393,7 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
         setState(() => _isSendingTest = false);
         _showTestResultDialog(
           success: false,
-          message: 'Failed to send test SMS.\n\n${_functionErrorMessage(e)}',
+          message: 'Failed to send test alert.\n\n${_functionErrorMessage(e)}',
         );
       }
     } catch (e) {
@@ -393,19 +402,14 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
         feature: 'emergency_sos',
         action: 'send_test_sms',
         error: e,
-        context: {
-          'contact_last4': contactPhone.length >= 4
-              ? contactPhone.substring(contactPhone.length - 4)
-              : contactPhone,
-          'using_fallback_location': usingFallback,
-        },
+        context: {'using_fallback_location': usingFallback},
       );
       if (mounted) {
         setState(() => _isSendingTest = false);
         _showTestResultDialog(
           success: false,
           message:
-              'Failed to send test SMS.\n\n${e.toString().replaceFirst('Exception: ', '')}',
+              'Failed to send test alert.\n\n${e.toString().replaceFirst('Exception: ', '')}',
         );
       }
     }
@@ -440,7 +444,7 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
             ),
             SizedBox(width: 2.w),
             Text(
-              success ? 'Test SMS Sent!' : 'Test SMS Failed',
+              success ? 'Test Alert Sent!' : 'Test Alert Failed',
               style: GoogleFonts.dmSans(
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
@@ -479,7 +483,7 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
                     SizedBox(width: 2.w),
                     Expanded(
                       child: Text(
-                        'SID: $messageSid',
+                        'Alert ID: $messageSid',
                         style: GoogleFonts.dmSans(
                           color: Colors.white38,
                           fontSize: 9.sp,
@@ -508,40 +512,6 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
             child: Text(
               'OK',
               style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showNoContactDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.0),
-        ),
-        title: Text(
-          'No Emergency Contact',
-          style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
-        ),
-        content: Text(
-          'Please set an emergency contact before using SOS.',
-          style: GoogleFonts.dmSans(),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _showEditContactSheet();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE85A4F),
-            ),
-            child: Text(
-              'Add Contact',
-              style: GoogleFonts.dmSans(color: Colors.white),
             ),
           ),
         ],
@@ -579,40 +549,6 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
             ),
             child: Text(
               'Retry',
-              style: GoogleFonts.dmSans(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showInvalidPhoneDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.0),
-        ),
-        title: Text(
-          'Invalid Phone Number',
-          style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
-        ),
-        content: Text(
-          'Please enter the emergency contact number in international format, for example +971501234567.',
-          style: GoogleFonts.dmSans(),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _showEditContactSheet();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE85A4F),
-            ),
-            child: Text(
-              'Edit Contact',
               style: GoogleFonts.dmSans(color: Colors.white),
             ),
           ),
@@ -911,7 +847,7 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
                 SizedBox(width: 2.w),
                 Expanded(
                   child: Text(
-                    'Tapping SOS sends your name and GPS location to your emergency contact via SMS after a 3-second countdown.\n\nRydMatch emergency alerts are not a replacement for contacting local emergency services.',
+                    'Tapping SOS alerts your active live ride participants and RydMatch matches with your continuously updated GPS location after a 3-second countdown.\n\nRydMatch emergency alerts are not a replacement for contacting local emergency services.',
                     style: GoogleFonts.dmSans(
                       fontSize: 10.sp,
                       color: Colors.white.withValues(alpha: 0.45),
@@ -938,7 +874,7 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
                     )
                   : const Icon(Icons.send_rounded, size: 16),
               label: Text(
-                _isSendingTest ? 'Sending Test...' : 'Send Test SMS',
+                _isSendingTest ? 'Sending Test...' : 'Test RydMatch Alert',
                 style: GoogleFonts.dmSans(
                   fontSize: 12.sp,
                   fontWeight: FontWeight.w600,
@@ -985,7 +921,7 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
           ),
           SizedBox(height: 1.h),
           Text(
-            'Contacting $_contactName',
+            'Alerting your RydMatch emergency network',
             style: GoogleFonts.dmSans(
               fontSize: 12.sp,
               color: Colors.white.withValues(alpha: 0.6),
@@ -994,6 +930,31 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _resolveAlert() async {
+    final alertId = _activeAlertId;
+    if (alertId != null) {
+      try {
+        await Supabase.instance.client
+            .from('emergency_alerts')
+            .update({
+              'status': 'resolved',
+              'resolved_at': DateTime.now().toUtc().toIso8601String(),
+              'updated_at': DateTime.now().toUtc().toIso8601String(),
+            })
+            .eq('id', alertId);
+      } catch (error) {
+        debugPrint('Emergency alert resolution failed: $error');
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _smsSent = false;
+      _sentAt = null;
+      _activeAlertId = null;
+      _recipientCount = 0;
+    });
   }
 
   Widget _buildSuccessState() {
@@ -1031,7 +992,7 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
             ),
             SizedBox(height: 1.h),
             Text(
-              'SMS sent to $_contactName',
+              'Notified $_recipientCount RydMatch ${_recipientCount == 1 ? 'rider' : 'riders'}',
               style: GoogleFonts.dmSans(
                 fontSize: 13.sp,
                 color: Colors.white.withValues(alpha: 0.7),
@@ -1056,7 +1017,7 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
                 border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
               ),
               child: Text(
-                'Your name and live GPS location were sent as a Google Maps link.',
+                'Your live GPS location will continue updating while this screen remains open.',
                 style: GoogleFonts.dmSans(
                   fontSize: 11.sp,
                   color: Colors.white.withValues(alpha: 0.6),
@@ -1069,10 +1030,7 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
-                onPressed: () => setState(() {
-                  _smsSent = false;
-                  _sentAt = null;
-                }),
+                onPressed: _resolveAlert,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
                   side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
@@ -1082,7 +1040,7 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
                   ),
                 ),
                 child: Text(
-                  'Back to SOS Screen',
+                  'Resolve Alert',
                   style: GoogleFonts.dmSans(
                     fontSize: 13.sp,
                     fontWeight: FontWeight.w600,

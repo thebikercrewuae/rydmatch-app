@@ -15,6 +15,7 @@ import '../presentation/premium_subscription_screen/premium_subscription_screen.
 import '../presentation/ride_groups_screen/ride_groups_screen.dart';
 import '../presentation/ride_analytics_screen/ride_analytics_screen.dart';
 import '../presentation/emergency_sos_screen/emergency_sos_screen.dart';
+import '../presentation/emergency_alert_screen/emergency_alert_screen.dart';
 import '../presentation/blocked_users_screen/blocked_users_screen.dart';
 import '../presentation/report_user_screen/report_user_screen.dart';
 import '../presentation/post_ride_rating_screen/post_ride_rating_screen.dart';
@@ -52,6 +53,7 @@ class AppRoutes {
   static const String rideGroups = '/ride-groups-screen';
   static const String rideAnalytics = '/ride-analytics-screen';
   static const String emergencySos = '/emergency-sos-screen';
+  static const String emergencyAlert = '/emergency-alert-screen';
   static const String reportUser = '/report-user-screen';
   static const String blockUserConfirmation = '/block-user-confirmation-screen';
   static const String blockedUsers = '/blocked-users-screen';
@@ -90,6 +92,7 @@ class AppRoutes {
     rideGroups: (context) => const RideGroupsScreen(),
     rideAnalytics: (context) => const RideAnalyticsScreen(),
     emergencySos: (context) => const EmergencySosScreen(),
+    emergencyAlert: (context) => const EmergencyAlertScreen(),
     reportUser: (context) {
       final args = ModalRoute.of(context)?.settings.arguments;
       if (args is Map<String, dynamic>) {

@@ -43,6 +43,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return Icons.group_rounded;
       case NotificationType.rideStarted:
         return Icons.motorcycle_rounded;
+      case NotificationType.emergencySos:
+        return Icons.emergency_rounded;
       case NotificationType.urgentAlert:
         return Icons.warning_amber_rounded;
     }
@@ -58,6 +60,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return const Color(0xFF2D5A27);
       case NotificationType.rideStarted:
         return const Color(0xFF2E7D32);
+      case NotificationType.emergencySos:
+        return const Color(0xFFB3261E);
       case NotificationType.urgentAlert:
         return const Color(0xFFB7791F);
     }
@@ -73,6 +77,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return 'Ride Invite';
       case NotificationType.rideStarted:
         return 'Live Ride';
+      case NotificationType.emergencySos:
+        return 'Emergency SOS';
       case NotificationType.urgentAlert:
         return 'Urgent';
     }

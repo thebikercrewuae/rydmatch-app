@@ -1,10 +1,9 @@
-const INFOBIP_BASE_URL = Deno.env.get('INFOBIP_BASE_URL');
-const INFOBIP_API_KEY = Deno.env.get('INFOBIP_API_KEY');
-const INFOBIP_SENDER = Deno.env.get('INFOBIP_SENDER') ?? 'RydMatch';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': '*',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type',
 };
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -14,65 +13,39 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-function normalizePhoneNumber(value: unknown): string {
-  const raw = String(value ?? '').trim();
-  if (raw.startsWith('+')) {
-    return `+${raw.slice(1).replace(/\D/g, '')}`;
-  }
-
-  const digits = raw.replace(/\D/g, '');
-  if (digits.startsWith('00') && digits.length > 2) {
-    return `+${digits.slice(2)}`;
-  }
-
-  return digits;
-}
-
-function isE164(value: string): boolean {
-  return /^\+[1-9]\d{7,14}$/.test(value);
-}
-
-function normalizedBaseUrl(value: string): string {
-  const trimmed = value.trim().replace(/\/+$/, '');
-  return trimmed.startsWith('http') ? trimmed : `https://${trimmed}`;
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    if (!INFOBIP_BASE_URL || !INFOBIP_API_KEY) {
-      return jsonResponse(
-        {
-          error:
-            'Infobip credentials not configured. Set INFOBIP_BASE_URL and INFOBIP_API_KEY in Supabase secrets.',
-        },
-        500,
-      );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const authHeader = req.headers.get('Authorization') ?? '';
+
+    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+      return jsonResponse({ error: 'Emergency network is not configured' }, 500);
     }
+    if (!authHeader) {
+      return jsonResponse({ error: 'Missing authorization header' }, 401);
+    }
+
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const {
+      data: { user },
+      error: userError,
+    } = await userClient.auth.getUser();
+    if (userError || !user) {
+      return jsonResponse({ error: 'Not signed in' }, 401);
+    }
+
+    const admin = createClient(supabaseUrl, serviceRoleKey);
 
     const body = await req.json();
-    const { riderName, contactPhone, latitude, longitude, isTest } = body;
-
-    if (!riderName || !contactPhone) {
-      return jsonResponse(
-        { error: 'Missing required fields: riderName, contactPhone' },
-        400,
-      );
-    }
-
-    const normalizedContactPhone = normalizePhoneNumber(contactPhone);
-    if (!isE164(normalizedContactPhone)) {
-      return jsonResponse(
-        {
-          error:
-            'Emergency contact phone number must be in international E.164 format, for example +971501234567.',
-        },
-        400,
-      );
-    }
+    const { latitude, longitude, accuracy, isTest, liveRideSessionId } = body;
 
     if (latitude == null || longitude == null) {
       return jsonResponse(
@@ -94,73 +67,115 @@ Deno.serve(async (req) => {
       );
     }
 
-    const mapsLink = `https://maps.google.com/?q=${lat},${lng}`;
-    const title = isTest ? 'RydMatch TEST SOS' : 'RydMatch EMERGENCY SOS';
-    const message =
-      `${title} from ${riderName}\n\n` +
-      'This rider needs immediate assistance.\n\n' +
-      `Live Location: ${mapsLink}\n\n` +
-      `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}\n\n` +
-      'Sent via RydMatch Emergency SOS';
+    const { data: profile } = await admin
+      .from('user_profiles')
+      .select('full_name, phone_number')
+      .eq('id', user.id)
+      .maybeSingle();
+    const riderName =
+      profile?.full_name?.trim() || body.riderName?.trim() || 'RydMatch Rider';
 
-    const endpoint = `${normalizedBaseUrl(INFOBIP_BASE_URL)}/sms/2/text/advanced`;
+    const recipients = new Map<string, 'live_ride' | 'match' | 'self_test'>();
+    if (isTest === true) {
+      recipients.set(user.id, 'self_test');
+    } else {
+      if (typeof liveRideSessionId === 'string' && liveRideSessionId.length > 0) {
+        const { data: participants } = await admin
+          .from('live_ride_participants')
+          .select('user_id')
+          .eq('session_id', liveRideSessionId)
+          .eq('status', 'active');
+        for (const participant of participants ?? []) {
+          if (participant.user_id !== user.id) {
+            recipients.set(participant.user_id, 'live_ride');
+          }
+        }
+      }
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        Authorization: `App ${INFOBIP_API_KEY}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        messages: [
-          {
-            from: INFOBIP_SENDER,
-            destinations: [{ to: normalizedContactPhone }],
-            text: message,
-          },
-        ],
-      }),
-    });
+      const { data: matches } = await admin
+        .from('rider_matches')
+        .select('user1_id, user2_id')
+        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+        .limit(50);
+      for (const match of matches ?? []) {
+        const recipientId =
+          match.user1_id === user.id ? match.user2_id : match.user1_id;
+        if (recipientId && recipientId !== user.id && !recipients.has(recipientId)) {
+          recipients.set(recipientId, 'match');
+        }
+      }
+    }
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      const requestError =
-        data?.requestError?.serviceException?.text ||
-        data?.requestError?.serviceException?.messageId ||
-        data?.message ||
-        'Unknown Infobip error';
-
+    const { data: alert, error: alertError } = await admin
+      .from('emergency_alerts')
+      .insert({
+        rider_id: user.id,
+        rider_name: riderName,
+        latitude: lat,
+        longitude: lng,
+        accuracy: Number.isFinite(Number(accuracy)) ? Number(accuracy) : null,
+        phone_number: profile?.phone_number ?? null,
+        live_ride_session_id:
+          typeof liveRideSessionId === 'string' && liveRideSessionId.length > 0
+            ? liveRideSessionId
+            : null,
+        is_test: isTest === true,
+      })
+      .select('id')
+      .single();
+    if (alertError || !alert) {
       return jsonResponse(
-        {
-          error: 'Failed to send SOS SMS',
-          infobipError: requestError,
-          details: data,
-        },
-        response.status,
+        { error: 'Could not create emergency alert', details: alertError?.message },
+        500,
       );
     }
 
-    const firstMessage = data?.messages?.[0];
-    const status = firstMessage?.status;
+    const recipientRows = [...recipients.entries()].map(
+      ([recipientId, source]) => ({
+        alert_id: alert.id,
+        recipient_id: recipientId,
+        source,
+      }),
+    );
+    if (recipientRows.length > 0) {
+      const { error: recipientError } = await admin
+        .from('emergency_alert_recipients')
+        .insert(recipientRows);
+      if (recipientError) {
+        return jsonResponse(
+          { error: 'Could not notify emergency contacts', details: recipientError.message },
+          500,
+        );
+      }
 
-    if (status?.groupName === 'REJECTED') {
-      return jsonResponse(
-        {
-          error: 'Failed to send SOS SMS',
-          infobipError: status?.description ?? 'Infobip rejected the message',
-          details: data,
-        },
-        400,
-      );
+      const notifications = recipientRows.map((recipient) => ({
+        user_id: recipient.recipient_id,
+        notification_type: 'emergency_sos',
+        title: isTest === true ? 'Test emergency alert' : 'Emergency SOS',
+        message:
+          isTest === true
+            ? `${riderName} sent a test RydMatch emergency alert.`
+            : `${riderName} needs immediate assistance. Tap to respond.`,
+        action_route: '/emergency-alert-screen',
+        action_arguments: { alert_id: alert.id },
+        reference_id: user.id,
+      }));
+      const { error: notificationError } = await admin
+        .from('notifications')
+        .insert(notifications);
+      if (notificationError) {
+        return jsonResponse(
+          { error: 'Could not deliver emergency notifications', details: notificationError.message },
+          500,
+        );
+      }
     }
 
     return jsonResponse({
       success: true,
-      messageSid: firstMessage?.messageId,
-      status: status?.description ?? status?.name ?? 'Accepted by Infobip',
-      provider: 'infobip',
+      alertId: alert.id,
+      recipientCount: recipientRows.length,
+      provider: 'rydmatch_network',
     });
   } catch (error) {
     return jsonResponse(
