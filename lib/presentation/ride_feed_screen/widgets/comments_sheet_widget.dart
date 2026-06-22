@@ -68,6 +68,13 @@ class _CommentsSheetWidgetState extends State<CommentsSheetWidget> {
           _comments.add(comment);
           widget.post.commentsCount++;
         });
+      } else {
+        final message =
+            RideFeedService.instance.lastContentSafetyError ??
+            'Could not send the comment. Please try again.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+        );
       }
       setState(() => _isSending = false);
     }

@@ -108,6 +108,7 @@ class LiveRideService {
   RealtimeChannel? _participantsChannel;
   DateTime? _lastSessionHealthCheck;
   DateTime? _lastLocationErrorLogAt;
+  bool _isLocationSharingEnabled = true;
   final Map<String, ({String displayName, String? avatarUrl})> _profileCache =
       {};
 
@@ -142,6 +143,7 @@ class LiveRideService {
       final existingSession = await _getActiveSessionForGroup(rideGroupId);
       if (existingSession != null) {
         _currentSessionId = existingSession.id;
+        _isLocationSharingEnabled = true;
         await _joinAsParticipant(existingSession.id, userId);
         await AnalyticsService.instance.logLiveRideJoined(
           sessionId: existingSession.id,
@@ -177,6 +179,7 @@ class LiveRideService {
 
       final session = LiveRideSession.fromMap(sessionData);
       _currentSessionId = session.id;
+      _isLocationSharingEnabled = true;
 
       await _joinAsParticipant(session.id, userId);
       await _notifyGroupMembers(rideGroupId, session.id);
@@ -219,6 +222,7 @@ class LiveRideService {
       }
 
       _currentSessionId = session.id;
+      _isLocationSharingEnabled = true;
 
       await _joinAsParticipant(session.id, userId);
       await AnalyticsService.instance.logLiveRideJoined(
@@ -302,11 +306,19 @@ class LiveRideService {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null || _currentSessionId == null) return;
 
+      _isLocationSharingEnabled = isSharing;
+
       await _supabase
           .from('live_ride_participants')
           .update({'is_sharing_location': isSharing})
           .eq('session_id', _currentSessionId!)
           .eq('user_id', userId);
+
+      if (!isSharing) {
+        final updated = Map<String, RiderLocation>.from(riderLocations.value)
+          ..remove(userId);
+        riderLocations.value = updated;
+      }
     } catch (e) {
       debugPrint('LiveRideService.toggleLocationSharing error: $e');
       await DiagnosticsService.instance.logError(
@@ -384,7 +396,9 @@ class LiveRideService {
     _subscribeToLocations(sessionId);
     _subscribeToParticipants(sessionId);
 
-    participants.value = await getParticipants(sessionId);
+    final currentParticipants = await getParticipants(sessionId);
+    participants.value = currentParticipants;
+    _pruneLocationsForParticipants(currentParticipants);
     await _loadLatestLocations(sessionId);
 
     _startTracking();
@@ -502,6 +516,7 @@ class LiveRideService {
     _locationsChannel = null;
     _participantsChannel = null;
     _currentSessionId = null;
+    _isLocationSharingEnabled = true;
     isRideActive.value = false;
     riderLocations.value = {};
     participants.value = [];
@@ -511,6 +526,7 @@ class LiveRideService {
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null || _currentSessionId == null) return;
+      if (!_isLocationSharingEnabled) return;
 
       final sessionActive = await _isCurrentSessionActive();
       if (!sessionActive) {
@@ -630,11 +646,15 @@ class LiveRideService {
           .limit(100);
 
       final currentUserId = _supabase.auth.currentUser?.id;
+      final sharingUserIds = _sharingParticipantUserIds(participants.value);
       final latestByUser = <String, Map<String, dynamic>>{};
 
       for (final row in List<Map<String, dynamic>>.from(data)) {
         final userId = row['user_id'] as String?;
         if (userId == null || userId == currentUserId) continue;
+        if (sharingUserIds.isNotEmpty && !sharingUserIds.contains(userId)) {
+          continue;
+        }
         latestByUser.putIfAbsent(userId, () => row);
       }
 
@@ -679,6 +699,7 @@ class LiveRideService {
             final currentUserId = _supabase.auth.currentUser?.id;
 
             if (userId == null || userId == currentUserId) return;
+            if (!_isParticipantSharingLocation(userId)) return;
 
             final rider = await _riderLocationFromRecord(record);
             if (rider == null) return;
@@ -779,9 +800,59 @@ class LiveRideService {
           callback: (_) async {
             final updated = await getParticipants(sessionId);
             participants.value = updated;
+            _pruneLocationsForParticipants(updated);
           },
         )
         .subscribe();
+  }
+
+  Set<String> _sharingParticipantUserIds(
+    List<Map<String, dynamic>> participantRows,
+  ) {
+    return participantRows
+        .where(
+          (participant) =>
+              participant['status'] != 'left' &&
+              (participant['is_sharing_location'] as bool? ?? false),
+        )
+        .map((participant) => participant['user_id'] as String?)
+        .whereType<String>()
+        .toSet();
+  }
+
+  bool _isParticipantSharingLocation(String userId) {
+    final participantRows = participants.value;
+    if (participantRows.isEmpty) return true;
+
+    return participantRows.any(
+      (participant) =>
+          participant['user_id'] == userId &&
+          participant['status'] != 'left' &&
+          (participant['is_sharing_location'] as bool? ?? false),
+    );
+  }
+
+  void _pruneLocationsForParticipants(
+    List<Map<String, dynamic>> participantRows,
+  ) {
+    final visibleUserIds = _sharingParticipantUserIds(participantRows);
+    if (visibleUserIds.isEmpty) {
+      if (riderLocations.value.isNotEmpty) {
+        riderLocations.value = {};
+      }
+      return;
+    }
+
+    final currentUserId = _supabase.auth.currentUser?.id;
+    final updated = Map<String, RiderLocation>.from(riderLocations.value)
+      ..removeWhere(
+        (userId, _) =>
+            userId == currentUserId || !visibleUserIds.contains(userId),
+      );
+
+    if (updated.length != riderLocations.value.length) {
+      riderLocations.value = updated;
+    }
   }
 
   Future<void> _notifyGroupMembers(String rideGroupId, String sessionId) async {

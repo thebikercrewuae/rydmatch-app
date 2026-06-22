@@ -2,9 +2,11 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'app_update_service.dart';
 import 'diagnostics_service.dart';
 
 enum NotificationType {
+  appUpdate,
   newMatch,
   newMessage,
   rideGroupInvite,
@@ -14,6 +16,8 @@ enum NotificationType {
 
   static NotificationType fromString(String value) {
     switch (value) {
+      case 'app_update':
+        return NotificationType.appUpdate;
       case 'new_match':
         return NotificationType.newMatch;
       case 'new_message':
@@ -33,6 +37,8 @@ enum NotificationType {
 
   String toDbString() {
     switch (this) {
+      case NotificationType.appUpdate:
+        return 'app_update';
       case NotificationType.newMatch:
         return 'new_match';
       case NotificationType.newMessage:
@@ -159,6 +165,32 @@ class AppNotification {
     );
   }
 
+  factory AppNotification.appUpdate({
+    required String userId,
+    required AppUpdateInfo info,
+    required bool isRead,
+  }) {
+    return AppNotification(
+      id: NotificationService.appUpdateNotificationId,
+      userId: userId,
+      type: NotificationType.appUpdate,
+      title: info.title,
+      message: info.isForced
+          ? '${info.message} This update is required to keep using RydMatch.'
+          : info.message,
+      isRead: isRead,
+      actionUrl: info.storeUrl,
+      actionArguments: {
+        'store_url': info.storeUrl,
+        'latest_version_name': info.latestVersionName,
+        'latest_build_number': info.latestBuildNumber.toString(),
+        'current_build_number': info.currentBuildNumber.toString(),
+        'is_forced': info.isForced.toString(),
+      },
+      createdAt: DateTime.now(),
+    );
+  }
+
   AppNotification copyWith({bool? isRead}) {
     return AppNotification(
       id: id,
@@ -182,7 +214,10 @@ class NotificationService extends ChangeNotifier {
 
   NotificationService._();
 
+  static const String appUpdateNotificationId = 'local-app-update';
+
   final SupabaseClient _client = Supabase.instance.client;
+  final AppUpdateService _appUpdateService = AppUpdateService.instance;
 
   final List<AppNotification> _notifications = [];
   final StreamController<AppNotification> _bannerController =
@@ -190,6 +225,9 @@ class NotificationService extends ChangeNotifier {
 
   RealtimeChannel? _channel;
   bool _isInitialized = false;
+  bool _updateListenerAttached = false;
+  bool _updateNotificationRead = false;
+  bool _updateBannerShown = false;
 
   List<AppNotification> get notifications => List.unmodifiable(_notifications);
 
@@ -203,6 +241,9 @@ class NotificationService extends ChangeNotifier {
 
     _isInitialized = true;
     await _loadNotifications();
+    _attachUpdateListener();
+    await _appUpdateService.checkForUpdate();
+    _syncAppUpdateNotification(showBanner: true);
     _subscribeToRealtime(user.id);
   }
 
@@ -224,6 +265,7 @@ class NotificationService extends ChangeNotifier {
           AppNotification.fromJson(row as Map<String, dynamic>),
         );
       }
+      _syncAppUpdateNotification();
       notifyListeners();
     } catch (e) {
       debugPrint('NotificationService: failed to load notifications: $e');
@@ -235,6 +277,39 @@ class NotificationService extends ChangeNotifier {
         context: {'limit': 50},
       );
     }
+  }
+
+  void _attachUpdateListener() {
+    if (_updateListenerAttached) return;
+    _appUpdateService.addListener(_syncAppUpdateNotification);
+    _updateListenerAttached = true;
+  }
+
+  void _syncAppUpdateNotification({bool showBanner = false}) {
+    final existingIndex = _notifications.indexWhere(
+      (n) => n.id == appUpdateNotificationId,
+    );
+    if (existingIndex != -1) {
+      _notifications.removeAt(existingIndex);
+    }
+
+    final user = _client.auth.currentUser;
+    final info = _appUpdateService.updateInfo;
+    if (user != null && info != null) {
+      final notification = AppNotification.appUpdate(
+        userId: user.id,
+        info: info,
+        isRead: _updateNotificationRead,
+      );
+      _notifications.insert(0, notification);
+
+      if (showBanner && !_updateBannerShown && !notification.isRead) {
+        _updateBannerShown = true;
+        _bannerController.add(notification);
+      }
+    }
+
+    notifyListeners();
   }
 
   void _subscribeToRealtime(String userId) {
@@ -285,6 +360,16 @@ class NotificationService extends ChangeNotifier {
 
   Future<void> markAsRead(String notificationId) async {
     try {
+      if (notificationId == appUpdateNotificationId) {
+        _updateNotificationRead = true;
+        final idx = _notifications.indexWhere((n) => n.id == notificationId);
+        if (idx != -1) {
+          _notifications[idx] = _notifications[idx].copyWith(isRead: true);
+          notifyListeners();
+        }
+        return;
+      }
+
       await _client
           .from('notifications')
           .update({'is_read': true})
@@ -357,6 +442,7 @@ class NotificationService extends ChangeNotifier {
           _notifications[i] = _notifications[i].copyWith(isRead: true);
         }
       }
+      _updateNotificationRead = true;
       notifyListeners();
     } catch (e) {
       debugPrint('NotificationService: markAllAsRead error: $e');
@@ -377,6 +463,7 @@ class NotificationService extends ChangeNotifier {
       await _client.from('notifications').delete().eq('user_id', user.id);
 
       _notifications.clear();
+      _syncAppUpdateNotification();
       notifyListeners();
     } catch (e) {
       debugPrint('NotificationService: clearAllNotifications error: $e');
@@ -394,12 +481,21 @@ class NotificationService extends ChangeNotifier {
     _channel = null;
     _isInitialized = false;
     _notifications.clear();
+    if (_updateListenerAttached) {
+      _appUpdateService.removeListener(_syncAppUpdateNotification);
+      _updateListenerAttached = false;
+    }
+    _updateNotificationRead = false;
+    _updateBannerShown = false;
     notifyListeners();
   }
 
   @override
   void dispose() {
     _channel?.unsubscribe();
+    if (_updateListenerAttached) {
+      _appUpdateService.removeListener(_syncAppUpdateNotification);
+    }
     _bannerController.close();
     super.dispose();
   }

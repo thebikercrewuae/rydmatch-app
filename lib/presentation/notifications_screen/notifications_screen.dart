@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../services/app_update_service.dart';
 import '../../services/notification_service.dart';
 import '../live_ride/live_ride_navigation.dart';
 import '../ride_groups_screen/ride_groups_screen.dart';
@@ -35,6 +36,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   IconData _iconForType(NotificationType type) {
     switch (type) {
+      case NotificationType.appUpdate:
+        return Icons.system_update_alt_rounded;
       case NotificationType.newMatch:
         return Icons.favorite_rounded;
       case NotificationType.newMessage:
@@ -52,6 +55,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Color _colorForType(NotificationType type) {
     switch (type) {
+      case NotificationType.appUpdate:
+        return const Color(0xFF1B365D);
       case NotificationType.newMatch:
         return const Color(0xFFE85A4F);
       case NotificationType.newMessage:
@@ -69,6 +74,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   String _labelForType(NotificationType type) {
     switch (type) {
+      case NotificationType.appUpdate:
+        return 'Update';
       case NotificationType.newMatch:
         return 'New Match';
       case NotificationType.newMessage:
@@ -95,6 +102,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _onTap(AppNotification notification) async {
     await _service.markAsRead(notification.id);
+
+    if (notification.type == NotificationType.appUpdate) {
+      await AppUpdateService.instance.launchUpdate();
+      return;
+    }
 
     if (notification.type == NotificationType.rideGroupInvite) {
       if (!mounted) return;

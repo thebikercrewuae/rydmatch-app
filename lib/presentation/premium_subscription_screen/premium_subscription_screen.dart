@@ -586,7 +586,7 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
           icon: AppIcons.group,
           title: 'Ride Groups',
           description:
-              'Create group rides with up to 6 riders, plan routes, and coordinate with matched riders.',
+              'Create group rides with up to 15 riders, plan routes, and coordinate with matched riders.',
           accentColor: const Color(0xFF4FC3F7),
         ),
         SizedBox(height: 1.2.h),

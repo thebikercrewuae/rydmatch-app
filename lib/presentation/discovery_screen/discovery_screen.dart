@@ -159,7 +159,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       final data = await supabase
           .from('swipes')
           .select('swiped_id')
-          .eq('swiper_id', currentUser.id);
+          .eq('swiper_id', currentUser.id)
+          .eq('direction', 'right');
 
       final ids = List<Map<String, dynamic>>.from(
         data,
@@ -272,12 +273,16 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         }, onConflict: 'id');
       }
     } catch (e) {
+      final isLocationTimeout = e is TimeoutException;
       await DiagnosticsService.instance.logError(
         feature: 'discovery',
         action: 'fetch_and_store_location',
         error: e,
-        severity: 'warning',
-        context: {'location_attempts': locationAttempts},
+        severity: isLocationTimeout ? 'info' : 'warning',
+        context: {
+          'location_attempts': locationAttempts,
+          if (isLocationTimeout) 'transient_location_timeout': true,
+        },
       );
     }
   }
@@ -690,7 +695,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     );
 
     _lastSwipedRider = rider;
-    if (swipedId.isNotEmpty) {
+    if (swipedId.isNotEmpty && direction != CardSwiperDirection.left) {
       _swipedIds.add(swipedId);
     }
 
@@ -709,7 +714,12 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       );
     }
 
-    _allRiders.removeWhere((r) => r['id'] == swipedId);
+    if (direction == CardSwiperDirection.left) {
+      _moveRiderToEnd(swipedId);
+    } else {
+      _allRiders.removeWhere((r) => r['id'] == swipedId);
+      _filteredRiders.removeWhere((r) => r['id'] == swipedId);
+    }
 
     if (currentIndex == null) {
       setState(() => _isEmpty = true);
@@ -737,7 +747,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     required String direction,
   }) async {
     try {
-      _swipedIds.add(swipedId);
+      if (direction == 'right') {
+        _swipedIds.add(swipedId);
+      }
 
       final result = await SwipeService.instance.recordSwipe(
         swipedId: swipedId,
@@ -785,6 +797,23 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         context: {'swiped_id': swipedId, 'direction': direction},
       );
     }
+  }
+
+  void _moveRiderToEnd(String riderId) {
+    if (riderId.isEmpty) return;
+
+    void moveInList(List<Map<String, dynamic>> riders) {
+      final index = riders.indexWhere((rider) => rider['id'] == riderId);
+      if (index < 0 || index >= riders.length - 1) return;
+
+      final rider = riders.removeAt(index);
+      riders.add(rider);
+    }
+
+    setState(() {
+      moveInList(_allRiders);
+      moveInList(_filteredRiders);
+    });
   }
 
   void _handlePass() {

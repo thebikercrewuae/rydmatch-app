@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'diagnostics_service.dart';
+import 'photo_safety_service.dart';
 
 class ProfileService {
   static String? _lastUploadError;
@@ -79,6 +80,35 @@ class ProfileService {
       // Check we actually got data
       if (bytes.isEmpty) {
         debugPrint('❌ uploadPhoto: Empty bytes for ${photo.name}');
+        return null;
+      }
+
+      final safety = await PhotoSafetyService.assessBytes(bytes);
+      if (!safety.allowed) {
+        _lastUploadError = safety.reason ?? PhotoSafetyService.blockedMessage;
+        debugPrint(
+          '⚠️ uploadPhoto: blocked by photo safety filter '
+          'skin=${safety.skinRatio.toStringAsFixed(2)} '
+          'central=${safety.centralSkinRatio.toStringAsFixed(2)} '
+          'lower=${safety.lowerSkinRatio.toStringAsFixed(2)} '
+          'blood_red=${safety.bloodRedRatio.toStringAsFixed(2)} '
+          'central_blood_red=${safety.centralBloodRedRatio.toStringAsFixed(2)}',
+        );
+        await DiagnosticsService.instance.logError(
+          feature: 'profile_media',
+          action: 'photo_safety_filter_blocked',
+          error: _lastUploadError!,
+          severity: 'info',
+          context: {
+            'folder': folder,
+            'photo_name': photo.name,
+            'skin_ratio': safety.skinRatio,
+            'central_skin_ratio': safety.centralSkinRatio,
+            'lower_skin_ratio': safety.lowerSkinRatio,
+            'blood_red_ratio': safety.bloodRedRatio,
+            'central_blood_red_ratio': safety.centralBloodRedRatio,
+          },
+        );
         return null;
       }
 

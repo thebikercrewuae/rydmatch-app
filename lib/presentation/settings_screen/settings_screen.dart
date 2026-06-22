@@ -34,6 +34,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _profileVisible = true;
   bool _isLoading = true;
   bool _isPremium = false;
+  bool _isAmbassador = false;
+  DateTime? _ambassadorExpiresAt;
+  String? _ambassadorCode;
   bool _priorityListings = false;
   bool _hapticEnabled = true;
   ThemeMode _themeMode = ThemeMode.system;
@@ -52,6 +55,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         _isMetric = prefs.getBool(_unitPrefKey) ?? true;
         _isPremium = PremiumService().isPremium;
+        _isAmbassador = PremiumService().isAmbassador;
+        _ambassadorExpiresAt = PremiumService().ambassadorExpiresAt;
+        _ambassadorCode = PremiumService().ambassadorCode;
         _priorityListings = PremiumService().priorityListingsEnabled;
         _themeMode = ThemeService().themeMode;
         _hapticEnabled = HapticService.instance.isEnabled;
@@ -438,6 +444,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ];
   }
 
+  String _ambassadorSubtitle() {
+    final code = _ambassadorCode?.trim();
+    final suffix = code == null || code.isEmpty ? '' : ' - $code';
+    final expiresAt = _ambassadorExpiresAt;
+    if (expiresAt == null) return 'Active program access$suffix';
+
+    final local = expiresAt.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    return 'Active until $day/$month/${local.year}$suffix';
+  }
+
   Widget _buildPremiumBanner(ThemeData theme) {
     const gold = Color(0xFFFFB347);
     const orange = Color(0xFFE85A4F);
@@ -463,7 +481,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'RydMatch Premium',
+                      _isAmbassador
+                          ? 'RydMatch Ambassador'
+                          : 'RydMatch Premium',
                       style: GoogleFonts.dmSans(
                         fontSize: 13.sp,
                         fontWeight: FontWeight.w700,
@@ -471,7 +491,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     Text(
-                      'Active subscription',
+                      _isAmbassador
+                          ? _ambassadorSubtitle()
+                          : 'Active subscription',
                       style: GoogleFonts.dmSans(
                         fontSize: 11.sp,
                         color: gold.withValues(alpha: 0.8),
@@ -487,7 +509,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   borderRadius: BorderRadius.circular(20.0),
                 ),
                 child: Text(
-                  'Active',
+                  _isAmbassador ? 'Ambassador' : 'Active',
                   style: GoogleFonts.dmSans(
                     fontSize: 10.sp,
                     fontWeight: FontWeight.w700,
@@ -509,7 +531,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             '/premium-subscription-screen',
           );
           if (result == true && mounted) {
-            setState(() => _isPremium = PremiumService().isPremium);
+            setState(() {
+              _isPremium = PremiumService().isPremium;
+              _isAmbassador = PremiumService().isAmbassador;
+              _ambassadorExpiresAt = PremiumService().ambassadorExpiresAt;
+              _ambassadorCode = PremiumService().ambassadorCode;
+            });
           }
         },
         child: Container(

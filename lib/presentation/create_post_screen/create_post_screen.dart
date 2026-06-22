@@ -130,7 +130,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       await Future.delayed(const Duration(milliseconds: 1500));
       if (mounted) Navigator.of(context).pop();
     } else {
+      final message =
+          RideFeedService.instance.lastContentSafetyError ??
+          'Could not share the ride. Please try again.';
       setState(() => _isPosting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+      );
     }
   }
 
@@ -1075,11 +1081,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
       if (!mounted) return;
       if (photoUrl == null) {
+        final message =
+            ProfileService.lastUploadError ??
+            'Could not upload the photo. Please try again.';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not upload the photo. Please try again.'),
-            behavior: SnackBarBehavior.floating,
-          ),
+          SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
         );
         return;
       }

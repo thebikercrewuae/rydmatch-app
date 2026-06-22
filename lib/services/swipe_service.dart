@@ -243,10 +243,10 @@ class SwipeService {
     try {
       final profileResponse = await _supabase
           .from('user_profiles')
-          .select(
-            'id, full_name, email, avatar_url, bike_types, bio, ride_mode, '
-            'updated_at',
-          )
+          // Carry every available profile field into the match detail route.
+          // Selecting all fields also remains compatible while optional
+          // columns are being rolled out.
+          .select()
           .inFilter('id', uniqueIds);
 
       final profileMap = <String, Map<String, dynamic>>{};
@@ -269,6 +269,7 @@ class SwipeService {
         );
 
         matches.add({
+          if (profile != null) ...profile,
           'id': otherId,
           'full_name': (profile?['full_name'] as String?) ?? '',
           'email': (profile?['email'] as String?) ?? '',

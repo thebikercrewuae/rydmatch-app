@@ -134,6 +134,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
         'userId': otherUserId,
         'userName': otherUserName,
         'userImage': otherUserAvatar.isEmpty ? null : otherUserAvatar,
+        'profileData': match,
       },
     );
   }

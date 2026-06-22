@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../presentation/chat_screen/chat_screen.dart';
 import '../../presentation/live_ride/live_ride_navigation.dart';
+import '../../services/app_update_service.dart';
 import '../../services/notification_service.dart';
 
 class NotificationBannerOverlay extends StatefulWidget {
@@ -75,6 +76,11 @@ class _NotificationBannerOverlayState extends State<NotificationBannerOverlay> {
                 NotificationService.instance.markAsRead(entry.notification.id);
                 final route = entry.notification.actionRoute;
                 final args = entry.notification.actionArguments;
+
+                if (entry.notification.type == NotificationType.appUpdate) {
+                  unawaited(AppUpdateService.instance.launchUpdate());
+                  return;
+                }
 
                 // Handle live ride notifications
                 if (entry.notification.type == NotificationType.rideStarted) {
@@ -168,6 +174,8 @@ class _NotificationBannerState extends State<_NotificationBanner>
 
   IconData _iconForType(NotificationType type) {
     switch (type) {
+      case NotificationType.appUpdate:
+        return Icons.system_update_alt_rounded;
       case NotificationType.newMatch:
         return Icons.favorite_rounded;
       case NotificationType.newMessage:
@@ -185,6 +193,8 @@ class _NotificationBannerState extends State<_NotificationBanner>
 
   Color _colorForType(NotificationType type) {
     switch (type) {
+      case NotificationType.appUpdate:
+        return const Color(0xFF1B365D);
       case NotificationType.newMatch:
         return const Color(0xFFE85A4F);
       case NotificationType.newMessage:

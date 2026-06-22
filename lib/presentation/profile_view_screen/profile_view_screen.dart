@@ -44,6 +44,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   bool _isLoading = true;
   bool _initialized = false;
   double _ridingSpeed = 60.0;
+  bool _hasRidingSpeed = false;
   List<String> _skillLevels = [];
   List<String> _bikeTypes = [];
   List<String> _preferredRoads = [];
@@ -238,6 +239,12 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     final otherUserImage = args is Map<String, dynamic>
         ? args['userImage'] as String?
         : null;
+    final rawRouteProfile = args is Map<String, dynamic>
+        ? args['profileData']
+        : null;
+    final routeProfile = rawRouteProfile is Map
+        ? Map<String, dynamic>.from(rawRouteProfile)
+        : null;
 
     List<String> stringList(dynamic value) {
       if (value is List) {
@@ -266,7 +273,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
 
     if (isOtherUser && otherUserId != null && otherUserId.isNotEmpty) {
       try {
-        final profile = await Supabase.instance.client
+        final fetchedProfile = await Supabase.instance.client
             .from('user_profiles')
             // Fetch the available profile row instead of naming optional
             // columns. A missing optional column must not make the whole
@@ -274,6 +281,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             .select()
             .eq('id', otherUserId)
             .maybeSingle();
+        final profile = fetchedProfile ?? routeProfile;
 
         if (!mounted) return;
 
@@ -287,6 +295,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             _preferredRoads = [];
             _rideTimes = {};
             _ridingSpeed = 60.0;
+            _hasRidingSpeed = false;
             _isMetric = preferredIsMetric;
             _gender = null;
             _sameGenderMatching = false;
@@ -300,21 +309,45 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
 
         final fullName = profile['full_name'] as String?;
         final email = profile['email'] as String?;
+
+        dynamic profileValue(String key) {
+          final remoteValue = profile[key];
+          final routeValue = routeProfile?[key];
+
+          if (remoteValue == null) return routeValue;
+          if (remoteValue is String && remoteValue.trim().isEmpty) {
+            return routeValue ?? remoteValue;
+          }
+          if (remoteValue is Iterable && remoteValue.isEmpty) {
+            return routeValue ?? remoteValue;
+          }
+          if (remoteValue is Map && remoteValue.isEmpty) {
+            return routeValue ?? remoteValue;
+          }
+          return remoteValue;
+        }
+
         final avatarUrl = await ProfileService.resolveUserProfilePhotoUrl(
           userId: otherUserId,
-          avatarUrl: profile['avatar_url'] as String?,
+          avatarUrl: profileValue('avatar_url') as String?,
         );
         final fallbackAvatarUrl = await ProfileService.resolvePhotoUrl(
           otherUserImage,
         );
         final bikePhotoUrls = await ProfileService.resolvePhotoUrls(
-          stringList(profile['bike_photo_urls']),
+          stringList(profileValue('bike_photo_urls')),
         );
         final canUseLocalFallback = otherUserId == currentUserId;
-        final skillLevels = stringList(profile['skill_levels']);
-        final bikeTypes = stringList(profile['bike_types']);
-        final preferredRoads = stringList(profile['preferred_roads']);
-        final rideTimes = rideTimesMap(profile['ride_times']);
+        final skillLevels = stringList(profileValue('skill_levels'));
+        final bikeTypes = stringList(profileValue('bike_types'));
+        final preferredRoads = stringList(profileValue('preferred_roads'));
+        final rideTimes = rideTimesMap(profileValue('ride_times'));
+        final ridingSpeed = (profileValue('riding_speed') as num?)?.toDouble();
+        final hasProfilePreferences =
+            skillLevels.isNotEmpty ||
+            bikeTypes.isNotEmpty ||
+            preferredRoads.isNotEmpty ||
+            rideTimes.isNotEmpty;
 
         setState(() {
           _riderName = fullName?.trim().isNotEmpty == true
@@ -324,7 +357,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                         ? email!.split('@').first
                         : 'Rider');
 
-          _riderBio = profile['bio'] as String? ?? '';
+          _riderBio = profileValue('bio') as String? ?? '';
           _riderPhotoPath = avatarUrl?.trim().isNotEmpty == true
               ? avatarUrl
               : fallbackAvatarUrl;
@@ -344,14 +377,17 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                   localProfile['rideTimes'] as Map<String, List<String>>,
                 );
 
-          _ridingSpeed = (profile['riding_speed'] as num?)?.toDouble() ?? 60.0;
+          _ridingSpeed = ridingSpeed ?? 60.0;
+          _hasRidingSpeed =
+              ridingSpeed != null &&
+              (hasProfilePreferences || ridingSpeed != 60.0);
           _isMetric = preferredIsMetric;
-          _gender = profile['gender'] as String?;
+          _gender = profileValue('gender') as String?;
           _sameGenderMatching =
-              (profile['same_gender_matching'] as bool?) ?? false;
-          _rideMode = profile['ride_mode'] as String? ?? 'motorcycle';
+              (profileValue('same_gender_matching') as bool?) ?? false;
+          _rideMode = profileValue('ride_mode') as String? ?? 'motorcycle';
           _mixedCommunityMatching =
-              (profile['mixed_community_matching'] as bool?) ?? false;
+              (profileValue('mixed_community_matching') as bool?) ?? false;
           _bikePhotoPaths = bikePhotoUrls.where(_canOpenPhoto).toList();
           _isVerified = _profileIsVerified(profile);
           _isLoading = false;
@@ -372,23 +408,45 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
           context: {'other_user_id': otherUserId},
         );
 
+        final skillLevels = stringList(routeProfile?['skill_levels']);
+        final bikeTypes = stringList(routeProfile?['bike_types']);
+        final preferredRoads = stringList(routeProfile?['preferred_roads']);
+        final rideTimes = rideTimesMap(routeProfile?['ride_times']);
+        final ridingSpeed = (routeProfile?['riding_speed'] as num?)?.toDouble();
+        final hasProfilePreferences =
+            skillLevels.isNotEmpty ||
+            bikeTypes.isNotEmpty ||
+            preferredRoads.isNotEmpty ||
+            rideTimes.isNotEmpty;
+        final bikePhotoUrls = await ProfileService.resolvePhotoUrls(
+          stringList(routeProfile?['bike_photo_urls']),
+        );
+
         if (!mounted) return;
 
         setState(() {
           _riderName = otherUserName ?? 'Rider';
           _riderPhotoPath = otherUserImage;
-          _riderBio = '';
-          _skillLevels = [];
-          _bikeTypes = [];
-          _preferredRoads = [];
-          _rideTimes = {};
-          _ridingSpeed = 60.0;
+          _riderBio = routeProfile?['bio'] as String? ?? '';
+          _skillLevels = skillLevels;
+          _bikeTypes = bikeTypes;
+          _preferredRoads = preferredRoads;
+          _rideTimes = rideTimes;
+          _ridingSpeed = ridingSpeed ?? 60.0;
+          _hasRidingSpeed =
+              ridingSpeed != null &&
+              (hasProfilePreferences || ridingSpeed != 60.0);
           _isMetric = preferredIsMetric;
-          _gender = null;
-          _sameGenderMatching = false;
-          _rideMode = 'motorcycle';
-          _mixedCommunityMatching = false;
-          _isVerified = false;
+          _gender = routeProfile?['gender'] as String?;
+          _sameGenderMatching =
+              routeProfile?['same_gender_matching'] as bool? ?? false;
+          _rideMode = routeProfile?['ride_mode'] as String? ?? 'motorcycle';
+          _mixedCommunityMatching =
+              routeProfile?['mixed_community_matching'] as bool? ?? false;
+          _bikePhotoPaths = bikePhotoUrls.where(_canOpenPhoto).toList();
+          _isVerified = routeProfile != null
+              ? _profileIsVerified(routeProfile)
+              : false;
           _isLoading = false;
         });
         return;
@@ -400,6 +458,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     if (mounted) {
       setState(() {
         _ridingSpeed = data['ridingSpeed'] as double;
+        _hasRidingSpeed = true;
         _skillLevels = List<String>.from(data['skillLevels'] as List);
         _bikeTypes = List<String>.from(data['bikeTypes'] as List);
         _preferredRoads = List<String>.from(data['preferredRoads'] as List);
@@ -875,10 +934,17 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                       title: 'Riding Speed',
                       icon: AppIcons.speed,
                       onEdit: isOtherUser ? null : _editRidingSpeed,
-                      child: SpeedDisplayWidget(
-                        ridingSpeed: _ridingSpeed,
-                        isMetric: _isMetric,
-                      ),
+                      child: _hasRidingSpeed
+                          ? SpeedDisplayWidget(
+                              ridingSpeed: _ridingSpeed,
+                              isMetric: _isMetric,
+                            )
+                          : Text(
+                              'Not specified',
+                              style: TextStyle(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
                     ),
                     ProfileInfoCardWidget(
                       title: _rideMode == 'bicycle'

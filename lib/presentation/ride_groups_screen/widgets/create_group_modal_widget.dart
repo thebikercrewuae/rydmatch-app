@@ -33,6 +33,8 @@ class CreateGroupModalWidget extends StatefulWidget {
 }
 
 class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
+  static const int _maxGroupSize = 15;
+
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _routeController = TextEditingController();
@@ -471,35 +473,34 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
                 ],
               ),
               SizedBox(height: 1.5.h),
-              _buildLabel('Group Size (max 6 riders)'),
-              Row(
-                children: List.generate(5, (index) {
+              _buildLabel('Group Size (max $_maxGroupSize riders)'),
+              Wrap(
+                spacing: 2.w,
+                runSpacing: 1.h,
+                children: List.generate(_maxGroupSize - 1, (index) {
                   final size = index + 2;
                   final selected = _groupSize == size;
 
-                  return Padding(
-                    padding: EdgeInsets.only(right: 2.w),
-                    child: GestureDetector(
-                      onTap: () => setState(() => _groupSize = size),
-                      child: Container(
-                        width: 10.w,
-                        height: 10.w,
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(10.0),
-                        ),
-                        child: Center(
-                          child: Text(
-                            '$size',
-                            style: GoogleFonts.dmSans(
-                              fontSize: 13.sp,
-                              fontWeight: FontWeight.w700,
-                              color: selected
-                                  ? Colors.white
-                                  : theme.colorScheme.onSurface,
-                            ),
+                  return GestureDetector(
+                    onTap: () => setState(() => _groupSize = size),
+                    child: Container(
+                      width: 10.w,
+                      height: 10.w,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(10.0),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '$size',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w700,
+                            color: selected
+                                ? Colors.white
+                                : theme.colorScheme.onSurface,
                           ),
                         ),
                       ),

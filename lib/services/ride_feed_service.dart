@@ -1,10 +1,14 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/ride_feed_post_model.dart';
+import 'public_content_safety_service.dart';
 
 class RideFeedService {
   static RideFeedService? _instance;
   static RideFeedService get instance => _instance ??= RideFeedService._();
   RideFeedService._();
+
+  String? _lastContentSafetyError;
+  String? get lastContentSafetyError => _lastContentSafetyError;
 
   SupabaseClient get _client => Supabase.instance.client;
 
@@ -60,8 +64,14 @@ class RideFeedService {
     required String? bikeName,
   }) async {
     try {
+      _lastContentSafetyError = null;
       final userId = _currentUserId;
       if (userId == null) return null;
+      final captionSafety = PublicContentSafetyService.assessText(caption);
+      if (!captionSafety.allowed) {
+        _lastContentSafetyError = captionSafety.reason;
+        return null;
+      }
       final data = {
         'user_id': userId,
         'caption': caption,
@@ -133,8 +143,14 @@ class RideFeedService {
   /// Add a comment
   Future<PostComment?> addComment(String postId, String content) async {
     try {
+      _lastContentSafetyError = null;
       final userId = _currentUserId;
       if (userId == null) return null;
+      final contentSafety = PublicContentSafetyService.assessText(content);
+      if (!contentSafety.allowed) {
+        _lastContentSafetyError = contentSafety.reason;
+        return null;
+      }
       final response = await _client
           .from('post_comments')
           .insert({'post_id': postId, 'user_id': userId, 'content': content})

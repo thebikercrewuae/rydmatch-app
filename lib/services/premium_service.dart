@@ -14,6 +14,9 @@ class PremiumService extends ChangeNotifier {
 
   bool _isPremiumAccount = false;
   bool _isAdmin = false;
+  bool _isAmbassador = false;
+  DateTime? _ambassadorExpiresAt;
+  String? _ambassadorCode;
   bool _priorityListingsEnabled = false;
   bool _isLoaded = false;
 
@@ -26,13 +29,17 @@ class PremiumService extends ChangeNotifier {
 
   /// Existing app code mostly checks isPremium.
   /// Admin users should receive full access too, so this returns true for either.
-  bool get isPremium => _isPremiumAccount || _isAdmin;
+  bool get isPremium => _isPremiumAccount || _isAdmin || _isAmbassador;
 
   /// The actual paid/trial premium flag from the database.
   bool get isPremiumAccount => _isPremiumAccount;
 
   /// Admin profile flag from user_profiles.is_admin.
   bool get isAdmin => _isAdmin;
+
+  bool get isAmbassador => _isAmbassador;
+  DateTime? get ambassadorExpiresAt => _ambassadorExpiresAt;
+  String? get ambassadorCode => _ambassadorCode;
 
   /// Clearer name for future screens.
   bool get hasFullAccess => isPremium;
@@ -56,6 +63,9 @@ class PremiumService extends ChangeNotifier {
     if (currentUser == null) {
       _isPremiumAccount = false;
       _isAdmin = false;
+      _isAmbassador = false;
+      _ambassadorExpiresAt = null;
+      _ambassadorCode = null;
       _priorityListingsEnabled = false;
       _isLoaded = true;
       notifyListeners();
@@ -84,15 +94,28 @@ class PremiumService extends ChangeNotifier {
     try {
       final profile = await supabase
           .from('user_profiles')
-          .select('is_premium, is_admin')
+          .select(
+            'is_premium, is_admin, is_ambassador, ambassador_expires_at, ambassador_code',
+          )
           .eq('id', currentUser.id)
           .maybeSingle();
 
       final revenueCatPremium = await RevenueCatService.instance
           .refreshPremiumEntitlement();
       final remotePremium = profile?['is_premium'] == true;
+      final ambassadorExpiresAt = _parseDateTime(
+        profile?['ambassador_expires_at'],
+      );
+      final remoteAmbassador =
+          profile?['is_ambassador'] == true &&
+          (ambassadorExpiresAt == null ||
+              ambassadorExpiresAt.isAfter(DateTime.now()));
+      final ambassadorCode = profile?['ambassador_code'];
       _isPremiumAccount = remotePremium || localPremium || revenueCatPremium;
       _isAdmin = profile?['is_admin'] == true;
+      _isAmbassador = remoteAmbassador;
+      _ambassadorExpiresAt = remoteAmbassador ? ambassadorExpiresAt : null;
+      _ambassadorCode = remoteAmbassador ? ambassadorCode as String? : null;
 
       if (remotePremium && !localPremium) {
         await prefs.setBool(_localPremiumKey, true);
@@ -124,8 +147,8 @@ class PremiumService extends ChangeNotifier {
         );
       }
 
-      // Admins should have access to priority listings as part of full access.
-      if (_isAdmin) {
+      // Admins and ambassadors receive full access while their grant is active.
+      if (_isAdmin || _isAmbassador) {
         _isPremiumAccount = true;
         _priorityListingsEnabled = true;
       }
@@ -148,6 +171,9 @@ class PremiumService extends ChangeNotifier {
       );
       _isPremiumAccount = localPremium;
       _isAdmin = false;
+      _isAmbassador = false;
+      _ambassadorExpiresAt = null;
+      _ambassadorCode = null;
       _priorityListingsEnabled = false;
       _isLoaded = true;
       notifyListeners();
@@ -239,8 +265,8 @@ class PremiumService extends ChangeNotifier {
 
     _isPremiumAccount = false;
 
-    // Keep admin access even if paid premium is cancelled.
-    if (!_isAdmin) {
+    // Keep admin or ambassador access even if paid premium is cancelled.
+    if (!_isAdmin && !_isAmbassador) {
       _priorityListingsEnabled = false;
     }
 
@@ -252,9 +278,17 @@ class PremiumService extends ChangeNotifier {
     await _clearStoredEntitlement(prefs);
     _isPremiumAccount = false;
     _isAdmin = false;
+    _isAmbassador = false;
+    _ambassadorExpiresAt = null;
+    _ambassadorCode = null;
     _priorityListingsEnabled = false;
     _isLoaded = false;
     notifyListeners();
+  }
+
+  DateTime? _parseDateTime(dynamic value) {
+    if (value == null) return null;
+    return DateTime.tryParse(value.toString());
   }
 
   Future<void> _clearStoredEntitlement(SharedPreferences prefs) async {

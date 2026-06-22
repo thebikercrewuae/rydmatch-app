@@ -38,6 +38,9 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
   String? _notificationHealthError;
   Map<String, dynamic>? _stravaHealth;
   String? _stravaHealthError;
+  Map<String, dynamic>? _aiReview;
+  String? _aiReviewError;
+  bool _isAiReviewLoading = false;
 
   final List<String> _features = const [
     'all',
@@ -57,9 +60,14 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
 
   final List<String> _severities = const ['all', 'error', 'warning', 'info'];
 
+  List<Map<String, dynamic>> get _uniqueErrors {
+    final seen = <String>{};
+    return _errors.where((error) => seen.add(_errorSignature(error))).toList();
+  }
+
   List<Map<String, dynamic>> get _visibleErrors {
     final q = _searchQuery.trim().toLowerCase();
-    return _errors.where((error) {
+    return _uniqueErrors.where((error) {
       if (_selectedFeature != 'all' &&
           error['feature']?.toString() != _selectedFeature) {
         return false;
@@ -87,7 +95,7 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
 
   Map<String, int> get _featureCounts {
     final counts = <String, int>{};
-    for (final error in _errors) {
+    for (final error in _uniqueErrors) {
       final feature = (error['feature'] ?? 'unknown').toString();
       counts[feature] = (counts[feature] ?? 0) + 1;
     }
@@ -142,9 +150,9 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
     await Future.wait([
       _loadErrors(),
       _loadMatchingHealth(),
-      _loadLiveRideHealth(),
-      _loadNotificationHealth(),
+      _loadOperationalHealth(),
       _loadStravaHealth(),
+      _loadLatestAiReview(),
     ]);
   }
 
@@ -158,8 +166,16 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
           .select(
             'id, user_id, feature, action, severity, message, stack_trace, context, platform, is_debug, created_at',
           )
+          .eq('is_debug', false)
+          .gte(
+            'created_at',
+            DateTime.now()
+                .subtract(const Duration(days: 30))
+                .toUtc()
+                .toIso8601String(),
+          )
           .order('created_at', ascending: false)
-          .limit(150);
+          .limit(500);
 
       final errors = List<Map<String, dynamic>>.from(data);
       final profiles = await _loadProfilesForErrors(errors);
@@ -333,23 +349,34 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
     }
   }
 
-  Future<void> _loadLiveRideHealth() async {
+  Future<void> _loadOperationalHealth() async {
     try {
       final response = await Supabase.instance.client.functions.invoke(
         'admin-growth-dashboard',
       );
 
       final data = response.data;
-      if (data is! Map || data['liveRide'] is! Map) {
-        throw Exception('Invalid live ride diagnostics response');
+      if (data is! Map ||
+          data['liveRide'] is! Map ||
+          data['notifications'] is! Map) {
+        throw Exception('Invalid operational diagnostics response');
       }
 
       if (!mounted) return;
-      final health = Map<String, dynamic>.from(data['liveRide'] as Map);
+      final liveRide = Map<String, dynamic>.from(data['liveRide'] as Map);
+      final notifications = Map<String, dynamic>.from(
+        data['notifications'] as Map,
+      );
       setState(() {
-        _liveRideHealth = health;
-        _liveRideHealthError = health['available'] == false
-            ? health['error']?.toString() ?? 'Live ride diagnostics unavailable'
+        _liveRideHealth = liveRide;
+        _liveRideHealthError = liveRide['available'] == false
+            ? liveRide['error']?.toString() ??
+                  'Live ride diagnostics unavailable'
+            : null;
+        _notificationHealth = notifications;
+        _notificationHealthError = notifications['available'] == false
+            ? notifications['error']?.toString() ??
+                  'Notification diagnostics unavailable'
             : null;
       });
     } catch (e) {
@@ -357,36 +384,74 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
       setState(() {
         _liveRideHealth = null;
         _liveRideHealthError = e.toString();
+        _notificationHealth = null;
+        _notificationHealthError = e.toString();
       });
     }
   }
 
-  Future<void> _loadNotificationHealth() async {
+  Future<void> _loadAiReview() async {
+    if (_isAiReviewLoading) return;
+
+    setState(() {
+      _isAiReviewLoading = true;
+      _aiReviewError = null;
+    });
+
     try {
       final response = await Supabase.instance.client.functions.invoke(
-        'admin-growth-dashboard',
+        'admin-diagnostics-review',
+        body: {
+          'days': 30,
+          'feature': _selectedFeature == 'all' ? null : _selectedFeature,
+          'severity': _selectedSeverity == 'all' ? null : _selectedSeverity,
+        },
       );
 
       final data = response.data;
-      if (data is! Map || data['notifications'] is! Map) {
-        throw Exception('Invalid notification diagnostics response');
+      if (data is! Map) {
+        throw Exception('Invalid AI diagnostics response');
+      }
+      if (data['error'] != null) {
+        throw Exception(data['error'].toString());
       }
 
       if (!mounted) return;
-      final health = Map<String, dynamic>.from(data['notifications'] as Map);
       setState(() {
-        _notificationHealth = health;
-        _notificationHealthError = health['available'] == false
-            ? health['error']?.toString() ??
-                  'Notification diagnostics unavailable'
-            : null;
+        _aiReview = Map<String, dynamic>.from(data);
+        _aiReviewError = null;
+        _isAiReviewLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _notificationHealth = null;
-        _notificationHealthError = e.toString();
+        _aiReviewError = e.toString();
+        _isAiReviewLoading = false;
       });
+      _showSnack('Could not load AI diagnostic review.', isError: true);
+    }
+  }
+
+  Future<void> _loadLatestAiReview() async {
+    try {
+      final data = await Supabase.instance.client
+          .from('admin_diagnostic_reviews')
+          .select('review')
+          .order('generated_at', ascending: false)
+          .limit(1);
+
+      final rows = List<Map<String, dynamic>>.from(data);
+      if (rows.isEmpty) return;
+      final review = rows.first['review'];
+      if (review is! Map) return;
+
+      if (!mounted) return;
+      setState(() {
+        _aiReview = Map<String, dynamic>.from(review);
+        _aiReviewError = null;
+      });
+    } catch (_) {
+      // The scheduled review table may not exist until the migration is applied.
     }
   }
 
@@ -416,6 +481,16 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
   int _asInt(dynamic value) {
     if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  List<String> _stringList(dynamic value) {
+    if (value is List) {
+      return value
+          .map((item) => item?.toString().trim() ?? '')
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+    return const [];
   }
 
   String _prettyJson(dynamic value) {
@@ -664,6 +739,8 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
           SizedBox(height: 1.5.h),
           _buildStravaPanel(),
           SizedBox(height: 1.5.h),
+          _buildAiReviewPanel(),
+          SizedBox(height: 1.5.h),
           _buildSummaryRow(),
           SizedBox(height: 1.5.h),
           _buildFilters(),
@@ -685,6 +762,138 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
             )
           else
             ..._visibleErrors.map(_buildErrorCard),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiReviewPanel() {
+    final review = _aiReview;
+    final overview = review?['overview']?.toString();
+    final blockers = _stringList(review?['releaseBlockers']);
+    final rootCauses = _stringList(review?['likelyRootCauses']);
+    final nextActions = _stringList(review?['recommendedNextActions']);
+    final privacyNotes = _stringList(review?['privacyNotes']);
+    final generatedAt = review?['generatedAt'];
+
+    return Container(
+      padding: EdgeInsets.all(4.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _deepBlue.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.auto_awesome_rounded, color: _deepBlue),
+              SizedBox(width: 2.w),
+              Expanded(
+                child: Text(
+                  'Read-only AI Review',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w800,
+                    color: _deepBlue,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: _isAiReviewLoading ? null : _loadAiReview,
+                child: Text(_isAiReviewLoading ? 'Reviewing' : 'Review'),
+              ),
+            ],
+          ),
+          SizedBox(height: 0.6.h),
+          Text(
+            'Summarizes recent diagnostics without changing app data, SQL, or code.',
+            style: GoogleFonts.dmSans(fontSize: 10.sp, color: Colors.black54),
+          ),
+          if (_isAiReviewLoading) ...[
+            SizedBox(height: 1.2.h),
+            const LinearProgressIndicator(),
+          ],
+          if (_aiReviewError != null) ...[
+            SizedBox(height: 1.h),
+            Text(
+              _aiReviewError!,
+              style: GoogleFonts.dmSans(fontSize: 10.sp, color: _orange),
+            ),
+          ],
+          if (overview != null && overview.trim().isNotEmpty) ...[
+            SizedBox(height: 1.2.h),
+            Text(
+              overview,
+              style: GoogleFonts.dmSans(
+                fontSize: 10.5.sp,
+                color: _bodyText,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          if (generatedAt != null) ...[
+            SizedBox(height: 0.5.h),
+            Text(
+              'Generated: ${_formatDate(generatedAt)}',
+              style: GoogleFonts.dmSans(fontSize: 9.sp, color: Colors.black45),
+            ),
+          ],
+          _aiReviewSection('Release blockers', blockers, _orange),
+          _aiReviewSection('Likely root causes', rootCauses, _deepBlue),
+          _aiReviewSection('Recommended next actions', nextActions, _green),
+          _aiReviewSection(
+            'Privacy/security notes',
+            privacyNotes,
+            const Color(0xFFB7791F),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _aiReviewSection(String title, List<String> items, Color color) {
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: EdgeInsets.only(top: 1.2.h),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.dmSans(
+              fontSize: 10.5.sp,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+          SizedBox(height: 0.5.h),
+          ...items.map(
+            (item) => Padding(
+              padding: EdgeInsets.only(bottom: 0.45.h),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.only(top: 0.45.h),
+                    child: Icon(Icons.circle, size: 5, color: color),
+                  ),
+                  SizedBox(width: 2.w),
+                  Expanded(
+                    child: Text(
+                      item,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 9.8.sp,
+                        color: _bodyText,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -847,7 +1056,7 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
                 ),
               ),
               TextButton(
-                onPressed: _loadLiveRideHealth,
+                onPressed: _loadOperationalHealth,
                 child: const Text('Check'),
               ),
             ],
@@ -1071,7 +1280,7 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
                 ),
               ),
               TextButton(
-                onPressed: _loadNotificationHealth,
+                onPressed: _loadOperationalHealth,
                 child: const Text('Check'),
               ),
             ],
@@ -1393,10 +1602,10 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
   }
 
   Widget _buildSummaryRow() {
-    final errors = _errors
+    final errors = _uniqueErrors
         .where((e) => (e['severity'] ?? '').toString() == 'error')
         .length;
-    final warnings = _errors
+    final warnings = _uniqueErrors
         .where((e) => (e['severity'] ?? '').toString() == 'warning')
         .length;
     final topFeature = _featureCounts.entries.toList()
@@ -1406,8 +1615,8 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
       children: [
         Expanded(
           child: _summaryCard(
-            'Loaded',
-            _errors.length.toString(),
+            'Issues',
+            _uniqueErrors.length.toString(),
             _deepBlue,
             selected: _selectedSeverity == 'all',
             onTap: () => _applySeverityFilter('all'),
