@@ -54,6 +54,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   bool get _canUndo => _lastSwipedRider != null;
 
   final Set<String> _swipedIds = {};
+  final Set<String> _resurfacedLeftSwipeIds = {};
 
   String _myName = 'You';
   String? _myPhoto;
@@ -715,16 +716,21 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     }
 
     if (direction == CardSwiperDirection.left) {
-      _moveRiderToEnd(swipedId);
+      _queueRiderForResurface(rider);
     } else {
       _allRiders.removeWhere((r) => r['id'] == swipedId);
       _filteredRiders.removeWhere((r) => r['id'] == swipedId);
     }
 
     if (currentIndex == null) {
-      setState(() => _isEmpty = true);
+      setState(() {
+        _isEmpty = direction == CardSwiperDirection.left
+            ? _filteredRiders.isEmpty
+            : true;
+      });
+    } else {
+      _currentCardIndex = currentIndex;
     }
-
     if (direction == CardSwiperDirection.top) {
       AppToast.show(
         context,
@@ -799,20 +805,15 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     }
   }
 
-  void _moveRiderToEnd(String riderId) {
+  void _queueRiderForResurface(Map<String, dynamic> rider) {
+    final riderId = rider['id'] as String? ?? '';
     if (riderId.isEmpty) return;
 
-    void moveInList(List<Map<String, dynamic>> riders) {
-      final index = riders.indexWhere((rider) => rider['id'] == riderId);
-      if (index < 0 || index >= riders.length - 1) return;
-
-      final rider = riders.removeAt(index);
-      riders.add(rider);
-    }
+    if (_resurfacedLeftSwipeIds.contains(riderId)) return;
 
     setState(() {
-      moveInList(_allRiders);
-      moveInList(_filteredRiders);
+      _resurfacedLeftSwipeIds.add(riderId);
+      _filteredRiders.add(Map<String, dynamic>.from(rider));
     });
   }
 
