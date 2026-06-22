@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -226,11 +227,16 @@ class _RideChatWidgetState extends State<RideChatWidget> {
   @override
   Widget build(BuildContext context) {
     final currentUserId = _supabase.auth.currentUser?.id;
-    final screenWidth = MediaQuery.of(context).size.width;
+    final media = MediaQuery.of(context);
+    final screenWidth = media.size.width;
+    final panelHeight = math.min(
+      480.0,
+      math.max(390.0, media.size.height * 0.52),
+    );
 
     return Container(
       width: double.infinity,
-      height: 350,
+      height: panelHeight,
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A2E).withAlpha(242),
         borderRadius: const BorderRadius.only(
@@ -287,124 +293,166 @@ class _RideChatWidgetState extends State<RideChatWidget> {
           ),
           Divider(color: Colors.white.withAlpha(26), height: 1),
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              reverse: true,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[index];
-                final userId = message['user_id'] as String?;
-                final isOwn = userId != null && userId == currentUserId;
-                final displayName = _displayNameFor(userId);
-                final messageText = message['message'] as String? ?? '';
-                final createdAt = message['created_at'] as String?;
-                final timeStr = _formatTime(createdAt);
-
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    mainAxisAlignment:
-                        isOwn ? MainAxisAlignment.end : MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: screenWidth * 0.75,
+            child: _messages.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        'Send a quick update to your group.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withAlpha(178),
                         ),
-                        child: Column(
-                          crossAxisAlignment: isOwn
-                              ? CrossAxisAlignment.end
-                              : CrossAxisAlignment.start,
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    controller: _scrollController,
+                    reverse: true,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final message = _messages[index];
+                      final userId = message['user_id'] as String?;
+                      final isOwn = userId != null && userId == currentUserId;
+                      final displayName = _displayNameFor(userId);
+                      final messageText = message['message'] as String? ?? '';
+                      final createdAt = message['created_at'] as String?;
+                      final timeStr = _formatTime(createdAt);
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          mainAxisAlignment: isOwn
+                              ? MainAxisAlignment.end
+                              : MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text(
-                              displayName,
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: isOwn
-                                    ? const Color(0xFF93C5FD)
-                                    : Colors.white54,
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: screenWidth * 0.75,
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isOwn
-                                    ? const Color(0xFF2563EB)
-                                    : const Color(0xFF2A2A3E),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                messageText,
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              timeStr,
-                              style: GoogleFonts.inter(
-                                fontSize: 9,
-                                color: Colors.white38,
+                              child: Column(
+                                crossAxisAlignment: isOwn
+                                    ? CrossAxisAlignment.end
+                                    : CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    displayName,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: isOwn
+                                          ? const Color(0xFF93C5FD)
+                                          : Colors.white54,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isOwn
+                                          ? const Color(0xFF2563EB)
+                                          : const Color(0xFF2A2A3E),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      messageText,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 13,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    timeStr,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 9,
+                                      color: Colors.white38,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-          SizedBox(
-            height: 36,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              itemCount: _quickMessages.length,
-              itemBuilder: (context, index) {
-                final chip = _quickMessages[index];
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: GestureDetector(
-                    onTap: () {
-                      _messageController.text = chip;
-                      _sendMessage();
+                      );
                     },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2563EB).withAlpha(38),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        chip,
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: const Color(0xFF2563EB),
+                  ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111827).withAlpha(238),
+              border: Border(
+                top: BorderSide(color: Colors.white.withAlpha(20), width: 1),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Quick replies',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.2,
+                    color: Colors.white.withAlpha(204),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _quickMessages.map((chip) {
+                    return Material(
+                      color: const Color(0xFF2563EB),
+                      borderRadius: BorderRadius.circular(18),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(18),
+                        onTap: () {
+                          _messageController.text = chip;
+                          _sendMessage();
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 9,
+                          ),
+                          child: Text(
+                            chip,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                );
-              },
+                    );
+                  }).toList(),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 6),
           Container(
             color: const Color(0xFF0D0D1A),
-            padding: const EdgeInsets.all(8),
+            padding: EdgeInsets.fromLTRB(
+              8,
+              8,
+              8,
+              math.max(8.0, media.viewPadding.bottom),
+            ),
             child: Row(
               children: [
                 Expanded(
