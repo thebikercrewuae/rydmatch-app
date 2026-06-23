@@ -277,7 +277,10 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
   }
 
   Future<void> _ensureLiveRideSessionActive() async {
-    if (LiveRideService.instance.currentSessionId == widget.sessionId) return;
+    if (LiveRideService.instance.currentSessionId == widget.sessionId) {
+      await LiveRideService.instance.ensureRealtimeActive(widget.sessionId);
+      return;
+    }
 
     final joined = await LiveRideService.instance.joinRide(widget.sessionId);
     if (!mounted || joined) return;
@@ -1073,7 +1076,7 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
     return Scaffold(
       body: Stack(
         children: [
-          // ── Google Map ──────────────────────────────────────────────────
+          // Google Map
           GoogleMap(
             initialCameraPosition: CameraPosition(
               target: _myPosition ?? const LatLng(0, 0),
@@ -1097,7 +1100,7 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
             },
           ),
 
-          // ── Top Bar Overlay ─────────────────────────────────────────────
+          // Top Bar Overlay
           Positioned(
             top: 0,
             left: 0,
@@ -1252,7 +1255,7 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
             ),
           ),
 
-          // ── Bottom Panel ────────────────────────────────────────────────
+          // Bottom Panel
           if (!_isChatOpen)
             Positioned(
               bottom: 0,
@@ -1454,7 +1457,7 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
               ),
             ),
 
-          // ── Chat toggle button ──────────────────────────────────────────
+          // Chat toggle button
           if (!_isChatOpen)
             Positioned(
               right: 16,
@@ -1575,7 +1578,7 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
               ),
             ),
 
-          // ── Chat overlay ────────────────────────────────────────────────
+          // Chat overlay
           if (_isChatOpen)
             Positioned(
               bottom: 0,

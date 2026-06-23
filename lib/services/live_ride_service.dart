@@ -370,6 +370,11 @@ class LiveRideService {
     }
   }
 
+  Future<void> ensureRealtimeActive(String sessionId) async {
+    if (_currentSessionId != sessionId) return;
+    await _activateRealtime(sessionId);
+  }
+
   Future<List<Map<String, dynamic>>> getParticipants(String sessionId) async {
     try {
       final data = await _supabase
