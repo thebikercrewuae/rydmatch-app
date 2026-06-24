@@ -775,6 +775,8 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
     final nextActions = _stringList(review?['recommendedNextActions']);
     final privacyNotes = _stringList(review?['privacyNotes']);
     final generatedAt = review?['generatedAt'];
+    final aiWarning = review?['aiWarning']?.toString();
+    final aiProvider = review?['aiProvider']?.toString();
 
     return Container(
       padding: EdgeInsets.all(4.w),
@@ -830,6 +832,30 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
                 fontSize: 10.5.sp,
                 color: _bodyText,
                 fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          if (aiProvider == 'fallback' &&
+              aiWarning != null &&
+              aiWarning.trim().isNotEmpty) ...[
+            SizedBox(height: 1.h),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(3.w),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7E6),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: const Color(0xFFB7791F).withValues(alpha: 0.22),
+                ),
+              ),
+              child: Text(
+                aiWarning,
+                style: GoogleFonts.dmSans(
+                  fontSize: 9.5.sp,
+                  color: const Color(0xFF8A5A00),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -1873,7 +1899,7 @@ class _AdminDiagnosticsScreenState extends State<AdminDiagnosticsScreen> {
               SizedBox(height: 0.4.h),
               if (user != null)
                 Text(
-                  '${user['full_name'] ?? 'Unnamed'} • ${user['email'] ?? error['user_id']}',
+                  '${user['full_name'] ?? 'Unnamed'} â€¢ ${user['email'] ?? error['user_id']}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.dmSans(
