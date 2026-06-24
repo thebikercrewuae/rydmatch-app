@@ -33,9 +33,9 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get('Authorization') ?? '';
     const scheduleHeader = req.headers.get('x-scheduled-secret') ?? '';
 
-    if (!supabaseUrl || !anonKey || !serviceRoleKey || !openAiKey) {
+    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
       return jsonResponse(
-        { error: 'AI diagnostics service is not configured' },
+        { error: 'AI diagnostics service is missing Supabase configuration' },
         500,
       );
     }
@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
 
     const rows = (data ?? []) as DiagnosticRow[];
     const summary = buildDiagnosticSummary(rows, { days, feature, severity });
-    const review = await generateAiReview({
+    const reviewResult = await buildReview({
       apiKey: openAiKey,
       model,
       summary,
@@ -87,7 +87,9 @@ Deno.serve(async (req) => {
       days,
       filters: { feature, severity },
       trigger: auth.trigger,
-      ...review,
+      ...reviewResult.review,
+      aiProvider: reviewResult.provider,
+      aiWarning: reviewResult.warning,
       maintenance,
       source: {
         totalEvents: rows.length,
@@ -95,12 +97,15 @@ Deno.serve(async (req) => {
       },
     };
 
-    await storeReview(admin, responseBody, auth.userId);
+    const reviewId = await storeReview(admin, responseBody, auth.userId);
+    if (auth.trigger === 'scheduled') {
+      await notifyAdminsOfReview(admin, responseBody, reviewId);
+    }
 
     return jsonResponse(responseBody);
   } catch (error) {
     console.error('admin-diagnostics-review error:', error);
-    return jsonResponse({ error: 'Internal server error' }, 500);
+    return jsonResponse({ error: publicErrorMessage(error) }, 500);
   }
 });
 
@@ -180,10 +185,10 @@ async function storeReview(
   admin: any,
   review: Record<string, unknown>,
   userId: string | null,
-) {
+): Promise<string | null> {
   try {
     const source = review.source as Record<string, unknown> | undefined;
-    const { error } = await admin.from('admin_diagnostic_reviews').insert({
+    const { data, error } = await admin.from('admin_diagnostic_reviews').insert({
       generated_at: review.generatedAt,
       trigger_source: review.trigger,
       created_by: userId,
@@ -192,13 +197,80 @@ async function storeReview(
       grouped_issues: source?.groupedIssues ?? null,
       review,
       maintenance: review.maintenance ?? {},
-    });
+    }).select('id').single();
     if (error) {
       console.error('admin-diagnostics-review store error:', error);
+      return null;
     }
+    return typeof data?.id === 'string' ? data.id : null;
   } catch (error) {
     console.error('admin-diagnostics-review store exception:', error);
+    return null;
   }
+}
+
+async function notifyAdminsOfReview(
+  admin: any,
+  review: Record<string, unknown>,
+  reviewId: string | null,
+) {
+  try {
+    const { data: admins, error: adminError } = await admin
+      .from('user_profiles')
+      .select('id')
+      .eq('is_admin', true);
+
+    if (adminError) {
+      console.error('admin-diagnostics-review admin lookup error:', adminError);
+      return;
+    }
+
+    const rows = (admins ?? [])
+      .map((row: { id?: string }) => row.id)
+      .filter((id: unknown): id is string => typeof id === 'string')
+      .map((userId: string) => ({
+        user_id: userId,
+        notification_type: 'admin_diagnostics_review',
+        title: 'Daily AI diagnostics review',
+        message: buildNotificationMessage(review),
+        action_route: '/admin-diagnostics-screen',
+        action_arguments: {
+          review_id: reviewId,
+          generated_at: review.generatedAt,
+          total_events: (review.source as Record<string, unknown> | undefined)
+            ?.totalEvents ?? 0,
+          grouped_issues: (review.source as Record<string, unknown> | undefined)
+            ?.groupedIssues ?? 0,
+          days: review.days,
+        },
+        reference_id: reviewId,
+      }));
+
+    if (rows.length === 0) return;
+
+    const { error } = await admin.from('notifications').insert(rows);
+    if (error) {
+      console.error('admin-diagnostics-review notification error:', error);
+    }
+  } catch (error) {
+    console.error('admin-diagnostics-review notification exception:', error);
+  }
+}
+
+function buildNotificationMessage(review: Record<string, unknown>): string {
+  const source = review.source as Record<string, unknown> | undefined;
+  const total = Number(source?.totalEvents ?? 0);
+  const blockers = Array.isArray(review.releaseBlockers)
+    ? review.releaseBlockers.length
+    : 0;
+  const actions = Array.isArray(review.recommendedNextActions)
+    ? review.recommendedNextActions
+    : [];
+  const topAction = typeof actions[0] === 'string' ? actions[0] : '';
+  const overview = typeof review.overview === 'string' ? review.overview : '';
+  const summary = overview || `${total} diagnostic events reviewed.`;
+  const actionText = topAction ? ` Top fix: ${topAction}` : '';
+  return `${summary} ${blockers} blocker(s).${actionText}`.slice(0, 450);
 }
 
 function buildDiagnosticSummary(
@@ -285,6 +357,73 @@ function buildDiagnosticSummary(
   };
 }
 
+async function buildReview({
+  apiKey,
+  model,
+  summary,
+}: {
+  apiKey?: string;
+  model: string;
+  summary: ReturnType<typeof buildDiagnosticSummary>;
+}): Promise<{
+  review: Record<string, unknown>;
+  provider: 'openai' | 'fallback';
+  warning: string | null;
+}> {
+  if (!apiKey) {
+    return {
+      review: buildFallbackReview(summary),
+      provider: 'fallback',
+      warning: 'OPENAI_API_KEY is not configured; using local diagnostic summary.',
+    };
+  }
+
+  try {
+    return {
+      review: await generateAiReview({ apiKey, model, summary }),
+      provider: 'openai',
+      warning: null,
+    };
+  } catch (error) {
+    console.error('admin-diagnostics-review OpenAI fallback:', error);
+    return {
+      review: buildFallbackReview(summary),
+      provider: 'fallback',
+      warning: `OpenAI review unavailable: ${publicErrorMessage(error)}`,
+    };
+  }
+}
+
+function buildFallbackReview(
+  summary: ReturnType<typeof buildDiagnosticSummary>,
+): Record<string, unknown> {
+  const issues = summary.issues ?? [];
+  const errorIssues = issues.filter((issue) => issue.severity === 'error');
+  const warningIssues = issues.filter((issue) => issue.severity === 'warning');
+  const topIssues = issues.slice(0, 6);
+  const topFeature = Object.entries(summary.featureCounts ?? {}).sort(
+    (a, b) => Number(b[1]) - Number(a[1]),
+  )[0]?.[0] ?? 'none';
+
+  return {
+    overview:
+      `${summary.totalEvents} diagnostic event(s) reviewed across ${issues.length} grouped issue(s). ` +
+      `${errorIssues.length} error group(s), ${warningIssues.length} warning group(s). Top area: ${topFeature}.`,
+    releaseBlockers: errorIssues.slice(0, 5).map((issue) =>
+      `${issue.feature}/${issue.action}: ${issue.message}`,
+    ),
+    likelyRootCauses: topIssues.map((issue) =>
+      `${issue.feature}/${issue.action} repeated ${issue.count} time(s): ${issue.message}`,
+    ),
+    recommendedNextActions: topIssues.map((issue) =>
+      `Investigate ${issue.feature}/${issue.action}; verify schema, secrets, or network dependency related to this message.`,
+    ),
+    privacyNotes: [
+      'Fallback review is generated from grouped diagnostics only and does not modify app data, SQL, or code.',
+      'User identifiers and email addresses are not included in the OpenAI/fallback summary payload.',
+    ],
+  };
+}
 async function generateAiReview({
   apiKey,
   model,
@@ -294,78 +433,89 @@ async function generateAiReview({
   model: string;
   summary: unknown;
 }) {
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      input: [
-        {
-          role: 'system',
-          content:
-            'You are a senior mobile reliability reviewer for RydMatch. Review diagnostics in read-only mode. Do not claim to have changed data, code, SQL, policies, or deployments. Avoid exposing personal data. Be concise and practical.',
-        },
-        {
-          role: 'user',
-          content:
-            `Analyze this grouped diagnostic summary and return JSON only.\n\n${JSON.stringify(summary)}`,
-        },
-      ],
-      text: {
-        format: {
-          type: 'json_schema',
-          name: 'diagnostic_review',
-          strict: true,
-          schema: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              overview: { type: 'string' },
-              releaseBlockers: {
-                type: 'array',
-                items: { type: 'string' },
-                maxItems: 5,
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 18000);
+
+  let response: Response;
+  try {
+    response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        input: [
+          {
+            role: 'system',
+            content:
+              'You are a senior mobile reliability reviewer for RydMatch. Review diagnostics in read-only mode. Do not claim to have changed data, code, SQL, policies, or deployments. Avoid exposing personal data. Be concise and practical.',
+          },
+          {
+            role: 'user',
+            content:
+              `Analyze this grouped diagnostic summary and return JSON only.\n\n${JSON.stringify(summary)}`,
+          },
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'diagnostic_review',
+            strict: true,
+            schema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                overview: { type: 'string' },
+                releaseBlockers: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  maxItems: 5,
+                },
+                likelyRootCauses: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  maxItems: 6,
+                },
+                recommendedNextActions: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  maxItems: 6,
+                },
+                privacyNotes: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  maxItems: 4,
+                },
               },
-              likelyRootCauses: {
-                type: 'array',
-                items: { type: 'string' },
-                maxItems: 6,
-              },
-              recommendedNextActions: {
-                type: 'array',
-                items: { type: 'string' },
-                maxItems: 6,
-              },
-              privacyNotes: {
-                type: 'array',
-                items: { type: 'string' },
-                maxItems: 4,
-              },
+              required: [
+                'overview',
+                'releaseBlockers',
+                'likelyRootCauses',
+                'recommendedNextActions',
+                'privacyNotes',
+              ],
             },
-            required: [
-              'overview',
-              'releaseBlockers',
-              'likelyRootCauses',
-              'recommendedNextActions',
-              'privacyNotes',
-            ],
           },
         },
-      },
-    }),
-  });
+      }),
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
-  const data = await response.json();
+  const data = await safeResponseJson(response);
   if (!response.ok) {
     console.error('OpenAI diagnostics review error:', data);
     throw new Error('Could not generate AI diagnostics review');
   }
 
   const text =
-    typeof data.output_text === 'string' ? data.output_text : extractOutputText(data);
+    typeof data?.output_text === 'string'
+      ? data.output_text
+      : extractOutputText(data);
   if (!text) {
     throw new Error('AI diagnostics review returned no text');
   }
@@ -373,6 +523,13 @@ async function generateAiReview({
   return JSON.parse(text);
 }
 
+async function safeResponseJson(response: Response): Promise<any> {
+  try {
+    return await response.json();
+  } catch (_) {
+    return null;
+  }
+}
 function extractOutputText(data: any): string | null {
   const output = Array.isArray(data?.output) ? data.output : [];
   for (const item of output) {
@@ -446,6 +603,13 @@ function later(left: string | null, right: string | null): string | null {
   return left > right ? left : right;
 }
 
+function publicErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.slice(0, 300);
+  }
+  const text = String(error ?? '').trim();
+  return text ? text.slice(0, 300) : 'Internal server error';
+}
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,

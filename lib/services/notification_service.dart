@@ -12,6 +12,7 @@ enum NotificationType {
   rideGroupInvite,
   rideStarted,
   emergencySos,
+  adminDiagnosticsReview,
   urgentAlert;
 
   static NotificationType fromString(String value) {
@@ -28,6 +29,8 @@ enum NotificationType {
         return NotificationType.rideStarted;
       case 'emergency_sos':
         return NotificationType.emergencySos;
+      case 'admin_diagnostics_review':
+        return NotificationType.adminDiagnosticsReview;
       case 'urgent_alert':
         return NotificationType.urgentAlert;
       default:
@@ -49,6 +52,8 @@ enum NotificationType {
         return 'ride_started';
       case NotificationType.emergencySos:
         return 'emergency_sos';
+      case NotificationType.adminDiagnosticsReview:
+        return 'admin_diagnostics_review';
       case NotificationType.urgentAlert:
         return 'urgent_alert';
     }
@@ -335,7 +340,9 @@ class NotificationService extends ChangeNotifier {
               if (!notification.isRead &&
                   (notification.type == NotificationType.newMessage ||
                       notification.type == NotificationType.rideStarted ||
-                      notification.type == NotificationType.emergencySos)) {
+                      notification.type == NotificationType.emergencySos ||
+                      notification.type ==
+                          NotificationType.adminDiagnosticsReview)) {
                 _bannerController.add(notification);
               }
             } catch (e) {
