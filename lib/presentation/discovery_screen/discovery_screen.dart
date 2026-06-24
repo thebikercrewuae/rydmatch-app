@@ -41,6 +41,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
   final List<Map<String, dynamic>> _allRiders = [];
   List<Map<String, dynamic>> _filteredRiders = [];
+  final List<Map<String, dynamic>> _leftSwipeResurfaceQueue = [];
 
   int _currentCardIndex = 0;
   bool _isEmpty = true;
@@ -55,6 +56,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
   final Set<String> _swipedIds = {};
   final Set<String> _resurfacedLeftSwipeIds = {};
+  int _swiperDeckVersion = 0;
 
   String _myName = 'You';
   String? _myPhoto;
@@ -723,11 +725,19 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     }
 
     if (currentIndex == null) {
-      setState(() {
-        _isEmpty = direction == CardSwiperDirection.left
-            ? _filteredRiders.isEmpty
-            : true;
-      });
+      if (direction == CardSwiperDirection.left) {
+        final nextIndex = previousIndex + 1;
+        if (nextIndex < _filteredRiders.length) {
+          setState(() {
+            _currentCardIndex = nextIndex;
+            _isEmpty = false;
+          });
+        } else {
+          _showQueuedLeftSwipeRiders();
+        }
+      } else {
+        setState(() => _isEmpty = true);
+      }
     } else {
       _currentCardIndex = currentIndex;
     }
@@ -811,10 +821,24 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
     if (_resurfacedLeftSwipeIds.contains(riderId)) return;
 
+    _resurfacedLeftSwipeIds.add(riderId);
+    _leftSwipeResurfaceQueue.add(Map<String, dynamic>.from(rider));
+  }
+
+  bool _showQueuedLeftSwipeRiders() {
+    if (_leftSwipeResurfaceQueue.isEmpty) return false;
+
     setState(() {
-      _resurfacedLeftSwipeIds.add(riderId);
-      _filteredRiders.add(Map<String, dynamic>.from(rider));
+      _filteredRiders = List<Map<String, dynamic>>.from(
+        _leftSwipeResurfaceQueue,
+      );
+      _leftSwipeResurfaceQueue.clear();
+      _currentCardIndex = 0;
+      _isEmpty = false;
+      _swiperDeckVersion++;
     });
+
+    return true;
   }
 
   void _handlePass() {
@@ -1473,6 +1497,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                     : Stack(
                         children: [
                           CardSwiper(
+                            key: ValueKey(_swiperDeckVersion),
                             controller: _swiperController,
                             cardsCount: _filteredRiders.length,
                             isLoop: false,
@@ -1484,6 +1509,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                               return true;
                             },
                             onEnd: () {
+                              if (_showQueuedLeftSwipeRiders()) return;
+
                               setState(() {
                                 _filteredRiders.clear();
                                 _isEmpty = true;
