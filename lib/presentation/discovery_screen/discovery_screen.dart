@@ -41,7 +41,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
   final List<Map<String, dynamic>> _allRiders = [];
   List<Map<String, dynamic>> _filteredRiders = [];
-  final List<Map<String, dynamic>> _leftSwipeResurfaceQueue = [];
 
   int _currentCardIndex = 0;
   bool _isEmpty = true;
@@ -56,7 +55,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
   final Set<String> _swipedIds = {};
   final Set<String> _resurfacedLeftSwipeIds = {};
-  int _swiperDeckVersion = 0;
+  final int _swiperDeckVersion = 0;
 
   String _myName = 'You';
   String? _myPhoto;
@@ -507,7 +506,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       final rideMode = p['ride_mode'] as String? ?? 'motorcycle';
       final rideModeLabel = _rideModeLabel(rideMode);
 
-      String distanceLabel = _isMetric ? '— km' : '— mi';
+      String distanceLabel = _isMetric ? '- km' : '- mi';
       double? distanceMilesValue;
 
       if (_myLat != null &&
@@ -718,7 +717,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     }
 
     if (direction == CardSwiperDirection.left) {
-      _queueRiderForResurface(rider);
+      _appendRiderToDeckEnd(previousIndex, rider);
     } else {
       _allRiders.removeWhere((r) => r['id'] == swipedId);
       _filteredRiders.removeWhere((r) => r['id'] == swipedId);
@@ -733,7 +732,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
             _isEmpty = false;
           });
         } else {
-          _showQueuedLeftSwipeRiders();
+          setState(() => _isEmpty = true);
         }
       } else {
         setState(() => _isEmpty = true);
@@ -815,30 +814,22 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     }
   }
 
-  void _queueRiderForResurface(Map<String, dynamic> rider) {
+  void _appendRiderToDeckEnd(int previousIndex, Map<String, dynamic> rider) {
     final riderId = rider['id'] as String? ?? '';
     if (riderId.isEmpty) return;
 
     if (_resurfacedLeftSwipeIds.contains(riderId)) return;
 
+    final alreadyQueuedBehindCurrent = _filteredRiders
+        .skip(previousIndex + 1)
+        .any((r) => r['id'] == riderId);
+    if (alreadyQueuedBehindCurrent) return;
+
     _resurfacedLeftSwipeIds.add(riderId);
-    _leftSwipeResurfaceQueue.add(Map<String, dynamic>.from(rider));
-  }
-
-  bool _showQueuedLeftSwipeRiders() {
-    if (_leftSwipeResurfaceQueue.isEmpty) return false;
-
     setState(() {
-      _filteredRiders = List<Map<String, dynamic>>.from(
-        _leftSwipeResurfaceQueue,
-      );
-      _leftSwipeResurfaceQueue.clear();
-      _currentCardIndex = 0;
+      _filteredRiders.add(Map<String, dynamic>.from(rider));
       _isEmpty = false;
-      _swiperDeckVersion++;
     });
-
-    return true;
   }
 
   void _handlePass() {
@@ -1203,7 +1194,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                             SizedBox(width: 1.w),
                             Text(
                               rider['distance'] as String? ??
-                                  (_isMetric ? '— km' : '— mi'),
+                                  (_isMetric ? '- km' : '- mi'),
                               style: GoogleFonts.dmSans(
                                 fontSize: 12.sp,
                                 color: theme.colorScheme.onSurfaceVariant,
@@ -1509,8 +1500,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                               return true;
                             },
                             onEnd: () {
-                              if (_showQueuedLeftSwipeRiders()) return;
-
                               setState(() {
                                 _filteredRiders.clear();
                                 _isEmpty = true;
