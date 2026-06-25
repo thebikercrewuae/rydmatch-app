@@ -307,7 +307,7 @@ async function getConnection(adminClient: any, userId: string) {
 
   if (error) {
     console.error('Strava connection lookup failed:', error);
-    throw new Error('Could not load Strava connection');
+    return null;
   }
 
   return data;
@@ -427,3 +427,4 @@ function jsonResponse(body: unknown, status = 200): Response {
     },
   });
 }
+

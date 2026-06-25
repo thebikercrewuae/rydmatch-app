@@ -174,7 +174,9 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
       }
       final XFile? photo = await picker.pickImage(
         source: ImageSource.camera,
-        imageQuality: 85,
+        imageQuality: 78,
+        maxWidth: 1600,
+        maxHeight: 1600,
       );
       if (photo != null) {
         final adjustedPhoto = await _adjustRiderPhoto(photo);
@@ -189,7 +191,9 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
     try {
       final XFile? photo = await picker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 85,
+        imageQuality: 78,
+        maxWidth: 1600,
+        maxHeight: 1600,
       );
       if (photo != null) {
         final adjustedPhoto = await _adjustRiderPhoto(photo);
@@ -219,7 +223,9 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
       }
       final XFile? photo = await picker.pickImage(
         source: ImageSource.camera,
-        imageQuality: 85,
+        imageQuality: 78,
+        maxWidth: 1600,
+        maxHeight: 1600,
       );
       if (photo != null) {
         widget.onBikePhotosChanged([...widget.bikePhotos, photo]);
@@ -232,7 +238,9 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
   Future<void> _pickBikeFromGallery(ImagePicker picker) async {
     try {
       final List<XFile> photos = await ImagePicker().pickMultiImage(
-        imageQuality: 85,
+        imageQuality: 78,
+        maxWidth: 1600,
+        maxHeight: 1600,
       );
       if (photos.isNotEmpty) {
         final remaining =
@@ -257,9 +265,9 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
     widget.onExistingBikePhotoUrlsChanged(updated);
   }
 
-  /// Builds the rider photo image widget — handles new XFile, existing URL, or placeholder
+  /// Builds the rider photo image widget - handles new XFile, existing URL, or placeholder
   Widget _buildRiderPhotoImage() {
-    // New photo picked — show from XFile
+    // New photo picked - show from XFile
     if (widget.riderPhoto != null) {
       if (kIsWeb) {
         return CustomImageWidget(
@@ -458,7 +466,7 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 8.w),
                       child: Text(
-                        'Show your face — riders want to know who they\'re riding with',
+                        'Show your face - riders want to know who they\'re riding with',
                         style: theme.textTheme.bodySmall,
                         textAlign: TextAlign.center,
                         maxLines: 2,
@@ -517,7 +525,7 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
         ),
         SizedBox(height: 0.5.h),
         Text(
-          'Show off your ride — add up to ${PhotoUploadWidget.maxBikePhotos} bike photos',
+          'Show off your ride - add up to ${PhotoUploadWidget.maxBikePhotos} bike photos',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
