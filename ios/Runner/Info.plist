@@ -53,5 +53,29 @@
 	<string>RydMatch needs your location to track your ride route in the background.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>RydMatch uses your microphone for live ride voice chat.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>RydMatch uses your camera so you can add profile, motorcycle, and ride photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>RydMatch lets you choose photos from your library for your profile, motorcycle, and ride posts.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>RydMatch may save photos you choose to share with your rides and profile.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.rydmatch.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>rydmatch</string>
+			</array>
+		</dict>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>waze</string>
+		<string>instagram</string>
+		<string>tiktok</string>
+		<string>youtube</string>
+	</array>
 </dict>
 </plist>
