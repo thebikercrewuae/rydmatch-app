@@ -96,6 +96,18 @@ class BikeCardWidget extends StatelessWidget {
     final theme = Theme.of(context);
     final isPrimary = bike['isPrimary'] as bool? ?? false;
     final photoPath = bike['photo'] as String?;
+    final rawMods = bike['mods'];
+    final mods = rawMods is List
+        ? rawMods
+              .map((mod) => mod.toString().trim())
+              .where((mod) => mod.isNotEmpty)
+              .toList()
+        : <String>[];
+    final displayedMods = mods.take(2).join(', ');
+    final extraMods = mods.length > 2 ? ' +${mods.length - 2} more' : '';
+    final modsLabel = mods.isEmpty
+        ? 'No modifications'
+        : '$displayedMods$extraMods';
 
     return GestureDetector(
       onTap: onTap,
@@ -187,7 +199,7 @@ class BikeCardWidget extends StatelessWidget {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            '${(bike['mods'] as List?)?.length ?? 0} modifications',
+                            modsLabel,
                             style: GoogleFonts.manrope(
                               fontSize: 10.sp,
                               color: theme.colorScheme.onSurfaceVariant,

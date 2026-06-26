@@ -30,6 +30,25 @@ class _GarageScreenState extends State<GarageScreen> {
 
   String? get _userId => _supabase.auth.currentUser?.id;
 
+  List<String> _normalizeMods(dynamic rawMods) {
+    if (rawMods is List) {
+      return rawMods
+          .map((mod) => mod.toString().trim())
+          .where((mod) => mod.isNotEmpty)
+          .toList();
+    }
+
+    if (rawMods is String && rawMods.trim().isNotEmpty) {
+      return rawMods
+          .split(',')
+          .map((mod) => mod.trim())
+          .where((mod) => mod.isNotEmpty)
+          .toList();
+    }
+
+    return <String>[];
+  }
+
   @override
   void initState() {
     super.initState();
@@ -74,7 +93,7 @@ class _GarageScreenState extends State<GarageScreen> {
                       {'url': photoUrl, 'label': 'Motorcycle photo'},
                     ]
                   : [],
-              'mods': [],
+              'mods': _normalizeMods(r['mods']),
             });
           }
           _isLoading = false;
@@ -114,6 +133,7 @@ class _GarageScreenState extends State<GarageScreen> {
       'mileage': bike['mileage'] ?? '',
       'bike_type': bike['bikeType'] ?? '',
       'notes': bike['notes'] ?? '',
+      'mods': _normalizeMods(bike['mods']),
       'is_primary': isPrimary,
       if (photoUrl != null) 'photo_url': photoUrl,
     });
@@ -140,6 +160,7 @@ class _GarageScreenState extends State<GarageScreen> {
       'mileage': bike['mileage'] ?? '',
       'bike_type': bike['bikeType'] ?? '',
       'notes': bike['notes'] ?? '',
+      'mods': _normalizeMods(bike['mods']),
       'photo_url': photoUrl,
       'updated_at': DateTime.now().toIso8601String(),
     };

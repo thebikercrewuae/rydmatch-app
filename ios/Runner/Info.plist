@@ -51,6 +51,8 @@
 	<string>RydMatch needs your location to show it on the map and help plan your rides.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>RydMatch needs your location to track your ride route in the background.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>RydMatch uses your location during live rides to share your position with your ride group, show rider markers, and help track your ride route even when the app is in the background.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>RydMatch uses your microphone for live ride voice chat.</string>
 	<key>NSCameraUsageDescription</key>
