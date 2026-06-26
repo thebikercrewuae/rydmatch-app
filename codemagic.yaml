@@ -224,6 +224,11 @@ workflows:
 
       - name: Set up iOS code signing
         script: |
+          app-store-connect fetch-signing-files com.rydmatch.app \
+            --type IOS_APP_STORE \
+            --create
+          keychain initialize
+          keychain add-certificates
           xcode-project use-profiles
 
       - name: Build iOS IPA
