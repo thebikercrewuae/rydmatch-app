@@ -240,12 +240,15 @@ workflows:
         script: |
           APP_VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
           APP_VERSION_NAME="${APP_VERSION%%+*}"
-          APP_VERSION_CODE="${APP_VERSION##*+}"
+          PUBSPEC_BUILD_NUMBER="${APP_VERSION##*+}"
+          IOS_BUILD_NUMBER="${IOS_BUILD_NUMBER:-$(date -u +%Y%m%d%H%M%S)}"
 
-          if [ -z "$APP_VERSION_NAME" ] || [ -z "$APP_VERSION_CODE" ] || [ "$APP_VERSION_NAME" = "$APP_VERSION_CODE" ]; then
+          if [ -z "$APP_VERSION_NAME" ] || [ -z "$PUBSPEC_BUILD_NUMBER" ] || [ "$APP_VERSION_NAME" = "$PUBSPEC_BUILD_NUMBER" ]; then
             echo "Could not read app version from pubspec.yaml. Expected format: version: 1.0.24+24"
             exit 1
           fi
+
+          echo "Building iOS IPA versionName=$APP_VERSION_NAME buildNumber=$IOS_BUILD_NUMBER"
 
           EXPORT_OPTIONS_PLIST="${CM_EXPORT_OPTIONS_PLIST:-}"
           if [ -z "$EXPORT_OPTIONS_PLIST" ] && [ -f "/Users/builder/export_options.plist" ]; then
@@ -263,7 +266,7 @@ workflows:
           flutter build ipa \
             --release \
             --build-name="$APP_VERSION_NAME" \
-            --build-number="$APP_VERSION_CODE" \
+            --build-number="$IOS_BUILD_NUMBER" \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
             --dart-define=GOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY" \
