@@ -130,7 +130,9 @@ class _AddEditBikeModalWidgetState extends State<AddEditBikeModalWidget> {
                     final picker = ImagePicker();
                     final XFile? image = await picker.pickImage(
                       source: ImageSource.camera,
-                      imageQuality: 85,
+                      imageQuality: 78,
+                      maxWidth: 1600,
+                      maxHeight: 1600,
                     );
                     if (image != null) {
                       setState(() {
@@ -172,7 +174,9 @@ class _AddEditBikeModalWidgetState extends State<AddEditBikeModalWidget> {
                     final picker = ImagePicker();
                     final XFile? image = await picker.pickImage(
                       source: ImageSource.gallery,
-                      imageQuality: 85,
+                      imageQuality: 78,
+                      maxWidth: 1600,
+                      maxHeight: 1600,
                     );
                     if (image != null) {
                       setState(() {

@@ -84,7 +84,11 @@ class ProfileService {
       }
 
       final safety = await PhotoSafetyService.assessBytes(bytes);
-      if (!safety.allowed) {
+      final isBikePhoto = folder == 'bikes' || folder == 'profile-bikes';
+      final isRedBikeFalsePositive =
+          isBikePhoto &&
+          safety.reason == PhotoSafetyService.graphicViolenceBlockedMessage;
+      if (!safety.allowed && !isRedBikeFalsePositive) {
         _lastUploadError = safety.reason ?? PhotoSafetyService.blockedMessage;
         debugPrint(
           '⚠️ uploadPhoto: blocked by photo safety filter '
@@ -382,11 +386,14 @@ class ProfileService {
 
     for (final bikePhoto in bikePhotoFiles) {
       final uploadedUrl = await uploadPhoto(bikePhoto, 'profile-bikes');
-      if (uploadedUrl != null &&
-          uploadedUrl.isNotEmpty &&
-          !uploadedUrl.startsWith('blob:')) {
-        resolvedBikePhotoUrls.add(uploadedUrl);
+      if (uploadedUrl == null ||
+          uploadedUrl.isEmpty ||
+          uploadedUrl.startsWith('blob:')) {
+        throw Exception(
+          'Motorcycle photo upload failed${_lastUploadError != null ? ': $_lastUploadError' : ''}',
+        );
       }
+      resolvedBikePhotoUrls.add(uploadedUrl);
     }
 
     if (resolvedPhotoUrl != null && resolvedPhotoUrl.isNotEmpty) {

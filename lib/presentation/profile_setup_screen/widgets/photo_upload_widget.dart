@@ -244,7 +244,7 @@ class _PhotoUploadWidgetState extends State<PhotoUploadWidget> {
       );
       if (photos.isNotEmpty) {
         final remaining =
-            PhotoUploadWidget.maxBikePhotos - widget.bikePhotos.length;
+            PhotoUploadWidget.maxBikePhotos - _totalBikePhotoCount;
         final toAdd = photos.take(remaining).toList();
         widget.onBikePhotosChanged([...widget.bikePhotos, ...toAdd]);
       }

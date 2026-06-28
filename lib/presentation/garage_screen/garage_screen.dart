@@ -121,6 +121,11 @@ class _GarageScreenState extends State<GarageScreen> {
 
     if (photoFile != null) {
       photoUrl = await ProfileService.uploadPhoto(photoFile, 'bikes');
+      if (photoUrl == null || photoUrl.isEmpty) {
+        throw Exception(
+          ProfileService.lastUploadError ?? 'Motorcycle photo upload failed.',
+        );
+      }
     }
 
     await _supabase.from('garage_bikes').insert({
@@ -149,6 +154,11 @@ class _GarageScreenState extends State<GarageScreen> {
 
     if (photoFile != null) {
       photoUrl = await ProfileService.uploadPhoto(photoFile, 'bikes');
+      if (photoUrl == null || photoUrl.isEmpty) {
+        throw Exception(
+          ProfileService.lastUploadError ?? 'Motorcycle photo upload failed.',
+        );
+      }
     }
 
     final updateData = <String, dynamic>{
