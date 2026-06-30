@@ -1406,7 +1406,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                         onTap: () => Navigator.of(
                           context,
                           rootNavigator: true,
-                        ).pushNamed('/matches-screen'),
+                        ).pushNamed('/ride-groups-screen'),
                         child: Icon(
                           Icons.sports_motorsports,
                           color: theme.colorScheme.primary,
