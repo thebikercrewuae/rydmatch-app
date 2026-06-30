@@ -1050,14 +1050,14 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                         child: ElevatedButton.icon(
                           onPressed: () => Navigator.pushNamed(
                             context,
-                            '/route-planner-screen',
+                            '/garage-screen',
                           ),
                           icon: const Icon(
-                            Icons.map_outlined,
+                            Icons.garage_outlined,
                             color: Colors.white,
                           ),
                           label: Text(
-                            'Plan a Ride',
+                            'My Garage',
                             style: GoogleFonts.dmSans(
                               fontSize: 14.sp,
                               fontWeight: FontWeight.w600,

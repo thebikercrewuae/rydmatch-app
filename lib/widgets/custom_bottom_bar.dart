@@ -68,9 +68,9 @@ class CustomBottomBar extends StatelessWidget {
               _buildNavItem(
                 context: context,
                 index: 4,
-                icon: Icons.garage_outlined,
-                activeIcon: Icons.garage_rounded,
-                label: 'Garage',
+                icon: Icons.map_outlined,
+                activeIcon: Icons.map_rounded,
+                label: 'Plan Ride',
               ),
             ],
           ),

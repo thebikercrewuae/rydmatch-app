@@ -183,7 +183,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                     Navigator.of(
                       context,
                       rootNavigator: true,
-                    ).pushNamed('/garage-screen').then((_) {
+                    ).pushNamed('/route-planner-screen').then((_) {
                       if (mounted) setState(() => _currentIndex = 0);
                     });
                     setState(() => _currentIndex = 4);
