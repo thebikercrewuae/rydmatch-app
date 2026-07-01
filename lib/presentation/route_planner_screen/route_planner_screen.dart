@@ -1197,6 +1197,221 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     );
   }
 
+  LatLng? _savedWaypointPoint(Map<String, dynamic> waypoint) {
+    final lat = waypoint['lat'];
+    final lng = waypoint['lng'];
+    if (lat is num && lng is num) {
+      return LatLng(lat.toDouble(), lng.toDouble());
+    }
+    return null;
+  }
+
+  Future<void> _loadSavedRoute(Map<String, dynamic> route) async {
+    final rawWaypoints = route['waypoints'];
+    if (rawWaypoints is! List) return;
+
+    final waypoints = rawWaypoints
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+    final start = waypoints
+        .where((item) => item['type'] == 'start')
+        .firstOrNull;
+    final end = waypoints.where((item) => item['type'] == 'end').firstOrNull;
+    if (start == null || end == null) {
+      AppToast.show(
+        context,
+        message: 'This saved route is incomplete.',
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    final startLabel = start['label']?.toString() ?? '';
+    final endLabel = end['label']?.toString() ?? '';
+    final startPoint =
+        _savedWaypointPoint(start) ??
+        await _geocodeAddress(startLabel, biasToStart: false);
+    if (!mounted) return;
+    if (startPoint == null) {
+      AppToast.show(
+        context,
+        message: 'Could not locate the saved start point.',
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    setState(() {
+      _startPoint = startPoint;
+      _startSet = true;
+      _startController.text = startLabel;
+    });
+
+    final stopLabels = <String>[];
+    final stopPoints = <LatLng>[];
+    for (final stop in waypoints.where((item) => item['type'] == 'waypoint')) {
+      final label = stop['label']?.toString() ?? '';
+      final point = _savedWaypointPoint(stop) ?? await _geocodeAddress(label);
+      if (point != null) {
+        stopLabels.add(label);
+        stopPoints.add(point);
+      }
+    }
+
+    final endPoint =
+        _savedWaypointPoint(end) ?? await _geocodeAddress(endLabel);
+    if (!mounted) return;
+    if (endPoint == null) {
+      AppToast.show(
+        context,
+        message: 'Could not locate the saved destination.',
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    setState(() {
+      _endPoint = endPoint;
+      _destinationController.text = endLabel;
+      _waypoints
+        ..clear()
+        ..addAll(stopLabels);
+      _waypointPoints
+        ..clear()
+        ..addAll(stopPoints);
+      _routeType = route['route_type'] as String? ?? 'fastest';
+      _weatherLocation = _weatherLocationForPoint(endPoint);
+      _routeSet = false;
+    });
+    _rebuildMapOverlays();
+    _updateRoute();
+  }
+
+  Future<void> _showSavedRoutes() async {
+    final client = Supabase.instance.client;
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      final response = await client
+          .from('saved_routes')
+          .select()
+          .eq('user_id', userId)
+          .order('updated_at', ascending: false);
+      if (!mounted) return;
+
+      final routes = (response as List)
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (sheetContext) => SafeArea(
+          child: SizedBox(
+            height: 70.h,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(5.w, 0, 5.w, 1.5.h),
+                  child: Text(
+                    'Saved Routes',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: routes.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No saved routes yet',
+                            style: GoogleFonts.dmSans(fontSize: 13.sp),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: EdgeInsets.symmetric(horizontal: 4.w),
+                          itemCount: routes.length,
+                          separatorBuilder: (_, _) => const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final route = routes[index];
+                            final points = route['waypoints'] is List
+                                ? route['waypoints'] as List
+                                : const [];
+                            final labels = points
+                                .whereType<Map>()
+                                .map(
+                                  (point) => point['label']?.toString() ?? '',
+                                )
+                                .where((label) => label.isNotEmpty)
+                                .toList();
+                            final routeLine = labels.length >= 2
+                                ? '${labels.first} → ${labels.last}'
+                                : 'Tap to open this route';
+                            final distance =
+                                (route['distance_km'] as num?)?.toDouble() ?? 0;
+
+                            return ListTile(
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 2.w,
+                                vertical: 0.6.h,
+                              ),
+                              leading: const CircleAvatar(
+                                backgroundColor: Color(0xFF1B365D),
+                                foregroundColor: Colors.white,
+                                child: Icon(Icons.route_rounded),
+                              ),
+                              title: Text(
+                                route['name'] as String? ?? 'Saved Route',
+                                style: GoogleFonts.dmSans(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Text(
+                                distance > 0
+                                    ? '$routeLine\n${distance.toStringAsFixed(1)} km'
+                                    : routeLine,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.dmSans(),
+                              ),
+                              isThreeLine: distance > 0,
+                              trailing: const Icon(Icons.chevron_right_rounded),
+                              onTap: () async {
+                                Navigator.pop(sheetContext);
+                                await _loadSavedRoute(route);
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } catch (error, stackTrace) {
+      await DiagnosticsService.instance.logError(
+        feature: 'route_planner',
+        action: 'load_saved_routes',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        AppToast.show(
+          context,
+          message: 'Could not load saved routes.',
+          type: ToastType.error,
+        );
+      }
+    }
+  }
+
   Future<void> _saveRoute() async {
     if (_startController.text.isEmpty || _destinationController.text.isEmpty) {
       AppToast.show(
@@ -1261,9 +1476,29 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       final userId = client.auth.currentUser?.id;
 
       final waypointsData = [
-        {'label': _startController.text, 'type': 'start'},
-        ..._waypoints.map((w) => {'label': w, 'type': 'waypoint'}),
-        {'label': _destinationController.text, 'type': 'end'},
+        {
+          'label': _startController.text,
+          'type': 'start',
+          'lat': _startPoint.latitude,
+          'lng': _startPoint.longitude,
+        },
+        ...List.generate(_waypoints.length, (index) {
+          final point = index < _waypointPoints.length
+              ? _waypointPoints[index]
+              : null;
+          return {
+            'label': _waypoints[index],
+            'type': 'waypoint',
+            if (point != null) 'lat': point.latitude,
+            if (point != null) 'lng': point.longitude,
+          };
+        }),
+        {
+          'label': _destinationController.text,
+          'type': 'end',
+          'lat': _endPoint.latitude,
+          'lng': _endPoint.longitude,
+        },
       ];
 
       await client.from('saved_routes').insert({
@@ -2030,6 +2265,15 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                 ],
               ),
               actions: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.bookmarks_outlined,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                  onPressed: _showSavedRoutes,
+                  tooltip: 'Saved Routes',
+                ),
                 IconButton(
                   icon: const Icon(
                     Icons.share_outlined,
