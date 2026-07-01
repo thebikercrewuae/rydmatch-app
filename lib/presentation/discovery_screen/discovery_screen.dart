@@ -12,6 +12,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../presentation/match_success_screen/match_success_screen.dart';
 import '../../services/analytics_service.dart';
 import '../../services/diagnostics_service.dart';
+import '../../services/discovery_distance_filter.dart';
 import '../../services/haptic_service.dart';
 import '../../services/premium_service.dart';
 import '../../services/profile_service.dart';
@@ -98,34 +99,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       _loadMyProfile(),
     ]);
 
-    _loadRiders();
-
-    _fetchAndStoreLocation().then((_) {
-      if (mounted && _allRiders.isNotEmpty) {
-        setState(() {
-          for (int i = 0; i < _allRiders.length; i++) {
-            final p = _allRiders[i];
-            final otherLat = p['_rawLat'] as double?;
-            final otherLng = p['_rawLng'] as double?;
-
-            if (_myLat != null &&
-                _myLng != null &&
-                otherLat != null &&
-                otherLng != null) {
-              final d = _distanceMiles(_myLat!, _myLng!, otherLat, otherLng);
-              _allRiders[i] = {
-                ..._allRiders[i],
-                'distance': _formatDistance(d),
-                'distanceMiles': d,
-              };
-            }
-          }
-
-          _filteredRiders = _applyFiltersToList(_allRiders, _activeFilters);
-          _isEmpty = _filteredRiders.isEmpty;
-        });
-      }
-    });
+    await _fetchAndStoreLocation();
+    await _loadRiders();
   }
 
   Future<bool> _loadUnitPreference() async {
@@ -625,15 +600,13 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     return riders.where((rider) {
       final distanceMiles = rider['distanceMiles'] as double?;
 
-      final distanceLimitMiles = _isMetric
-          ? filters.distance / 1.609344
-          : filters.distance;
-
-      if (filters.distance < 500 &&
-          _myLat != null &&
-          _myLng != null &&
-          distanceMiles != null) {
-        if (distanceMiles > distanceLimitMiles) return false;
+      if (!DiscoveryDistanceFilter.includes(
+        hasViewerLocation: _myLat != null && _myLng != null,
+        distanceMiles: distanceMiles,
+        radius: filters.distance,
+        isMetric: _isMetric,
+      )) {
+        return false;
       }
 
       if (filters.skillLevel != 'All') {
@@ -950,7 +923,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Search radius expanded. Showing all riders'),
+        content: Text('Search radius expanded to the maximum distance'),
         duration: Duration(seconds: 2),
       ),
     );
