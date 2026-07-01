@@ -22,6 +22,7 @@ class LiveRideMapScreen extends StatefulWidget {
   final bool isCreator;
   final String initialRouteName;
   final List<LatLng> initialRoutePoints;
+  final List<LatLng> initialWaypointPoints;
 
   const LiveRideMapScreen({
     super.key,
@@ -30,6 +31,7 @@ class LiveRideMapScreen extends StatefulWidget {
     required this.isCreator,
     this.initialRouteName = '',
     this.initialRoutePoints = const [],
+    this.initialWaypointPoints = const [],
   });
 
   @override
@@ -43,6 +45,7 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
   final Set<Polyline> _polylines = {};
   final Map<String, List<LatLng>> _riderTrails = {};
   List<LatLng> _plannedRoutePoints = [];
+  List<LatLng> _plannedWaypointPoints = [];
   String _plannedRouteName = '';
   bool _hasFittedInitialView = false;
   LatLng? _myPosition;
@@ -162,7 +165,7 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
 
       final group = await Supabase.instance.client
           .from('ride_groups')
-          .select('route, route_polyline')
+          .select('route, route_polyline, route_waypoints')
           .eq('id', rideGroupId)
           .maybeSingle();
 
@@ -181,6 +184,7 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
       setState(() {
         _plannedRouteName = group['route'] as String? ?? '';
         _plannedRoutePoints = routePoints;
+        _plannedWaypointPoints = _parseRouteWaypoints(group['route_waypoints']);
       });
       _rebuildMarkers();
       _fitInitialView();
@@ -226,12 +230,39 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
         .toList();
   }
 
+  List<LatLng> _parseRouteWaypoints(dynamic value) {
+    if (value is! List) return const [];
+
+    return value
+        .map((item) {
+          if (item is Map) {
+            final lat = item['lat'];
+            final lng = item['lng'];
+            if (lat is num && lng is num) {
+              return LatLng(lat.toDouble(), lng.toDouble());
+            }
+          }
+          if (item is String) {
+            final parts = item.split(',');
+            if (parts.length == 2) {
+              final lat = double.tryParse(parts[0].trim());
+              final lng = double.tryParse(parts[1].trim());
+              if (lat != null && lng != null) return LatLng(lat, lng);
+            }
+          }
+          return null;
+        })
+        .whereType<LatLng>()
+        .toList();
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _plannedRouteName = widget.initialRouteName;
     _plannedRoutePoints = List<LatLng>.from(widget.initialRoutePoints);
+    _plannedWaypointPoints = List<LatLng>.from(widget.initialWaypointPoints);
     if (_plannedRoutePoints.length >= 2) {
       unawaited(_rebuildMarkers());
     }
@@ -513,20 +544,13 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
   }
 
   List<LatLng> _navigationWaypoints() {
-    if (_plannedRoutePoints.length < 2) return const [];
-
-    final candidates = _plannedRoutePoints.sublist(
-      0,
-      _plannedRoutePoints.length - 1,
-    );
+    // Only user-selected stops belong in an external navigation request.
+    // Polyline shaping points are road geometry, not destinations.
     const maxWaypoints = 6;
-    if (candidates.length <= maxWaypoints) return candidates;
-
-    return List.generate(maxWaypoints, (index) {
-      final candidateIndex =
-          (index * (candidates.length - 1) / (maxWaypoints - 1)).round();
-      return candidates[candidateIndex];
-    });
+    if (_plannedWaypointPoints.length <= maxWaypoints) {
+      return List<LatLng>.from(_plannedWaypointPoints);
+    }
+    return _plannedWaypointPoints.take(maxWaypoints).toList();
   }
 
   Future<void> _showNavigationChooser() async {

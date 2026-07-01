@@ -693,7 +693,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       _appendRiderToDeckEnd(previousIndex, rider);
     } else {
       _allRiders.removeWhere((r) => r['id'] == swipedId);
-      _filteredRiders.removeWhere((r) => r['id'] == swipedId);
+      // CardSwiper advances by index after this callback. Keep the active
+      // deck stable so the next rider is not shifted out from under it.
     }
 
     if (currentIndex == null) {

@@ -26,7 +26,7 @@ class WaypointListWidget extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Waypoints (${waypoints.length}/5)',
+              'Stops (${waypoints.length}/5)',
               style: GoogleFonts.dmSans(
                 fontSize: 13.sp,
                 fontWeight: FontWeight.w700,
@@ -64,7 +64,7 @@ class WaypointListWidget extends StatelessWidget {
           Padding(
             padding: EdgeInsets.symmetric(vertical: 1.h),
             child: Text(
-              'Tap "Add Stop" to add intermediate waypoints',
+              'Add stops between your start point and destination',
               style: GoogleFonts.dmSans(
                 fontSize: 11.sp,
                 color: theme.colorScheme.onSurfaceVariant.withValues(

@@ -212,20 +212,61 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     }
   }
 
-  Future<LatLng?> _geocodeAddress(String address) async {
+  Future<LatLng?> _geocodeAddress(
+    String address, {
+    bool biasToStart = true,
+  }) async {
     if (address.trim().isEmpty) return null;
     try {
+      final queryParameters = <String, dynamic>{
+        'address': address.trim(),
+        'key': _mapsApiKey,
+      };
+
+      // Ambiguous names such as "Sports City" must resolve near the ride,
+      // rather than to the first similarly named place anywhere in the world.
+      if (biasToStart && _startSet) {
+        const span = 5.0;
+        queryParameters['bounds'] =
+            '${_startPoint.latitude - span},${_startPoint.longitude - span}|'
+            '${_startPoint.latitude + span},${_startPoint.longitude + span}';
+      }
+
       final dio = Dio();
       final response = await dio.get(
         'https://maps.googleapis.com/maps/api/geocode/json',
-        queryParameters: {'address': address.trim(), 'key': _mapsApiKey},
+        queryParameters: queryParameters,
       );
       final data = response.data;
       if (data['status'] == 'OK' &&
           data['results'] != null &&
           (data['results'] as List).isNotEmpty) {
-        final loc = data['results'][0]['geometry']['location'];
-        return LatLng(loc['lat'] as double, loc['lng'] as double);
+        final results = (data['results'] as List).whereType<Map>().toList();
+        if (biasToStart && _startSet) {
+          results.sort((a, b) {
+            final aLoc = a['geometry']?['location'] as Map?;
+            final bLoc = b['geometry']?['location'] as Map?;
+            if (aLoc == null || bLoc == null) return 0;
+            final aDistance = Geolocator.distanceBetween(
+              _startPoint.latitude,
+              _startPoint.longitude,
+              (aLoc['lat'] as num).toDouble(),
+              (aLoc['lng'] as num).toDouble(),
+            );
+            final bDistance = Geolocator.distanceBetween(
+              _startPoint.latitude,
+              _startPoint.longitude,
+              (bLoc['lat'] as num).toDouble(),
+              (bLoc['lng'] as num).toDouble(),
+            );
+            return aDistance.compareTo(bDistance);
+          });
+        }
+        final loc = results.first['geometry']['location'] as Map;
+        return LatLng(
+          (loc['lat'] as num).toDouble(),
+          (loc['lng'] as num).toDouble(),
+        );
       }
     } catch (_) {}
     return null;
@@ -307,14 +348,15 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       dio.options.connectTimeout = const Duration(seconds: 15);
       dio.options.receiveTimeout = const Duration(seconds: 15);
 
-      String waypointsParam = '';
-      if (_waypoints.isNotEmpty) {
-        waypointsParam = _waypoints.join('|');
-      }
+      final waypointsParam = _waypointPoints
+          .map((point) => '${point.latitude},${point.longitude}')
+          .join('|');
 
       final queryParams = <String, String>{
-        'origin': originText,
-        'destination': destText,
+        'origin': _startSet
+            ? '${_startPoint.latitude},${_startPoint.longitude}'
+            : originText,
+        'destination': '${_endPoint.latitude},${_endPoint.longitude}',
         'mode': _isBicycleMode ? 'bicycling' : 'driving',
         'alternatives': 'false',
         'key': _mapsApiKey,
@@ -599,7 +641,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     final text = _startController.text.trim();
     if (text.isEmpty) return;
     setState(() => _isGeocodingStart = true);
-    final latLng = await _geocodeAddress(text);
+    final latLng = await _geocodeAddress(text, biasToStart: false);
     if (mounted) {
       setState(() => _isGeocodingStart = false);
       if (latLng != null) {
@@ -1490,8 +1532,10 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
         prefillDate: DateTime.now().add(const Duration(days: 3)),
         prefillDistanceKm: _distanceKm > 0 ? _distanceKm : null,
         prefillRouteType: _routeType,
-        prefillWaypoints: _waypoints.isNotEmpty
-            ? List<String>.from(_waypoints)
+        prefillWaypoints: _waypointPoints.isNotEmpty
+            ? _waypointPoints
+                  .map((point) => '${point.latitude},${point.longitude}')
+                  .toList()
             : null,
         prefillRoutePolylinePoints: _routePolylinePoints.isNotEmpty
             ? List<LatLng>.from(_routePolylinePoints)
@@ -2425,14 +2469,6 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Route summary
-                RouteSummaryCardWidget(
-                  distanceKm: _distanceKm,
-                  estimatedMinutes: _estimatedMinutes,
-                  isMetric: _isMetric,
-                  rideMode: _rideMode,
-                ),
-                SizedBox(height: 2.h),
                 // Start field
                 RouteLocationFieldWidget(
                   controller: _startController,
@@ -2445,36 +2481,6 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                   onChanged: (_) {},
                 ),
                 SizedBox(height: 1.5.h),
-                // Destination field
-                RouteLocationFieldWidget(
-                  controller: _destinationController,
-                  label: 'Destination',
-                  hint: 'Type a location or tap the map',
-                  dotColor: const Color(0xFFE85A4F),
-                  isLoading: _isGeocodingDest,
-                  onSearch: _geocodeDestAddress,
-                  onChanged: (_) {},
-                ),
-                SizedBox(height: 2.h),
-                // Weather widget
-                if (_weatherLocation != null && _weatherLocation!.isNotEmpty)
-                  _isPremium
-                      ? RouteWeatherWidget(locationName: _weatherLocation)
-                      : WeatherPremiumGateWidget(
-                          onUpgrade: () async {
-                            final result = await Navigator.pushNamed(
-                              context,
-                              AppRoutes.premiumSubscription,
-                            );
-                            if (result == true && mounted) {
-                              setState(() {
-                                _isPremium = PremiumService().isPremium;
-                              });
-                            }
-                          },
-                        ),
-                if (_weatherLocation != null && _weatherLocation!.isNotEmpty)
-                  SizedBox(height: 2.h),
                 // Waypoints
                 WaypointListWidget(
                   waypoints: _waypoints,
@@ -2509,6 +2515,44 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                 ),
 
                 SizedBox(height: 2.h),
+                // Destination field
+                RouteLocationFieldWidget(
+                  controller: _destinationController,
+                  label: 'Destination',
+                  hint: 'Type a location or tap the map',
+                  dotColor: const Color(0xFFE85A4F),
+                  isLoading: _isGeocodingDest,
+                  onSearch: _geocodeDestAddress,
+                  onChanged: (_) {},
+                ),
+                SizedBox(height: 2.h),
+                // Route summary
+                RouteSummaryCardWidget(
+                  distanceKm: _distanceKm,
+                  estimatedMinutes: _estimatedMinutes,
+                  isMetric: _isMetric,
+                  rideMode: _rideMode,
+                ),
+                SizedBox(height: 2.h),
+                // Weather widget
+                if (_weatherLocation != null && _weatherLocation!.isNotEmpty)
+                  _isPremium
+                      ? RouteWeatherWidget(locationName: _weatherLocation)
+                      : WeatherPremiumGateWidget(
+                          onUpgrade: () async {
+                            final result = await Navigator.pushNamed(
+                              context,
+                              AppRoutes.premiumSubscription,
+                            );
+                            if (result == true && mounted) {
+                              setState(() {
+                                _isPremium = PremiumService().isPremium;
+                              });
+                            }
+                          },
+                        ),
+                if (_weatherLocation != null && _weatherLocation!.isNotEmpty)
+                  SizedBox(height: 2.h),
                 // Route type
                 RouteTypeSelectorWidget(
                   selectedType: _routeType,

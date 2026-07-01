@@ -15,6 +15,7 @@ class LiveRideNavigation {
     bool useRootNavigator = false,
     String initialRouteName = '',
     List<LatLng> initialRoutePoints = const [],
+    List<LatLng> initialWaypointPoints = const [],
   }) async {
     final trimmedSessionId = sessionId.trim();
     if (trimmedSessionId.isEmpty) {
@@ -50,6 +51,7 @@ class LiveRideNavigation {
           isCreator: isCreator,
           initialRouteName: initialRouteName,
           initialRoutePoints: initialRoutePoints,
+          initialWaypointPoints: initialWaypointPoints,
         ),
       ),
     );

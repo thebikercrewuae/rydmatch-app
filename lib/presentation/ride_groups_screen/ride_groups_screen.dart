@@ -315,6 +315,20 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
     return value.map((item) => item.toString()).toList();
   }
 
+  List<LatLng> _routeWaypointPoints(List<String> waypoints) {
+    return waypoints
+        .map((value) {
+          final parts = value.split(',');
+          if (parts.length != 2) return null;
+          final lat = double.tryParse(parts[0].trim());
+          final lng = double.tryParse(parts[1].trim());
+          if (lat == null || lng == null) return null;
+          return LatLng(lat, lng);
+        })
+        .whereType<LatLng>()
+        .toList();
+  }
+
   List<Map<String, double>> _routePolylineToJson(List<LatLng> points) {
     return points
         .map((point) => {'lat': point.latitude, 'lng': point.longitude})
@@ -1497,6 +1511,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
           sessionId: sessionId,
           initialRouteName: group.route,
           initialRoutePoints: group.routePolyline,
+          initialWaypointPoints: _routeWaypointPoints(group.routeWaypoints),
         );
       } else if (mounted) {
         AppToast.show(
@@ -1519,6 +1534,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
         isCreator: true,
         initialRouteName: group.route,
         initialRoutePoints: group.routePolyline,
+        initialWaypointPoints: _routeWaypointPoints(group.routeWaypoints),
       );
     } else if (mounted) {
       AppToast.show(
@@ -1541,6 +1557,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
         sessionId: sessionId,
         initialRouteName: group.route,
         initialRoutePoints: group.routePolyline,
+        initialWaypointPoints: _routeWaypointPoints(group.routeWaypoints),
       );
     } else if (mounted) {
       AppToast.show(
