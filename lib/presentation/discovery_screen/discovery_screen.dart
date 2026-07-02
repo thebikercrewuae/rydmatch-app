@@ -366,8 +366,24 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       return;
     }
 
+    if (_myLat == null || _myLng == null) {
+      await DiagnosticsService.instance.logError(
+        feature: 'discovery',
+        action: 'load_profiles_without_location',
+        error: StateError('Viewer location is unavailable'),
+        severity: 'warning',
+      );
+      if (!mounted) return;
+      setState(() {
+        _allRiders.clear();
+        _filteredRiders = [];
+        _isLoading = false;
+        _isEmpty = true;
+      });
+      return;
+    }
+
     List<Map<String, dynamic>> allProfiles = [];
-    var usedDiscoveryRpc = false;
 
     try {
       final rawAll = await supabase.rpc(
@@ -375,48 +391,40 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         params: {
           'p_current_user_id': currentUser.id,
           'p_excluded_ids': _swipedIds.toList(),
+          'p_latitude': _myLat,
+          'p_longitude': _myLng,
+          'p_radius_meters': DiscoveryDistanceFilter.radiusMetres(
+            radius: _activeFilters.distance,
+            isMetric: _isMetric,
+          ),
+          'p_limit': 150,
+          'p_offset': 0,
         },
       );
 
       allProfiles = List<Map<String, dynamic>>.from(rawAll as List<dynamic>);
-      usedDiscoveryRpc = true;
     } catch (e) {
-      debugPrint('DiscoveryScreen: RPC discovery failed, using fallback: $e');
+      debugPrint('DiscoveryScreen: secure discovery query failed: $e');
       await DiagnosticsService.instance.logError(
         feature: 'discovery',
         action: 'load_profiles_rpc',
         error: e,
-        severity: 'warning',
-        context: {'excluded_count': _swipedIds.length},
+        context: {
+          'excluded_count': _swipedIds.length,
+          'has_location': true,
+          'radius': _activeFilters.distance,
+          'is_metric': _isMetric,
+        },
       );
-
-      try {
-        final rawAll = await supabase
-            .from('user_profiles')
-            .select(
-              'id, full_name, email, skill_levels, bike_types, preferred_roads, riding_speed, gender, same_gender_matching, avatar_url, bio, latitude, longitude, ride_mode, mixed_community_matching',
-            )
-            .limit(150);
-
-        allProfiles = List<Map<String, dynamic>>.from(rawAll);
-      } catch (fallbackError) {
-        debugPrint(
-          'DiscoveryScreen: failed to fetch fallback profiles: $fallbackError',
-        );
-        await DiagnosticsService.instance.logError(
-          feature: 'discovery',
-          action: 'load_profiles_fallback',
-          error: fallbackError,
-          context: {'excluded_count': _swipedIds.length},
-        );
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _isEmpty = true;
-          });
-        }
-        return;
+      if (mounted) {
+        setState(() {
+          _allRiders.clear();
+          _filteredRiders = [];
+          _isLoading = false;
+          _isEmpty = true;
+        });
       }
+      return;
     }
 
     await _hydrateDiscoveryProfileFields(allProfiles);
@@ -429,28 +437,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         ? List<Map<String, dynamic>>.from(afterExcludeSelf)
         : afterExcludeSelf.where((p) => !_swipedIds.contains(p['id'])).toList();
 
-    List<String> blockedIds = [];
-
-    if (!usedDiscoveryRpc) {
-      try {
-        final blockedData = await supabase
-            .from('user_blocks')
-            .select('blocked_id')
-            .eq('blocker_id', currentUser.id);
-
-        blockedIds = List<Map<String, dynamic>>.from(
-          blockedData,
-        ).map((b) => b['blocked_id'] as String).toList();
-      } catch (_) {}
-    }
-
-    final afterExcludeBlocked = blockedIds.isEmpty
-        ? List<Map<String, dynamic>>.from(afterExcludeSwiped)
-        : afterExcludeSwiped
-              .where((p) => !blockedIds.contains(p['id']))
-              .toList();
-
-    final afterCommunityFilter = afterExcludeBlocked
+    final afterCommunityFilter = afterExcludeSwiped
         .where(_canShowForRideCommunity)
         .where(_canShowForGenderPreference)
         .toList();

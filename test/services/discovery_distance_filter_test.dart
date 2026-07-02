@@ -3,6 +3,21 @@ import 'package:rydmatch/services/discovery_distance_filter.dart';
 
 void main() {
   group('DiscoveryDistanceFilter', () {
+    test('converts metric and imperial radii to metres', () {
+      expect(
+        DiscoveryDistanceFilter.radiusMetres(radius: 500, isMetric: true),
+        500000,
+      );
+      expect(
+        DiscoveryDistanceFilter.radiusMetres(radius: 100, isMetric: false),
+        closeTo(160934.4, 0.001),
+      );
+      expect(
+        DiscoveryDistanceFilter.radiusMetres(radius: 0, isMetric: true),
+        0,
+      );
+    });
+
     test('enforces the maximum 500 kilometre radius', () {
       expect(
         DiscoveryDistanceFilter.includes(

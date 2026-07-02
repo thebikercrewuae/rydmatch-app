@@ -49,7 +49,6 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
   String _plannedRouteName = '';
   bool _hasFittedInitialView = false;
   LatLng? _myPosition;
-  Timer? _positionTimer;
   bool _isSharingLocation = true;
   bool _isChatOpen = false;
   bool _isPremium = false;
@@ -270,21 +269,21 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
     _loadPremiumAccess();
     _loadPlannedRoute();
     _initMyPosition();
-    _startPositionUpdates();
     _subscribeToChatNotifications();
     _voiceService.addListener(_onVoiceStateChanged);
     LiveRideService.riderLocations.addListener(_onRiderLocationsChanged);
+    LiveRideService.latestPosition.addListener(_onMyPositionChanged);
     LiveRideService.participants.addListener(_onParticipantsChanged);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _positionTimer?.cancel();
     _chatNotificationChannel?.unsubscribe();
     _voiceService.removeListener(_onVoiceStateChanged);
     _voiceService.disconnect();
     LiveRideService.riderLocations.removeListener(_onRiderLocationsChanged);
+    LiveRideService.latestPosition.removeListener(_onMyPositionChanged);
     LiveRideService.participants.removeListener(_onParticipantsChanged);
     _mapController?.dispose();
     super.dispose();
@@ -363,21 +362,13 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
     }
   }
 
-  void _startPositionUpdates() {
-    _positionTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
-      try {
-        final position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-          ),
-        );
-        if (mounted) {
-          setState(() {
-            _myPosition = LatLng(position.latitude, position.longitude);
-          });
-          _mapController?.animateCamera(CameraUpdate.newLatLng(_myPosition!));
-        }
-      } catch (_) {}
+  void _onMyPositionChanged() {
+    if (!mounted) return;
+    final position = LiveRideService.latestPosition.value;
+    if (position == null) return;
+
+    setState(() {
+      _myPosition = LatLng(position.latitude, position.longitude);
     });
   }
 

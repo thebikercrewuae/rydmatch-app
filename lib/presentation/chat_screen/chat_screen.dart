@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_export.dart';
 import '../../services/analytics_service.dart';
+import '../../services/diagnostics_service.dart';
 import '../../services/haptic_service.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/app_icons.dart';
@@ -143,7 +144,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       try {
         final simpleResult = await supabase
             .from('chat_messages')
-            .select('id, sender_id, recipient_id, message_body, created_at')
+            .select(
+              'id, sender_id, recipient_id, message_body, delivery_status, created_at',
+            )
             .eq('conversation_id', conversationId)
             .order('created_at', ascending: true)
             .limit(200);
@@ -165,7 +168,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             'message': row['message_body'] as String? ?? '',
             'isSender': isSender,
             'timestamp': time,
-            'status': 'sent',
+            'status': row['delivery_status'] as String? ?? 'sent',
             'isImage': false,
             'isRead': false,
           };
@@ -182,10 +185,30 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             (_) => _scrollToBottom(),
           );
         }
-      } catch (_) {
-        if (mounted) setState(() => _isLoading = false);
+      } catch (error, stackTrace) {
+        await DiagnosticsService.instance.logError(
+          feature: 'chat',
+          action: 'load_messages',
+          error: error,
+          stackTrace: stackTrace,
+          context: {'conversation_id': conversationId},
+        );
+        if (mounted) {
+          setState(() => _isLoading = false);
+          AppToast.show(
+            context,
+            message: 'Could not reload this conversation. Pull down to retry.',
+            type: ToastType.error,
+          );
+        }
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
+      await DiagnosticsService.instance.logError(
+        feature: 'chat',
+        action: 'prepare_conversation',
+        error: error,
+        stackTrace: stackTrace,
+      );
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -328,13 +351,13 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             callback: (payload) {
               if (!mounted) return;
               final updated = payload.newRecord;
-              final sid = updated['twilio_message_sid'] as String?;
+              final messageId = updated['id']?.toString();
               final newStatus = updated['delivery_status'] as String?;
-              if (sid == null || newStatus == null) return;
+              if (messageId == null || newStatus == null) return;
 
               setState(() {
                 for (final msg in _messages) {
-                  if (msg['twilio_sid'] == sid) {
+                  if (msg['dbId']?.toString() == messageId) {
                     msg['status'] = newStatus;
                     break;
                   }
@@ -394,7 +417,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       'message': text,
       'isSender': true,
       'timestamp': _getCurrentTime(),
-      'status': 'sent',
+      'status': 'sending',
       'isImage': false,
     };
     setState(() {
@@ -412,13 +435,24 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
       () async {
         try {
-          await supabase.from('chat_messages').insert({
-            'conversation_id': conversationId,
-            'sender_id': currentUser.id,
-            'recipient_id': otherUserId,
-            'message_body': text,
-            'delivery_status': 'sent',
-          });
+          final inserted = await supabase
+              .from('chat_messages')
+              .insert({
+                'conversation_id': conversationId,
+                'sender_id': currentUser.id,
+                'recipient_id': otherUserId,
+                'message_body': text,
+                'delivery_status': 'sent',
+              })
+              .select('id, delivery_status')
+              .single();
+          if (mounted) {
+            setState(() {
+              newMsg['dbId'] = inserted['id'];
+              newMsg['status'] =
+                  inserted['delivery_status'] as String? ?? 'sent';
+            });
+          }
           // Log message send analytics
           await AnalyticsService.instance.logMessageSent(
             conversationId: conversationId,
@@ -591,7 +625,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             riderName: riderName,
             riderImage: riderImage,
             bikeModel: bikeModel,
-            isOnline: riderData['isOnline'] as bool? ?? true,
+            isOnline: riderData['isOnline'] as bool? ?? false,
             onBackTap: () => Navigator.pop(context),
             onProfileTap: () {},
           ),

@@ -1,7 +1,13 @@
 class DiscoveryDistanceFilter {
   static const double _kilometresPerMile = 1.609344;
+  static const double _metresPerMile = 1609.344;
 
   const DiscoveryDistanceFilter._();
+
+  static double radiusMetres({required double radius, required bool isMetric}) {
+    if (!radius.isFinite || radius <= 0) return 0;
+    return isMetric ? radius * 1000 : radius * _metresPerMile;
+  }
 
   static bool includes({
     required bool hasViewerLocation,

@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'analytics_service.dart';
 import 'diagnostics_service.dart';
+import 'live_location_sampling_policy.dart';
 import 'profile_service.dart';
 
 class RiderLocation {
@@ -101,13 +102,23 @@ class LiveRideService {
   static final ValueNotifier<List<Map<String, dynamic>>> participants =
       ValueNotifier([]);
   static final ValueNotifier<bool> isRideActive = ValueNotifier(false);
+  static final ValueNotifier<Position?> latestPosition = ValueNotifier(null);
+
+  static const Duration _locationSampleInterval = Duration(seconds: 5);
+  static const Duration _staleRiderLocationAge = Duration(seconds: 90);
+  static const double _historyMinimumDistanceMeters = 20;
 
   String? _currentSessionId;
   Timer? _locationTimer;
   RealtimeChannel? _locationsChannel;
   RealtimeChannel? _participantsChannel;
+  RealtimeChannel? _sessionChannel;
   DateTime? _lastSessionHealthCheck;
   DateTime? _lastLocationErrorLogAt;
+  final LiveLocationSamplingPolicy _samplingPolicy =
+      LiveLocationSamplingPolicy();
+  Position? _lastHistoryPosition;
+  bool _isSendingLocation = false;
   bool _isLocationSharingEnabled = true;
   final Map<String, ({String displayName, String? avatarUrl})> _profileCache =
       {};
@@ -262,6 +273,7 @@ class LiveRideService {
           .eq('session_id', _currentSessionId!)
           .eq('user_id', userId);
 
+      await _deleteCurrentLocation(_currentSessionId!, userId);
       _stopTracking();
     } catch (e) {
       debugPrint('LiveRideService.leaveRide error: $e');
@@ -315,9 +327,12 @@ class LiveRideService {
           .eq('user_id', userId);
 
       if (!isSharing) {
+        await _deleteCurrentLocation(_currentSessionId!, userId);
         final updated = Map<String, RiderLocation>.from(riderLocations.value)
           ..remove(userId);
         riderLocations.value = updated;
+      } else {
+        unawaited(_sendLocation());
       }
     } catch (e) {
       debugPrint('LiveRideService.toggleLocationSharing error: $e');
@@ -328,6 +343,18 @@ class LiveRideService {
         severity: 'warning',
         context: {'session_id': _currentSessionId, 'is_sharing': isSharing},
       );
+    }
+  }
+
+  Future<void> _deleteCurrentLocation(String sessionId, String userId) async {
+    try {
+      await _supabase
+          .from('live_ride_current_locations')
+          .delete()
+          .eq('session_id', sessionId)
+          .eq('user_id', userId);
+    } catch (e) {
+      debugPrint('LiveRideService._deleteCurrentLocation error: $e');
     }
   }
 
@@ -400,6 +427,7 @@ class LiveRideService {
   Future<void> _activateRealtime(String sessionId) async {
     _subscribeToLocations(sessionId);
     _subscribeToParticipants(sessionId);
+    _subscribeToSessionStatus(sessionId);
 
     final currentParticipants = await getParticipants(sessionId);
     participants.value = currentParticipants;
@@ -507,10 +535,10 @@ class LiveRideService {
   void _startTracking() {
     _locationTimer?.cancel();
     unawaited(_sendLocation());
-    _locationTimer = Timer.periodic(
-      const Duration(seconds: 5),
-      (_) => _sendLocation(),
-    );
+    _locationTimer = Timer.periodic(_locationSampleInterval, (_) {
+      _pruneStaleRiderLocations();
+      unawaited(_sendLocation());
+    });
   }
 
   void _stopTracking() {
@@ -518,19 +546,28 @@ class LiveRideService {
     _locationTimer = null;
     _locationsChannel?.unsubscribe();
     _participantsChannel?.unsubscribe();
+    _sessionChannel?.unsubscribe();
     _locationsChannel = null;
     _participantsChannel = null;
+    _sessionChannel = null;
     _currentSessionId = null;
     _isLocationSharingEnabled = true;
+    _samplingPolicy.reset();
+    _lastHistoryPosition = null;
+    latestPosition.value = null;
     isRideActive.value = false;
     riderLocations.value = {};
     participants.value = [];
   }
 
   Future<void> _sendLocation() async {
+    if (_isSendingLocation) return;
+    _isSendingLocation = true;
+
     try {
       final userId = _supabase.auth.currentUser?.id;
-      if (userId == null || _currentSessionId == null) return;
+      final sessionId = _currentSessionId;
+      if (userId == null || sessionId == null) return;
       if (!_isLocationSharingEnabled) return;
 
       final sessionActive = await _isCurrentSessionActive();
@@ -564,16 +601,41 @@ class LiveRideService {
           accuracy: LocationAccuracy.high,
         ),
       );
+      latestPosition.value = position;
 
-      await _supabase.from('live_ride_locations').insert({
-        'session_id': _currentSessionId,
+      final now = DateTime.now().toUtc();
+      final locationRecord = {
+        'session_id': sessionId,
         'user_id': userId,
         'latitude': position.latitude,
         'longitude': position.longitude,
         'heading': position.heading,
         'speed': position.speed,
         'accuracy': position.accuracy,
-      });
+      };
+
+      if (_samplingPolicy.shouldWriteCurrent(now)) {
+        await _supabase.from('live_ride_current_locations').upsert({
+          ...locationRecord,
+          'updated_at': now.toIso8601String(),
+        }, onConflict: 'session_id,user_id');
+        _samplingPolicy.markCurrentWritten(now);
+      }
+
+      final movedSinceHistory = _lastHistoryPosition == null
+          ? double.infinity
+          : Geolocator.distanceBetween(
+              _lastHistoryPosition!.latitude,
+              _lastHistoryPosition!.longitude,
+              position.latitude,
+              position.longitude,
+            );
+      final movedEnough = movedSinceHistory >= _historyMinimumDistanceMeters;
+      if (_samplingPolicy.shouldWriteHistory(now, movedEnough: movedEnough)) {
+        await _supabase.from('live_ride_locations').insert(locationRecord);
+        _samplingPolicy.markHistoryWritten(now);
+        _lastHistoryPosition = position;
+      }
     } catch (e) {
       debugPrint('LiveRideService._sendLocation error: $e');
       final errorText = e.toString().toLowerCase();
@@ -600,6 +662,8 @@ class LiveRideService {
           },
         );
       }
+    } finally {
+      _isSendingLocation = false;
     }
   }
 
@@ -609,8 +673,7 @@ class LiveRideService {
 
     final now = DateTime.now();
     if (_lastSessionHealthCheck != null &&
-        now.difference(_lastSessionHealthCheck!) <
-            const Duration(seconds: 30)) {
+        now.difference(_lastSessionHealthCheck!) < const Duration(minutes: 2)) {
       return true;
     }
     _lastSessionHealthCheck = now;
@@ -641,14 +704,30 @@ class LiveRideService {
     );
   }
 
+  void _pruneStaleRiderLocations() {
+    final cutoff = DateTime.now().subtract(_staleRiderLocationAge);
+    final updated = Map<String, RiderLocation>.from(riderLocations.value)
+      ..removeWhere((_, location) => location.updatedAt.isBefore(cutoff));
+
+    if (updated.length != riderLocations.value.length) {
+      riderLocations.value = updated;
+    }
+  }
+
   Future<void> _loadLatestLocations(String sessionId) async {
     try {
       final data = await _supabase
-          .from('live_ride_locations')
+          .from('live_ride_current_locations')
           .select()
           .eq('session_id', sessionId)
-          .order('created_at', ascending: false)
-          .limit(100);
+          .gte(
+            'updated_at',
+            DateTime.now()
+                .toUtc()
+                .subtract(_staleRiderLocationAge)
+                .toIso8601String(),
+          )
+          .order('updated_at', ascending: false);
 
       final currentUserId = _supabase.auth.currentUser?.id;
       final sharingUserIds = _sharingParticipantUserIds(participants.value);
@@ -688,11 +767,11 @@ class LiveRideService {
     _locationsChannel?.unsubscribe();
 
     _locationsChannel = _supabase
-        .channel('live_ride_locations:$sessionId')
+        .channel('live_ride_current_locations:$sessionId')
         .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
+          event: PostgresChangeEvent.all,
           schema: 'public',
-          table: 'live_ride_locations',
+          table: 'live_ride_current_locations',
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'session_id',
@@ -721,6 +800,30 @@ class LiveRideService {
         .subscribe();
   }
 
+  void _subscribeToSessionStatus(String sessionId) {
+    _sessionChannel?.unsubscribe();
+
+    _sessionChannel = _supabase
+        .channel('live_ride_session:$sessionId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'live_ride_sessions',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: sessionId,
+          ),
+          callback: (payload) {
+            final status = payload.newRecord['status'] as String?;
+            if (status != null && status != 'active') {
+              _stopTracking();
+            }
+          },
+        )
+        .subscribe();
+  }
+
   Future<RiderLocation?> _riderLocationFromRecord(
     Map<String, dynamic> record,
   ) async {
@@ -744,8 +847,11 @@ class LiveRideService {
       speed: record['speed'] != null
           ? (record['speed'] as num).toDouble()
           : null,
-      updatedAt: record['created_at'] is String
-          ? DateTime.tryParse(record['created_at'] as String) ?? DateTime.now()
+      updatedAt: (record['updated_at'] ?? record['created_at']) is String
+          ? DateTime.tryParse(
+                  (record['updated_at'] ?? record['created_at']) as String,
+                ) ??
+                DateTime.now()
           : DateTime.now(),
     );
   }
