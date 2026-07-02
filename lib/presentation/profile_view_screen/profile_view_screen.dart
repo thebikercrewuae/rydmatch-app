@@ -334,9 +334,14 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         final fallbackAvatarUrl = await ProfileService.resolvePhotoUrl(
           otherUserImage,
         );
-        final bikePhotoUrls = await ProfileService.resolvePhotoUrls(
-          stringList(profileValue('bike_photo_urls')),
-        );
+        final motorcyclePhotosByUser =
+            await ProfileService.loadPublicMotorcyclePhotoUrls(
+              userIds: [otherUserId],
+              profilePhotoUrlsByUser: {
+                otherUserId: stringList(profileValue('bike_photo_urls')),
+              },
+            );
+        final bikePhotoUrls = motorcyclePhotosByUser[otherUserId] ?? const [];
         final canUseLocalFallback = otherUserId == currentUserId;
         final skillLevels = stringList(profileValue('skill_levels'));
         final bikeTypes = stringList(profileValue('bike_types'));
@@ -418,9 +423,14 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             bikeTypes.isNotEmpty ||
             preferredRoads.isNotEmpty ||
             rideTimes.isNotEmpty;
-        final bikePhotoUrls = await ProfileService.resolvePhotoUrls(
-          stringList(routeProfile?['bike_photo_urls']),
-        );
+        final motorcyclePhotosByUser =
+            await ProfileService.loadPublicMotorcyclePhotoUrls(
+              userIds: [otherUserId],
+              profilePhotoUrlsByUser: {
+                otherUserId: stringList(routeProfile?['bike_photo_urls']),
+              },
+            );
+        final bikePhotoUrls = motorcyclePhotosByUser[otherUserId] ?? const [];
 
         if (!mounted) return;
 

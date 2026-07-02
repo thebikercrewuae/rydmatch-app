@@ -309,16 +309,29 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       final rows = await Supabase.instance.client
           .from('user_profiles')
           .select(
-            'id, full_name, avatar_url, bio, is_verified, verification_status',
+            'id, full_name, avatar_url, bio, bike_photo_urls, is_verified, verification_status',
           )
           .inFilter('id', ids);
       final byId = {
         for (final row in List<Map<String, dynamic>>.from(rows))
           row['id']?.toString(): row,
       };
+      final profilePhotoUrlsByUser = <String, List<String>>{
+        for (final entry in byId.entries)
+          if (entry.key != null)
+            entry.key!: List<String>.from(
+              entry.value['bike_photo_urls'] as List? ?? const [],
+            ),
+      };
+      final motorcyclePhotosByUser =
+          await ProfileService.loadPublicMotorcyclePhotoUrls(
+            userIds: ids,
+            profilePhotoUrlsByUser: profilePhotoUrlsByUser,
+          );
 
       for (final profile in profiles) {
-        final row = byId[profile['id']?.toString()];
+        final profileId = profile['id']?.toString();
+        final row = byId[profileId];
         if (row == null) continue;
 
         final avatarUrl = await ProfileService.resolveUserProfilePhotoUrl(
@@ -339,6 +352,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
         profile['is_verified'] = row['is_verified'];
         profile['verification_status'] = row['verification_status'];
+        profile['motorcycle_photo_urls'] =
+            motorcyclePhotosByUser[profileId] ?? const <String>[];
       }
     } catch (e) {
       await DiagnosticsService.instance.logError(
@@ -486,6 +501,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         'photo': imageUrl,
         'image': imageUrl,
         'photos': <String>[imageUrl],
+        'motorcyclePhotoUrls': List<String>.from(
+          p['motorcycle_photo_urls'] as List? ?? const [],
+        ),
         'semanticLabel':
             '$name ${rideModeLabel.toLowerCase()} rider profile photo',
         'rideMode': rideMode,
@@ -1029,6 +1047,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         rider['photo'] as String,
       ...List<String>.from(rider['photos'] as List? ?? []),
       ...List<String>.from(rider['bikePhotoUrls'] as List? ?? []),
+      ...List<String>.from(rider['motorcyclePhotoUrls'] as List? ?? []),
     }.toList();
 
     final bio = (rider['bio'] as String?)?.trim();

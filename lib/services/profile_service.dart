@@ -193,6 +193,62 @@ class ProfileService {
     return resolved;
   }
 
+  static Future<Map<String, List<String>>> loadPublicMotorcyclePhotoUrls({
+    required List<String> userIds,
+    Map<String, List<String>> profilePhotoUrlsByUser = const {},
+  }) async {
+    final uniqueIds = userIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+    if (uniqueIds.isEmpty) return const {};
+
+    final photosByUser = <String, List<String>>{};
+    for (final userId in uniqueIds) {
+      photosByUser[userId] = await resolvePhotoUrls(
+        profilePhotoUrlsByUser[userId] ?? const [],
+      );
+    }
+
+    try {
+      final response = await Supabase.instance.client.rpc(
+        'get_public_garage_photos',
+        params: {'p_user_ids': uniqueIds},
+      );
+      final garageUrlsByUser = <String, List<String>>{};
+
+      for (final row in List<Map<String, dynamic>>.from(response as List)) {
+        final userId = row['user_id']?.toString();
+        final photoUrl = row['photo_url']?.toString();
+        if (userId == null || photoUrl == null || photoUrl.trim().isEmpty) {
+          continue;
+        }
+        garageUrlsByUser.putIfAbsent(userId, () => []).add(photoUrl);
+      }
+
+      for (final entry in garageUrlsByUser.entries) {
+        final resolvedGarageUrls = await resolvePhotoUrls(entry.value);
+        photosByUser.putIfAbsent(entry.key, () => []);
+        for (final url in resolvedGarageUrls) {
+          if (!photosByUser[entry.key]!.contains(url)) {
+            photosByUser[entry.key]!.add(url);
+          }
+        }
+      }
+    } catch (e) {
+      await DiagnosticsService.instance.logError(
+        feature: 'profile_media',
+        action: 'load_public_garage_photos',
+        error: e,
+        severity: 'warning',
+        context: {'profile_count': uniqueIds.length},
+      );
+    }
+
+    return photosByUser;
+  }
+
   static Future<String?> resolveUserProfilePhotoUrl({
     required String userId,
     String? avatarUrl,
