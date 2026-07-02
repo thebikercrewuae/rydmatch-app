@@ -29,7 +29,7 @@ class FeedEmptyStateWidget extends StatelessWidget {
             ),
             SizedBox(height: 3.h),
             Text(
-              'No posts from your matches yet',
+              'No rides shared yet',
               style: GoogleFonts.dmSans(
                 fontSize: 16.sp,
                 fontWeight: FontWeight.w700,
@@ -39,7 +39,7 @@ class FeedEmptyStateWidget extends StatelessWidget {
             ),
             SizedBox(height: 1.h),
             Text(
-              'When your matched ride partners share rides, they will appear here.',
+              'Share a ride to start building your private ride journal.',
               style: GoogleFonts.dmSans(
                 fontSize: 12.sp,
                 color: theme.colorScheme.onSurfaceVariant,

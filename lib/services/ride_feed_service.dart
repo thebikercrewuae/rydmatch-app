@@ -14,16 +14,18 @@ class RideFeedService {
 
   String? get _currentUserId => _client.auth.currentUser?.id;
 
-  /// Fetch posts from all users (RLS filters; app-level match filter applied)
+  /// Fetch only the signed-in user's private ride journal posts.
   Future<List<RideFeedPost>> fetchFeedPosts({
     int limit = 30,
     int offset = 0,
   }) async {
     try {
       final userId = _currentUserId;
+      if (userId == null) return [];
       final response = await _client
           .from('ride_feed_posts')
           .select('*')
+          .eq('user_id', userId)
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
 
@@ -32,7 +34,7 @@ class RideFeedService {
           .toList();
 
       // Mark liked posts
-      if (userId != null && posts.isNotEmpty) {
+      if (posts.isNotEmpty) {
         final postIds = posts.map((p) => p.id).toList();
         try {
           final likes = await _client
