@@ -1042,6 +1042,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         final theme = Theme.of(ctx);
@@ -1058,229 +1059,234 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                   top: Radius.circular(24.0),
                 ),
               ),
-              child: ListView(
-                controller: scrollController,
-                padding: EdgeInsets.zero,
-                children: [
-                  SizedBox(height: 1.2.h),
-                  Center(
-                    child: Container(
-                      width: 11.w,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.outline.withValues(
-                          alpha: 0.35,
+              child: SafeArea(
+                top: false,
+                minimum: EdgeInsets.only(bottom: 2.h),
+                child: ListView(
+                  controller: scrollController,
+                  padding: EdgeInsets.zero,
+                  children: [
+                    SizedBox(height: 1.2.h),
+                    Center(
+                      child: Container(
+                        width: 11.w,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.outline.withValues(
+                            alpha: 0.35,
+                          ),
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        borderRadius: BorderRadius.circular(4),
                       ),
                     ),
-                  ),
-                  SizedBox(height: 1.5.h),
-                  SizedBox(
-                    height: 34.h,
-                    child: PageView.builder(
-                      itemCount: photos.isEmpty ? 1 : photos.length,
-                      itemBuilder: (_, index) {
-                        final imageUrl = photos.isEmpty
-                            ? rider['photo'] as String
-                            : photos[index];
+                    SizedBox(height: 1.5.h),
+                    SizedBox(
+                      height: 34.h,
+                      child: PageView.builder(
+                        itemCount: photos.isEmpty ? 1 : photos.length,
+                        itemBuilder: (_, index) {
+                          final imageUrl = photos.isEmpty
+                              ? rider['photo'] as String
+                              : photos[index];
 
-                        return Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 4.w),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(18.0),
-                            child: Image.network(
-                              imageUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                color:
-                                    theme.colorScheme.surfaceContainerHighest,
-                                child: const Center(
-                                  child: Icon(Icons.person_rounded, size: 44),
+                          return Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 4.w),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(18.0),
+                              child: Image.network(
+                                imageUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color:
+                                      theme.colorScheme.surfaceContainerHighest,
+                                  child: const Center(
+                                    child: Icon(Icons.person_rounded, size: 44),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(5.w, 2.h, 5.w, 3.h),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                rider['name'] as String? ?? 'Rider',
-                                style: GoogleFonts.dmSans(
-                                  fontSize: 22.sp,
-                                  fontWeight: FontWeight.w800,
-                                  color: theme.colorScheme.onSurface,
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(5.w, 2.h, 5.w, 3.h),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  rider['name'] as String? ?? 'Rider',
+                                  style: GoogleFonts.dmSans(
+                                    fontSize: 22.sp,
+                                    fontWeight: FontWeight.w800,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
                                 ),
                               ),
-                            ),
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 3.w,
-                                vertical: 0.8.h,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(
-                                  0xFFE85A4F,
-                                ).withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                '${rider['compatibility'] ?? 0}% match',
-                                style: GoogleFonts.dmSans(
-                                  fontSize: 11.sp,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFFE85A4F),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 3.w,
+                                  vertical: 0.8.h,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFFE85A4F,
+                                  ).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '${rider['compatibility'] ?? 0}% match',
+                                  style: GoogleFonts.dmSans(
+                                    fontSize: 11.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFFE85A4F),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 1.h),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.location_on_rounded,
-                              size: 16,
-                              color: theme.colorScheme.primary,
-                            ),
-                            SizedBox(width: 1.w),
-                            Text(
-                              rider['distance'] as String? ??
-                                  (_isMetric ? '- km' : '- mi'),
-                              style: GoogleFonts.dmSans(
-                                fontSize: 12.sp,
-                                color: theme.colorScheme.onSurfaceVariant,
+                            ],
+                          ),
+                          SizedBox(height: 1.h),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on_rounded,
+                                size: 16,
+                                color: theme.colorScheme.primary,
                               ),
-                            ),
-                            SizedBox(width: 4.w),
-                            Icon(
-                              Icons.speed_rounded,
-                              size: 16,
-                              color: theme.colorScheme.primary,
-                            ),
-                            SizedBox(width: 1.w),
-                            Text(
-                              rider['skillLevel'] as String? ?? 'Rider',
-                              style: GoogleFonts.dmSans(
-                                fontSize: 12.sp,
-                                color: theme.colorScheme.onSurfaceVariant,
+                              SizedBox(width: 1.w),
+                              Text(
+                                rider['distance'] as String? ??
+                                    (_isMetric ? '- km' : '- mi'),
+                                style: GoogleFonts.dmSans(
+                                  fontSize: 12.sp,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 2.5.h),
-                        _sectionTitle(theme, 'Bio'),
-                        SizedBox(height: 0.8.h),
-                        Text(
-                          bio == null || bio.isEmpty
-                              ? 'No bio added yet.'
-                              : bio,
-                          style: GoogleFonts.dmSans(
-                            fontSize: 12.5.sp,
-                            height: 1.45,
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.78,
+                              SizedBox(width: 4.w),
+                              Icon(
+                                Icons.speed_rounded,
+                                size: 16,
+                                color: theme.colorScheme.primary,
+                              ),
+                              SizedBox(width: 1.w),
+                              Text(
+                                rider['skillLevel'] as String? ?? 'Rider',
+                                style: GoogleFonts.dmSans(
+                                  fontSize: 12.sp,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 2.5.h),
+                          _sectionTitle(theme, 'Bio'),
+                          SizedBox(height: 0.8.h),
+                          Text(
+                            bio == null || bio.isEmpty
+                                ? 'No bio added yet.'
+                                : bio,
+                            style: GoogleFonts.dmSans(
+                              fontSize: 12.5.sp,
+                              height: 1.45,
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.78,
+                              ),
                             ),
                           ),
-                        ),
-                        SizedBox(height: 2.5.h),
-                        _sectionTitle(theme, 'Ride Setup'),
-                        SizedBox(height: 1.h),
-                        if (bikeTypes.isEmpty)
-                          Text(
-                            'No ride setup details added yet.',
-                            style: GoogleFonts.dmSans(
-                              fontSize: 12.sp,
-                              color: theme.colorScheme.onSurfaceVariant,
+                          SizedBox(height: 2.5.h),
+                          _sectionTitle(theme, 'Ride Setup'),
+                          SizedBox(height: 1.h),
+                          if (bikeTypes.isEmpty)
+                            Text(
+                              'No ride setup details added yet.',
+                              style: GoogleFonts.dmSans(
+                                fontSize: 12.sp,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            )
+                          else
+                            Wrap(
+                              spacing: 2.w,
+                              runSpacing: 1.h,
+                              children: bikeTypes
+                                  .map(
+                                    (bike) => _chip(
+                                      theme,
+                                      rideMode == 'bicycle'
+                                          ? Icons.directions_bike_rounded
+                                          : Icons.two_wheeler_rounded,
+                                      bike,
+                                    ),
+                                  )
+                                  .toList(),
                             ),
-                          )
-                        else
+                          SizedBox(height: 2.5.h),
+                          _sectionTitle(theme, 'Riding Profile'),
+                          SizedBox(height: 1.h),
                           Wrap(
                             spacing: 2.w,
                             runSpacing: 1.h,
-                            children: bikeTypes
-                                .map(
-                                  (bike) => _chip(
-                                    theme,
-                                    rideMode == 'bicycle'
-                                        ? Icons.directions_bike_rounded
-                                        : Icons.two_wheeler_rounded,
-                                    bike,
-                                  ),
-                                )
-                                .toList(),
+                            children: [
+                              ...skillLevels.map(
+                                (level) =>
+                                    _chip(theme, Icons.speed_rounded, level),
+                              ),
+                              ...preferredRoads.map(
+                                (road) =>
+                                    _chip(theme, Icons.route_rounded, road),
+                              ),
+                            ],
                           ),
-                        SizedBox(height: 2.5.h),
-                        _sectionTitle(theme, 'Riding Profile'),
-                        SizedBox(height: 1.h),
-                        Wrap(
-                          spacing: 2.w,
-                          runSpacing: 1.h,
-                          children: [
-                            ...skillLevels.map(
-                              (level) =>
-                                  _chip(theme, Icons.speed_rounded, level),
-                            ),
-                            ...preferredRoads.map(
-                              (road) => _chip(theme, Icons.route_rounded, road),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 3.h),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: _handlePass,
-                                icon: const Icon(Icons.close_rounded),
-                                label: const Text('Pass'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFFE85A4F),
-                                  side: const BorderSide(
-                                    color: Color(0xFFE85A4F),
-                                  ),
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: 1.6.h,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
+                          SizedBox(height: 3.h),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _handlePass,
+                                  icon: const Icon(Icons.close_rounded),
+                                  label: const Text('Pass'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFFE85A4F),
+                                    side: const BorderSide(
+                                      color: Color(0xFFE85A4F),
+                                    ),
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: 1.6.h,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            SizedBox(width: 3.w),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: _handleMatch,
-                                icon: const Icon(Icons.favorite_rounded),
-                                label: const Text('Like'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF2E7D32),
-                                  foregroundColor: Colors.white,
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: 1.6.h,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
+                              SizedBox(width: 3.w),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: _handleMatch,
+                                  icon: const Icon(Icons.favorite_rounded),
+                                  label: const Text('Like'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF2E7D32),
+                                    foregroundColor: Colors.white,
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: 1.6.h,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           },
