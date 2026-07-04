@@ -1,4 +1,4 @@
-﻿-- Enforce discovery radius in PostgreSQL and index the spatial lookup.
+-- Enforce discovery radius in PostgreSQL and index the spatial lookup.
 CREATE EXTENSION IF NOT EXISTS postgis WITH SCHEMA extensions;
 
 CREATE INDEX IF NOT EXISTS idx_user_profiles_discovery_location

@@ -1,4 +1,4 @@
-﻿-- Keep one mutable location row per active rider for the live map.
+-- Keep one mutable location row per active rider for the live map.
 -- The existing live_ride_locations table remains the sampled ride-history trail.
 
 CREATE TABLE IF NOT EXISTS public.live_ride_current_locations (
