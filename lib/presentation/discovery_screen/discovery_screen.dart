@@ -202,6 +202,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
   Future<void> _fetchAndStoreLocation() async {
     var locationAttempts = 0;
+    var canUseRecentFallback = false;
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) return;
@@ -216,6 +217,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         return;
       }
 
+      canUseRecentFallback = true;
       Position position;
       try {
         locationAttempts = 1;
@@ -260,6 +262,55 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           'location_attempts': locationAttempts,
           if (isLocationTimeout) 'transient_location_timeout': true,
         },
+      );
+    } finally {
+      if (canUseRecentFallback && (_myLat == null || _myLng == null)) {
+        await _restoreRecentLocation();
+      }
+    }
+  }
+
+  Future<void> _restoreRecentLocation() async {
+    const maximumAge = Duration(hours: 24);
+    final cutoff = DateTime.now().subtract(maximumAge);
+
+    try {
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      final timestamp = lastKnown?.timestamp;
+      if (lastKnown != null && timestamp != null && timestamp.isAfter(cutoff)) {
+        _myLat = lastKnown.latitude;
+        _myLng = lastKnown.longitude;
+        return;
+      }
+
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      final profile = await Supabase.instance.client
+          .from('user_profiles')
+          .select('latitude, longitude, location_updated_at')
+          .eq('user_id', user.id)
+          .maybeSingle();
+      final latitude = (profile?['latitude'] as num?)?.toDouble();
+      final longitude = (profile?['longitude'] as num?)?.toDouble();
+      final updatedAt = DateTime.tryParse(
+        profile?['location_updated_at']?.toString() ?? '',
+      );
+
+      if (latitude != null &&
+          longitude != null &&
+          updatedAt != null &&
+          updatedAt.isAfter(cutoff)) {
+        _myLat = latitude;
+        _myLng = longitude;
+      }
+    } catch (error, stackTrace) {
+      await DiagnosticsService.instance.logError(
+        feature: 'discovery',
+        action: 'restore_recent_location',
+        error: error,
+        stackTrace: stackTrace,
+        severity: 'info',
       );
     }
   }
@@ -923,9 +974,15 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     );
   }
 
-  void _expandRadius() {
+  Future<void> _expandRadius() async {
     setState(() => _activeFilters = const FilterState());
-    _loadRiders();
+    if (_myLat == null || _myLng == null) {
+      setState(() => _isLoading = true);
+      await _fetchAndStoreLocation();
+    }
+    await _loadRiders();
+
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
