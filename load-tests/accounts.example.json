@@ -1,0 +1,11 @@
+﻿[
+  {
+    "email": "loadtest-rider-01@example.com",
+    "password": "replace-with-a-test-only-password",
+    "latitude": 25.2048,
+    "longitude": 55.2708,
+    "radiusMeters": 100000,
+    "conversationId": "first-user-uuid_second-user-uuid",
+    "liveRideSessionId": "active-live-ride-session-uuid"
+  }
+]
