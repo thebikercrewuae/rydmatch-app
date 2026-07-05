@@ -160,6 +160,167 @@ workflows:
       - android/app/build/outputs/bundle/release/*.json
       - gradle-build.log
 
+  android-staging-aab:
+    name: Android Staging AAB
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: 3.35.0
+      groups:
+        - rydmatch-staging
+
+    scripts:
+      - name: Validate release configuration
+        script: |
+          bash scripts/validate_release_config.sh
+
+      - name: Restore and verify release keystore
+        script: |
+          if [ -z "$CM_KEYSTORE_BASE64" ]; then
+            echo "CM_KEYSTORE_BASE64 is empty."
+            exit 1
+          fi
+
+          printf "%s" "$CM_KEYSTORE_BASE64" | tr -d '\n\r ' | base64 --decode > "$CM_BUILD_DIR/rydmatch-release-key.jks"
+
+          if [ ! -s "$CM_BUILD_DIR/rydmatch-release-key.jks" ]; then
+            echo "Keystore restore failed. File is empty."
+            exit 1
+          fi
+
+          keytool -list \
+            -keystore "$CM_BUILD_DIR/rydmatch-release-key.jks" \
+            -storepass "$CM_KEYSTORE_PASSWORD" \
+            -alias "$CM_KEY_ALIAS" \
+            >/dev/null
+
+          echo "Keystore verified."
+
+      - name: Create key.properties
+        script: |
+          printf "storePassword=%s\n" "$CM_KEYSTORE_PASSWORD" > "$CM_BUILD_DIR/android/key.properties"
+          printf "keyPassword=%s\n" "$CM_KEYSTORE_PASSWORD" >> "$CM_BUILD_DIR/android/key.properties"
+          printf "keyAlias=%s\n" "$CM_KEY_ALIAS" >> "$CM_BUILD_DIR/android/key.properties"
+          printf "storeFile=%s\n" "$CM_BUILD_DIR/rydmatch-release-key.jks" >> "$CM_BUILD_DIR/android/key.properties"
+
+      - name: Install Android SDK components
+        script: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$ANDROID_HOME/tools/bin/sdkmanager"
+          fi
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(command -v sdkmanager || true)"
+          fi
+
+          if [ -z "$SDKMANAGER" ] || [ ! -x "$SDKMANAGER" ]; then
+            echo "sdkmanager not found; using preinstalled Android SDK components."
+            exit 0
+          fi
+
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          yes | "$SDKMANAGER" --install "platforms;android-36" "platforms;android-35" "build-tools;35.0.0" "ndk;27.0.12077973"
+
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+
+      - name: Analyze Flutter code
+        script: |
+          flutter analyze
+
+      - name: Run Flutter tests
+        script: |
+          if [ -d test ] && find test -type f -name "*_test.dart" -print -quit | grep -q .; then
+            flutter test
+          else
+            echo "No Flutter tests found yet; skipping flutter test."
+          fi
+
+      - name: Generate launcher icons
+        script: |
+          dart run flutter_launcher_icons
+
+      - name: Build Android App Bundle
+        script: |
+          patch_gradle_file() {
+            perl -0pi -e 's/minSdkVersion\s+flutter\.minSdkVersion/minSdk = 24/g' android/app/build.gradle.kts
+            perl -0pi -e 's/minSdk\s*=\s*flutter\.minSdkVersion/minSdk = 24/g' android/app/build.gradle.kts
+            perl -0pi -e 's/minSdk\s*=\s*21/minSdk = 24/g' android/app/build.gradle.kts
+            sed -n '20,45p' android/app/build.gradle.kts
+          }
+
+          encode_define() {
+            printf "%s" "$1" | base64 | tr -d '\n'
+          }
+
+          DART_DEFINES="$(encode_define "SUPABASE_URL=$SUPABASE_URL"),$(encode_define "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"),$(encode_define "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY"),$(encode_define "STRAVA_CLIENT_ID=$STRAVA_CLIENT_ID"),$(encode_define "STRAVA_REDIRECT_URI=$STRAVA_REDIRECT_URI"),$(encode_define "REVENUECAT_ANDROID_API_KEY=$REVENUECAT_ANDROID_API_KEY"),$(encode_define "REVENUECAT_PREMIUM_ENTITLEMENT=${REVENUECAT_PREMIUM_ENTITLEMENT:-premium}"),$(encode_define "BETA_PREMIUM_UNLOCK_ENABLED=${BETA_PREMIUM_UNLOCK_ENABLED:-true}")"
+
+          APP_VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
+          APP_VERSION_NAME="${APP_VERSION%%+*}"
+          APP_VERSION_CODE="${APP_VERSION##*+}"
+
+          if [ -z "$APP_VERSION_NAME" ] || [ -z "$APP_VERSION_CODE" ] || [ "$APP_VERSION_NAME" = "$APP_VERSION_CODE" ]; then
+            echo "Could not read app version from pubspec.yaml. Expected format: version: 1.0.15+15"
+            exit 1
+          fi
+
+          echo "Building Android App Bundle versionName=$APP_VERSION_NAME versionCode=$APP_VERSION_CODE"
+
+          patch_gradle_file
+
+          cd android
+
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            GRADLE_CMD="./gradlew"
+          else
+            GRADLE_CMD="gradle"
+          fi
+
+          export GRADLE_OPTS="${GRADLE_OPTS:-} -Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.internal.repository.max.retries=3 -Dorg.gradle.internal.repository.initial.backoff=500"
+
+          run_gradle_bundle() {
+            $GRADLE_CMD bundleRelease \
+              -Pdart-defines="$DART_DEFINES" \
+              -Ptarget-platform=android-arm,android-arm64,android-x64 \
+              -Ptarget=lib/main.dart \
+              -Pbuild-name="$APP_VERSION_NAME" \
+              -Pbuild-number="$APP_VERSION_CODE" \
+              -Ptrack-widget-creation=false \
+              -Ptree-shake-icons=true \
+              --stacktrace 2>&1 | tee ../gradle-build.log
+            return ${PIPESTATUS[0]}
+          }
+
+          set +e
+          run_gradle_bundle
+          BUILD_STATUS=$?
+          if [ "$BUILD_STATUS" -ne 0 ] && grep -Eq "Read timed out|Could not download|Could not get resource" ../gradle-build.log; then
+            echo "Gradle dependency download failed, retrying once after 20 seconds..."
+            sleep 20
+            run_gradle_bundle
+            BUILD_STATUS=$?
+          fi
+          set -e
+
+          cd "$CM_BUILD_DIR"
+
+          echo "AAB files found:"
+          find . -type f -name "*.aab" -print
+
+          echo "Last 200 lines of Gradle log:"
+          tail -n 200 gradle-build.log
+
+          exit $BUILD_STATUS
+
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab
+      - android/app/build/outputs/bundle/release/*.aab
+      - android/app/build/outputs/bundle/release/*.json
+      - gradle-build.log
+
   ios-testflight-ipa:
     name: iOS TestFlight IPA
     max_build_duration: 60
@@ -287,3 +448,117 @@ workflows:
         auth: integration
         submit_to_testflight: true
         expire_build_submitted_for_review: true
+
+  ios-staging-ipa:
+    name: iOS Staging IPA
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: 3.35.0
+      xcode: latest
+      cocoapods: default
+      groups:
+        - rydmatch-staging
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.rydmatch.app
+
+    integrations:
+      app_store_connect: RydMatch App Store Connect
+
+    scripts:
+      - name: Validate iOS release configuration
+        script: |
+          missing=0
+          require_var() {
+            if [ -z "${!1:-}" ]; then
+              echo "$1 is empty or missing."
+              missing=1
+            else
+              echo "$1 is configured."
+            fi
+          }
+
+          require_var SUPABASE_URL
+          require_var SUPABASE_ANON_KEY
+          require_var GOOGLE_MAPS_API_KEY
+          require_var STRAVA_CLIENT_ID
+          require_var STRAVA_REDIRECT_URI
+          require_var REVENUECAT_IOS_API_KEY
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+
+      - name: Analyze Flutter code
+        script: |
+          flutter analyze
+
+      - name: Run Flutter tests
+        script: |
+          if [ -d test ] && find test -type f -name "*_test.dart" -print -quit | grep -q .; then
+            flutter test
+          else
+            echo "No Flutter tests found yet; skipping flutter test."
+          fi
+
+      - name: Generate launcher icons
+        script: |
+          dart run flutter_launcher_icons
+
+      - name: Set up iOS code signing
+        script: |
+          keychain initialize
+          keychain add-certificates
+          xcode-project use-profiles
+
+      - name: Build iOS IPA
+        script: |
+          APP_VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
+          APP_VERSION_NAME="${APP_VERSION%%+*}"
+          PUBSPEC_BUILD_NUMBER="${APP_VERSION##*+}"
+          IOS_BUILD_NUMBER="${IOS_BUILD_NUMBER:-$(date -u +%Y%m%d%H%M%S)}"
+
+          if [ -z "$APP_VERSION_NAME" ] || [ -z "$PUBSPEC_BUILD_NUMBER" ] || [ "$APP_VERSION_NAME" = "$PUBSPEC_BUILD_NUMBER" ]; then
+            echo "Could not read app version from pubspec.yaml. Expected format: version: 1.0.24+24"
+            exit 1
+          fi
+
+          echo "Building iOS IPA versionName=$APP_VERSION_NAME buildNumber=$IOS_BUILD_NUMBER"
+
+          EXPORT_OPTIONS_PLIST="${CM_EXPORT_OPTIONS_PLIST:-}"
+          if [ -z "$EXPORT_OPTIONS_PLIST" ] && [ -f "/Users/builder/export_options.plist" ]; then
+            EXPORT_OPTIONS_PLIST="/Users/builder/export_options.plist"
+          fi
+
+          if [ -z "$EXPORT_OPTIONS_PLIST" ] || [ ! -f "$EXPORT_OPTIONS_PLIST" ]; then
+            echo "Could not find iOS export options plist. Expected Codemagic to generate /Users/builder/export_options.plist."
+            find /Users/builder -maxdepth 3 -name "*export*plist" -print || true
+            exit 1
+          fi
+
+          echo "Using export options plist: $EXPORT_OPTIONS_PLIST"
+
+          flutter build ipa \
+            --release \
+            --build-name="$APP_VERSION_NAME" \
+            --build-number="$IOS_BUILD_NUMBER" \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            --dart-define=GOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY" \
+            --dart-define=STRAVA_CLIENT_ID="$STRAVA_CLIENT_ID" \
+            --dart-define=STRAVA_REDIRECT_URI="$STRAVA_REDIRECT_URI" \
+            --dart-define=REVENUECAT_IOS_API_KEY="$REVENUECAT_IOS_API_KEY" \
+            --dart-define=REVENUECAT_PREMIUM_ENTITLEMENT="${REVENUECAT_PREMIUM_ENTITLEMENT:-premium}" \
+            --dart-define=BETA_PREMIUM_UNLOCK_ENABLED="${BETA_PREMIUM_UNLOCK_ENABLED:-true}" \
+            --export-options-plist="$EXPORT_OPTIONS_PLIST"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
