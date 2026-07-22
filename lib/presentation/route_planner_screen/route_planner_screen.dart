@@ -1575,7 +1575,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                 color: theme.colorScheme.onSurface,
               ),
             ),
-            SizedBox(height: 2.h),
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 3.h),
             GestureDetector(
               onTap: () {
                 Navigator.pop(ctx);
