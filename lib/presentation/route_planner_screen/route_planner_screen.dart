@@ -1624,7 +1624,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                             'Share route details via chat',
                             style: GoogleFonts.dmSans(
                               fontSize: 10.sp,
-                              color: theme.colorScheme.onSurfaceVariant,
+                              color: Colors.white70,
                             ),
                           ),
                         ],
@@ -1647,10 +1647,10 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 1.8.h),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1B365D).withValues(alpha: 0.06),
+                  color: Colors.white.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(14.0),
                   border: Border.all(
-                    color: const Color(0xFF1B365D).withValues(alpha: 0.2),
+                    color: Colors.white.withValues(alpha: 0.18),
                   ),
                 ),
                 child: Row(
@@ -1659,12 +1659,12 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                       width: 11.w,
                       height: 11.w,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1B365D).withValues(alpha: 0.12),
+                        color: Colors.white.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(12.0),
                       ),
                       child: const Icon(
                         Icons.group_add_rounded,
-                        color: Color(0xFF1B365D),
+                        color: Colors.white,
                         size: 22,
                       ),
                     ),
@@ -1678,14 +1678,14 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                             style: GoogleFonts.dmSans(
                               fontSize: 13.sp,
                               fontWeight: FontWeight.w700,
-                              color: const Color(0xFF1B365D),
+                              color: Colors.white,
                             ),
                           ),
                           Text(
                             'Pre-fill group with this route & invite riders',
                             style: GoogleFonts.dmSans(
                               fontSize: 10.sp,
-                              color: theme.colorScheme.onSurfaceVariant,
+                              color: Colors.white70,
                             ),
                           ),
                         ],
@@ -1693,7 +1693,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                     ),
                     const Icon(
                       Icons.chevron_right_rounded,
-                      color: Color(0xFF1B365D),
+                      color: Colors.white70,
                     ),
                   ],
                 ),
@@ -2505,7 +2505,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                         const Icon(
                           Icons.list_alt_rounded,
                           size: 16,
-                          color: Color(0xFF1B365D),
+                          color: Colors.white,
                         ),
                         SizedBox(width: 2.w),
                         Text(
@@ -2584,7 +2584,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                                 step['distance'] as String,
                                 style: GoogleFonts.dmSans(
                                   fontSize: 9.sp,
-                                  color: theme.colorScheme.onSurfaceVariant,
+                                  color: Colors.white70,
                                 ),
                               ),
                             ],
@@ -2667,7 +2667,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                     color: Colors.black.withValues(alpha: 0.25),
                     child: const Center(
                       child: CircularProgressIndicator(
-                        color: Color(0xFF1B365D),
+                        color: Colors.white,
                         strokeWidth: 3,
                       ),
                     ),
@@ -2971,3 +2971,4 @@ class NavigationLauncher {
     }
   }
 }
+
