@@ -508,8 +508,17 @@ async function generateAiReview({
 
   const data = await safeResponseJson(response);
   if (!response.ok) {
-    console.error('OpenAI diagnostics review error:', data);
-    throw new Error('Could not generate AI diagnostics review');
+    const errorMessage =
+      typeof data?.error?.message === 'string'
+        ? data.error.message
+        : `OpenAI request failed with HTTP ${response.status}`;
+
+    console.error('OpenAI diagnostics review error:', {
+      status: response.status,
+      error: data?.error ?? data,
+    });
+
+    throw new Error(errorMessage);
   }
 
   const text =
