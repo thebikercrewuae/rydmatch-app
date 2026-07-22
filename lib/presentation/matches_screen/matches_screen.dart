@@ -564,7 +564,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
                   onPressed: () => _navigateToChat(match),
                   icon: const Icon(
                     Icons.chat_bubble_outline_rounded,
-                    color: Color(0xFF1B365D),
+                    color: Color(0xFF8EC5FF),
                     size: 18,
                   ),
                   tooltip: 'Open chat',
@@ -597,3 +597,4 @@ class _MatchesScreenState extends State<MatchesScreen> {
     );
   }
 }
+
