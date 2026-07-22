@@ -25,7 +25,7 @@ android {
     defaultConfig {
         applicationId = "com.rydmatch.app"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 36
         versionCode =
             (project.findProperty("build-number") as String?)?.toIntOrNull()
                 ?: flutter.versionCode
