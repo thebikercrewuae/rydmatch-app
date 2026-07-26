@@ -4,8 +4,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../services/swipe_service.dart';
+import '../../services/pioneer_service.dart';
 import '../../services/diagnostics_service.dart';
 import '../../widgets/app_icons.dart';
+import '../../widgets/pioneer_member_badge.dart';
 import '../chat_screen/chat_screen.dart';
 
 class MatchesScreen extends StatefulWidget {
@@ -79,6 +81,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
 
     try {
       final matches = await SwipeService.instance.getMatches();
+      await PioneerService.instance.enrichProfiles(matches);
 
       if (!mounted) return;
 
@@ -516,16 +519,30 @@ class _MatchesScreenState extends State<MatchesScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    name,
-                    style: GoogleFonts.dmSans(
-                      fontSize: 14.0,
-                      fontWeight: FontWeight.w700,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                    softWrap: false,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          name,
+                          style: GoogleFonts.dmSans(
+                            fontSize: 14.0,
+                            fontWeight: FontWeight.w700,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          softWrap: false,
+                        ),
+                      ),
+                      if (match['is_pioneer'] == true &&
+                          match['pioneer_number'] != null) ...[
+                        const SizedBox(width: 6),
+                        PioneerMemberBadge(
+                          number: match['pioneer_number'] as int,
+                          compact: true,
+                        ),
+                      ],
+                    ],
                   ),
                   SizedBox(height: 0.4.h),
                   Row(

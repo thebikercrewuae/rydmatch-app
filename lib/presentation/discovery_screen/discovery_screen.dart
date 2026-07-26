@@ -14,6 +14,7 @@ import '../../services/analytics_service.dart';
 import '../../services/diagnostics_service.dart';
 import '../../services/discovery_distance_filter.dart';
 import '../../services/haptic_service.dart';
+import '../../services/pioneer_service.dart';
 import '../../services/premium_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/swipe_service.dart';
@@ -494,6 +495,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     }
 
     await _hydrateDiscoveryProfileFields(allProfiles);
+    await PioneerService.instance.enrichProfiles(allProfiles);
 
     final afterExcludeSelf = allProfiles
         .where((p) => p['id'] != currentUser.id)
@@ -561,7 +563,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         'rideModeLabel': rideModeLabel,
         'age': p['age'] as int? ?? '',
         'isVerified': _profileIsVerified(p),
-        'bikeModel': bikeType,
+        'isPioneer': p['is_pioneer'] == true,
+        'pioneerNumber': p['pioneer_number'],
         'bikeName': bikeType,
         'bikeType': bikeType,
         'bikeBrand': 'All',

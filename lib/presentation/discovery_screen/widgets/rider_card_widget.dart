@@ -3,6 +3,7 @@ import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
 import '../../../widgets/app_icons.dart';
+import '../../../widgets/pioneer_member_badge.dart';
 import '../../../widgets/verified_badge_widget.dart';
 import '../../block_user_confirmation_screen/block_user_confirmation_screen.dart';
 import '../../report_user_screen/report_user_screen.dart';
@@ -336,6 +337,15 @@ class _RiderCardWidgetState extends State<RiderCardWidget>
                         const Padding(
                           padding: EdgeInsets.only(left: 6),
                           child: VerifiedBadgeWidget(size: 22),
+                        ),
+                      if (rider["isPioneer"] == true &&
+                          rider["pioneerNumber"] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: PioneerMemberBadge(
+                            number: rider["pioneerNumber"] as int,
+                            compact: true,
+                          ),
                         ),
                     ],
                   ),

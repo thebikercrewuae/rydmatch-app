@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import '../../../widgets/custom_icon_widget.dart';
+import '../../../widgets/pioneer_member_badge.dart';
 import '../../../widgets/verified_badge_widget.dart';
 
 class ProfileHeaderWidget extends StatelessWidget {
@@ -11,6 +12,8 @@ class ProfileHeaderWidget extends StatelessWidget {
   final String riderName;
   final String riderBio;
   final bool isVerified;
+  final bool isPioneer;
+  final int? pioneerNumber;
   final VoidCallback? onPhotoTap;
 
   const ProfileHeaderWidget({
@@ -19,6 +22,8 @@ class ProfileHeaderWidget extends StatelessWidget {
     required this.riderName,
     required this.riderBio,
     this.isVerified = false,
+    this.isPioneer = false,
+    this.pioneerNumber,
     this.onPhotoTap,
   });
 
@@ -38,18 +43,21 @@ class ProfileHeaderWidget extends StatelessWidget {
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
-              Container(
-                width: 28.w,
-                height: 28.w,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                  border: Border.all(
-                    color: theme.colorScheme.primary,
-                    width: 3,
+              PioneerAvatarFrame(
+                isPioneer: isPioneer,
+                child: Container(
+                  width: 28.w,
+                  height: 28.w,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    border: Border.all(
+                      color: theme.colorScheme.primary,
+                      width: 3,
+                    ),
                   ),
+                  child: ClipOval(child: _buildPhotoWidget(theme)),
                 ),
-                child: ClipOval(child: _buildPhotoWidget(theme)),
               ),
               if (isVerified)
                 Positioned(
@@ -97,6 +105,10 @@ class ProfileHeaderWidget extends StatelessWidget {
             ],
           ],
         ),
+        if (isPioneer && pioneerNumber != null) ...[
+          SizedBox(height: 1.h),
+          PioneerMemberBadge(number: pioneerNumber!),
+        ],
         if (riderBio.isNotEmpty) ...[
           SizedBox(height: 1.h),
           Text(

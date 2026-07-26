@@ -7,6 +7,7 @@ import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/diagnostics_service.dart';
 import '../../services/profile_service.dart';
+import '../../services/pioneer_service.dart';
 import '../../services/premium_service.dart';
 import '../../services/verification_service.dart';
 import '../../services/boost_service.dart';
@@ -63,6 +64,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   List<String> _allSafetyTags = [];
   bool _isVerified = false;
   int _pendingVerificationRequests = 0;
+  bool _isPioneer = false;
+  int? _pioneerNumber;
 
   // Boost state
   bool _isBoostActive = false;
@@ -224,7 +227,11 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   }
 
   Future<void> _loadProfile() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _isPioneer = false;
+      _pioneerNumber = null;
+    });
 
     final args = ModalRoute.of(context)?.settings.arguments;
     final isOtherUser = args is Map<String, dynamic>
@@ -402,6 +409,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
           await _loadOtherUserVerification(otherUserId);
         }
         await _loadRatings(otherUserId);
+        await _loadPioneerStatus(otherUserId);
         return;
       } catch (e) {
         debugPrint('ProfileViewScreen: failed to load other profile: $e');
@@ -459,6 +467,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
               : false;
           _isLoading = false;
         });
+        await _loadPioneerStatus(otherUserId);
         return;
       }
     }
@@ -498,6 +507,10 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         _isVerified = isVerified;
       });
     }
+
+    if (currentUserId != null) {
+      await _loadPioneerStatus(currentUserId);
+    }
   }
 
   Future<void> _loadRatings(String userId) async {
@@ -533,6 +546,15 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   Future<void> _loadOtherUserVerification(String userId) async {
     final verified = await VerificationService.instance.isUserVerified(userId);
     if (mounted) setState(() => _isVerified = verified);
+  }
+
+  Future<void> _loadPioneerStatus(String userId) async {
+    final status = await PioneerService.instance.getStatus(userId);
+    if (!mounted) return;
+    setState(() {
+      _isPioneer = status != null;
+      _pioneerNumber = status?.number;
+    });
   }
 
   Future<void> _openEditProfile() async {
@@ -918,6 +940,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                         riderName: _riderName,
                         riderBio: _riderBio,
                         isVerified: _rideMode != 'bicycle' && _isVerified,
+                        isPioneer: _isPioneer,
+                        pioneerNumber: _pioneerNumber,
                         onPhotoTap: _canOpenPhoto(_riderPhotoPath)
                             ? () => _showPhotoExpanded(
                                 context,

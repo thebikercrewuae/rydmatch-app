@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../widgets/custom_bottom_bar.dart';
 import '../../services/profile_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/pioneer_service.dart';
 import '../../services/premium_service.dart';
 import '../../widgets/notification_banner_overlay.dart';
 import '../../theme/app_theme.dart';
@@ -29,6 +30,19 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _notificationService.addListener(_onNotificationsChanged);
     _notificationService.initialize();
     PremiumService().refresh(reason: 'main_screen_init');
+    _ensurePioneerMembership();
+  }
+
+  Future<void> _ensurePioneerMembership() async {
+    // Best-effort: the database trigger on user_profiles already awards
+    // pioneer membership when a profile is marked complete. This client
+    // call is a safety net that also lets the app surface the member's
+    // number without an extra round trip on the profile screen.
+    try {
+      await PioneerService.instance.claimCurrentUserMembership();
+    } catch (e) {
+      debugPrint('MainScreen: pioneer membership claim failed: ');
+    }
   }
 
   void _onNotificationsChanged() {
