@@ -88,7 +88,7 @@ begin
     v_next_number::smallint,
     p_user_id
   )
-  on conflict (user_id) do nothing;
+  on conflict on constraint pioneer_members_user_id_key do nothing;
 
   return query
   select
