@@ -4,6 +4,7 @@ import 'package:sizer/sizer.dart';
 import '../../report_user_screen/report_user_screen.dart';
 import '../../block_user_confirmation_screen/block_user_confirmation_screen.dart';
 import '../../../widgets/app_logo_widget.dart';
+import '../../../widgets/pioneer_member_badge.dart';
 
 class ChatHeaderWidget extends StatelessWidget {
   final String riderName;
@@ -13,6 +14,8 @@ class ChatHeaderWidget extends StatelessWidget {
   final VoidCallback onBackTap;
   final VoidCallback onProfileTap;
   final String? riderId;
+  final bool isPioneer;
+  final int? pioneerNumber;
   final VoidCallback? onUserBlocked;
 
   const ChatHeaderWidget({
@@ -24,6 +27,8 @@ class ChatHeaderWidget extends StatelessWidget {
     required this.onBackTap,
     required this.onProfileTap,
     this.riderId,
+    this.isPioneer = false,
+    this.pioneerNumber,
     this.onUserBlocked,
   });
 
@@ -164,14 +169,27 @@ class ChatHeaderWidget extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    riderName,
-                    style: GoogleFonts.dmSans(
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          riderName,
+                          style: GoogleFonts.dmSans(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isPioneer && pioneerNumber != null) ...[
+                        const SizedBox(width: 6),
+                        PioneerMemberBadge(
+                          number: pioneerNumber!,
+                          compact: true,
+                        ),
+                      ],
+                    ],
                   ),
                   Text(
                     isOnline ? 'Online · $bikeModel' : bikeModel,

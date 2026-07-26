@@ -4,6 +4,7 @@ import 'package:sizer/sizer.dart';
 import '../../../models/ride_feed_post_model.dart';
 import '../../../services/haptic_service.dart';
 import '../../../services/ride_feed_service.dart';
+import '../../../widgets/pioneer_member_badge.dart';
 
 class PostCardWidget extends StatefulWidget {
   final RideFeedPost post;
@@ -152,14 +153,27 @@ class _PostCardWidgetState extends State<PostCardWidget>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  post.riderName ?? 'Rider',
-                  style: GoogleFonts.dmSans(
-                    fontSize: 13.sp,
-                    fontWeight: FontWeight.w700,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        post.riderName ?? 'Rider',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w700,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (post.isPioneer && post.pioneerNumber != null) ...[
+                      const SizedBox(width: 6),
+                      PioneerMemberBadge(
+                        number: post.pioneerNumber!,
+                        compact: true,
+                      ),
+                    ],
+                  ],
                 ),
                 if (post.bikeName != null)
                   Text(

@@ -8,6 +8,7 @@ import '../../services/analytics_service.dart';
 import '../../services/diagnostics_service.dart';
 import '../../services/haptic_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/pioneer_service.dart';
 import '../../widgets/app_icons.dart';
 import '../../widgets/skeleton_loader_widget.dart';
 import '../../widgets/toast_widget.dart';
@@ -32,6 +33,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final bool _isTyping = false;
   bool _showSuggestRide = false;
   bool _isLoading = true;
+  bool _isPioneer = false;
+  int? _pioneerNumber;
   RealtimeChannel? _statusSubscription;
   RealtimeChannel? _newMessageSubscription;
 
@@ -79,6 +82,21 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       _subscribeToNewMessages();
       _subscribeToStatusUpdates();
       _markMessagesAsRead();
+      _loadPioneerStatus();
+    });
+  }
+
+  Future<void> _loadPioneerStatus() async {
+    final args = ModalRoute.of(context)?.settings.arguments;
+    final riderData = args is Map<String, dynamic> ? args : _rider;
+    final otherUserId = riderData['otherUserId'] as String?;
+    if (otherUserId == null || otherUserId.isEmpty) return;
+
+    final status = await PioneerService.instance.getStatus(otherUserId);
+    if (!mounted) return;
+    setState(() {
+      _isPioneer = status != null;
+      _pioneerNumber = status?.number;
     });
   }
 
@@ -626,6 +644,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             riderImage: riderImage,
             bikeModel: bikeModel,
             isOnline: riderData['isOnline'] as bool? ?? false,
+            isPioneer: _isPioneer,
+            pioneerNumber: _pioneerNumber,
             onBackTap: () => Navigator.pop(context),
             onProfileTap: () {},
           ),

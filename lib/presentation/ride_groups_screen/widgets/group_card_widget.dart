@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import '../../../models/ride_group_model.dart';
+import '../../../widgets/pioneer_member_badge.dart';
 
 class GroupCardWidget extends StatelessWidget {
   final RideGroup group;
@@ -120,13 +121,28 @@ class GroupCardWidget extends StatelessWidget {
                         ),
                       ),
                       const Spacer(),
-                      Text(
-                        'Led by ${group.leaderName}',
-                        style: GoogleFonts.dmSans(
-                          fontSize: 11.sp,
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.primary,
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'Led by ${group.leaderName}',
+                              style: GoogleFonts.dmSans(
+                                fontSize: 11.sp,
+                                fontWeight: FontWeight.w600,
+                                color: theme.colorScheme.primary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (group.isPioneer && group.pioneerNumber != null) ...[
+                            const SizedBox(width: 6),
+                            PioneerMemberBadge(
+                              number: group.pioneerNumber!,
+                              compact: true,
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),

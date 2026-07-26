@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/ride_feed_post_model.dart';
+import 'pioneer_service.dart';
 import 'public_content_safety_service.dart';
 
 class RideFeedService {
@@ -49,6 +50,17 @@ class RideFeedService {
             post.isLikedByMe = likedIds.contains(post.id);
           }
         } catch (_) {}
+      }
+
+      // The feed is the signed-in user's private journal, so every post
+      // belongs to them. Resolve their pioneer status once and surface it
+      // on each post card for a consistent badge across the feed.
+      final pioneerStatus = await PioneerService.instance.getStatus(userId);
+      if (pioneerStatus != null) {
+        for (final post in posts) {
+          post.isPioneer = true;
+          post.pioneerNumber = pioneerStatus.number;
+        }
       }
       return posts;
     } catch (e) {

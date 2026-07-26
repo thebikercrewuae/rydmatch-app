@@ -8,6 +8,7 @@ import '../../models/ride_group_model.dart';
 import '../../services/analytics_service.dart';
 import '../../services/diagnostics_service.dart';
 import '../../services/live_ride_service.dart';
+import '../../services/pioneer_service.dart';
 import '../../services/premium_service.dart';
 import '../../widgets/app_icons.dart';
 import '../../widgets/app_logo_widget.dart';
@@ -119,7 +120,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
 
       final myGroups = List<Map<String, dynamic>>.from(
         myGroupsData,
-      ).map((row) => _rowToGroup(row, leaderName: 'You')).toList();
+      ).map((row) => _rowToGroup(row, leaderName: 'You', leaderId: currentUser.id)).toList();
 
       final seenGroupIds = myGroups.map((group) => group.id).toSet();
       final acceptedInvites = List<Map<String, dynamic>>.from(
@@ -156,7 +157,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
         final inviterId = invite['inviter_id'] as String?;
         final leaderName = leaderNamesById[inviterId] ?? 'Rider';
 
-        myGroups.add(_rowToGroup(groupRow, leaderName: leaderName));
+        myGroups.add(_rowToGroup(groupRow, leaderName: leaderName, leaderId: inviterId));
         seenGroupIds.add(groupId);
       }
 
@@ -172,7 +173,23 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
         final inviterId = invite['inviter_id'] as String?;
         final leaderName = leaderNamesById[inviterId] ?? 'Rider';
 
-        invitations.add(_rowToGroup(groupRow, leaderName: leaderName));
+        invitations.add(_rowToGroup(groupRow, leaderName: leaderName, leaderId: inviterId));
+      }
+
+      // Surface the ride leader's Pioneer status next to the Led by
+      // line on each group card.
+      final leaderIds = <String>{
+        for (final group in [...myGroups, ...invitations])
+          if ((group.leaderId ?? '').isNotEmpty) group.leaderId!,
+      }.toList();
+      final pioneerStatuses =
+          await PioneerService.instance.getStatuses(leaderIds);
+      for (final group in [...myGroups, ...invitations]) {
+        final status = group.leaderId == null
+            ? null
+            : pioneerStatuses[group.leaderId];
+        group.isPioneer = status != null;
+        group.pioneerNumber = status?.number;
       }
 
       if (mounted) {
@@ -269,7 +286,11 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
     }
   }
 
-  RideGroup _rowToGroup(Map<String, dynamic> row, {String leaderName = 'You'}) {
+  RideGroup _rowToGroup(
+    Map<String, dynamic> row, {
+    String leaderName = 'You',
+    String? leaderId,
+  }) {
     final rideDate = row['ride_date'] != null
         ? DateTime.tryParse(row['ride_date'] as String) ??
               DateTime.now().add(const Duration(days: 3))
@@ -283,6 +304,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       maxRiders: (row['max_riders'] as int?) ?? 4,
       memberCount: (row['member_count'] as int?) ?? 1,
       leaderName: leaderName,
+      leaderId: leaderId,
       rideCommunity: row['ride_community'] as String? ?? 'motorcycle',
       rideType: row['ride_type'] as String? ?? 'Scenic',
       difficulty: row['difficulty'] as String? ?? 'Moderate',

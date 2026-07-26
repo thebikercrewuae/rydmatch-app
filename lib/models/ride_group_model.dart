@@ -9,6 +9,9 @@ class RideGroup {
   final int maxRiders;
   final int memberCount;
   final String leaderName;
+  final String? leaderId;
+  bool isPioneer;
+  int? pioneerNumber;
   final String rideCommunity;
   final String rideType;
   final String difficulty;
@@ -25,6 +28,9 @@ class RideGroup {
     required this.maxRiders,
     required this.memberCount,
     required this.leaderName,
+    this.leaderId,
+    this.isPioneer = false,
+    this.pioneerNumber,
     this.rideCommunity = 'motorcycle',
     required this.rideType,
     required this.difficulty,

@@ -15,6 +15,8 @@ class RideFeedPost {
   // Display fields (joined from profile)
   final String? riderName;
   final String? riderPhotoUrl;
+  bool isPioneer;
+  int? pioneerNumber;
 
   RideFeedPost({
     required this.id,
@@ -31,6 +33,8 @@ class RideFeedPost {
     this.isLikedByMe = false,
     this.riderName,
     this.riderPhotoUrl,
+    this.isPioneer = false,
+    this.pioneerNumber,
   });
 
   factory RideFeedPost.fromMap(Map<String, dynamic> map) {
