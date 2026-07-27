@@ -75,8 +75,8 @@ class SosPremiumGateWidget extends StatelessWidget {
                     ),
                     SizedBox(height: 1.h),
                     _buildFeatureRow(
-                      Icons.sms_rounded,
-                      'Instant SMS to emergency contact',
+                      Icons.chat_rounded,
+                      'WhatsApp alert to emergency contact',
                     ),
                   ],
                 ),

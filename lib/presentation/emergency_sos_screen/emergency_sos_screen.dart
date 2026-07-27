@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/haptic_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/analytics_service.dart';
@@ -226,6 +227,33 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
     });
   }
 
+  Future<void> _openWhatsAppSos({
+    required bool isTest,
+    required double latitude,
+    required double longitude,
+  }) async {
+    // Opens WhatsApp addressed to the rider's emergency contact with a
+    // pre-filled SOS message and a live Google Maps link. The rider taps
+    // send in WhatsApp. No emergency contact set -> silent no-op.
+    final phone = _contactPhone.trim();
+    if (phone.isEmpty) return;
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return;
+    final rider = _riderName.isNotEmpty ? _riderName : 'RydMatch Rider';
+    final mapLink = 'https://maps.google.com/?q=$latitude,$longitude';
+    final message = isTest
+        ? '[TEST] $rider is testing their RydMatch emergency SOS. No action needed. Location: $mapLink'
+        : 'EMERGENCY: $rider needs help. This is an emergency SOS from RydMatch. Live location: $mapLink';
+    final url = Uri.parse(
+      'https://wa.me/$digits?text=${Uri.encodeComponent(message)}',
+    );
+    try {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('WhatsApp SOS launch failed: $e');
+    }
+  }
+
   Future<void> _triggerSOS() async {
     if (_latitude == null || _longitude == null) {
       _showNoLocationDialog();
@@ -332,6 +360,14 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
           ),
         );
       }
+    } finally {
+      // Always reach the personal emergency contact via WhatsApp, even if
+      // the in-app rider network alert failed.
+      await _openWhatsAppSos(
+        isTest: false,
+        latitude: _latitude!,
+        longitude: _longitude!,
+      );
     }
   }
 
@@ -376,6 +412,9 @@ class _EmergencySosScreenState extends State<EmergencySosScreen> {
               ? responseData['alertId'] as String?
               : null,
         );
+        // Also open WhatsApp to the emergency contact so the rider can
+        // verify the full flow (clearly marked as a test).
+        await _openWhatsAppSos(isTest: true, latitude: lat, longitude: lng);
       }
     } on FunctionException catch (e) {
       debugPrint('Test SMS FunctionException: ${e.status} - ${e.details}');
