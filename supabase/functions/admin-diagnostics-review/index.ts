@@ -27,9 +27,9 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const openAiKey = Deno.env.get('OPENAI_API_KEY');
+    const geminiKey = Deno.env.get('GEMINI_API_KEY');
     const scheduleSecret = Deno.env.get('DIAGNOSTICS_SCHEDULE_SECRET');
-    const model = Deno.env.get('OPENAI_DIAGNOSTICS_MODEL') ?? 'gpt-4.1-mini';
+    const model = Deno.env.get('GEMINI_DIAGNOSTICS_MODEL') ?? 'gemini-2.0-flash';
     const authHeader = req.headers.get('Authorization') ?? '';
     const scheduleHeader = req.headers.get('x-scheduled-secret') ?? '';
 
@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
     const rows = (data ?? []) as DiagnosticRow[];
     const summary = buildDiagnosticSummary(rows, { days, feature, severity });
     const reviewResult = await buildReview({
-      apiKey: openAiKey,
+      apiKey: geminiKey,
       model,
       summary,
     });
@@ -367,29 +367,29 @@ async function buildReview({
   summary: ReturnType<typeof buildDiagnosticSummary>;
 }): Promise<{
   review: Record<string, unknown>;
-  provider: 'openai' | 'fallback';
+  provider: 'gemini' | 'fallback';
   warning: string | null;
 }> {
   if (!apiKey) {
     return {
       review: buildFallbackReview(summary),
       provider: 'fallback',
-      warning: 'OPENAI_API_KEY is not configured; using local diagnostic summary.',
+      warning: 'GEMINI_API_KEY is not configured; using local diagnostic summary.',
     };
   }
 
   try {
     return {
       review: await generateAiReview({ apiKey, model, summary }),
-      provider: 'openai',
+      provider: 'gemini',
       warning: null,
     };
   } catch (error) {
-    console.error('admin-diagnostics-review OpenAI fallback:', error);
+    console.error('admin-diagnostics-review Gemini fallback:', error);
     return {
       review: buildFallbackReview(summary),
       provider: 'fallback',
-      warning: `OpenAI review unavailable: ${publicErrorMessage(error)}`,
+      warning: `Gemini review unavailable: ${publicErrorMessage(error)}`,
     };
   }
 }
@@ -436,59 +436,37 @@ async function generateAiReview({
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 18000);
 
+  const systemPrompt =
+    'You are a senior mobile reliability reviewer for RydMatch. Review diagnostics in read-only mode. ' +
+    'Do not claim to have changed data, code, SQL, policies, or deployments. Avoid exposing personal data. ' +
+    'Be concise and practical. For each issue, give a likely root cause and a concrete, specific recommended fix ' +
+    '(for example: the exact Supabase secret to set, the migration to run, the column to add, or the config to change).';
+
+  const userPrompt =
+    'Analyze this grouped diagnostic summary and return JSON only.\n\n' +
+    JSON.stringify(summary);
+
   let response: Response;
   try {
-    response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        input: [
-          {
-            role: 'system',
-            content:
-              'You are a senior mobile reliability reviewer for RydMatch. Review diagnostics in read-only mode. Do not claim to have changed data, code, SQL, policies, or deployments. Avoid exposing personal data. Be concise and practical.',
-          },
-          {
-            role: 'user',
-            content:
-              `Analyze this grouped diagnostic summary and return JSON only.\n\n${JSON.stringify(summary)}`,
-          },
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'diagnostic_review',
-            strict: true,
-            schema: {
+    response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseSchema: {
               type: 'object',
-              additionalProperties: false,
               properties: {
                 overview: { type: 'string' },
-                releaseBlockers: {
-                  type: 'array',
-                  items: { type: 'string' },
-                  maxItems: 5,
-                },
-                likelyRootCauses: {
-                  type: 'array',
-                  items: { type: 'string' },
-                  maxItems: 6,
-                },
-                recommendedNextActions: {
-                  type: 'array',
-                  items: { type: 'string' },
-                  maxItems: 6,
-                },
-                privacyNotes: {
-                  type: 'array',
-                  items: { type: 'string' },
-                  maxItems: 4,
-                },
+                releaseBlockers: { type: 'array', items: { type: 'string' } },
+                likelyRootCauses: { type: 'array', items: { type: 'string' } },
+                recommendedNextActions: { type: 'array', items: { type: 'string' } },
+                privacyNotes: { type: 'array', items: { type: 'string' } },
               },
               required: [
                 'overview',
@@ -499,9 +477,9 @@ async function generateAiReview({
               ],
             },
           },
-        },
-      }),
-    });
+        }),
+      },
+    );
   } finally {
     clearTimeout(timeout);
   }
@@ -511,9 +489,9 @@ async function generateAiReview({
     const errorMessage =
       typeof data?.error?.message === 'string'
         ? data.error.message
-        : `OpenAI request failed with HTTP ${response.status}`;
+        : `Gemini request failed with HTTP ${response.status}`;
 
-    console.error('OpenAI diagnostics review error:', {
+    console.error('Gemini diagnostics review error:', {
       status: response.status,
       error: data?.error ?? data,
     });
@@ -521,15 +499,27 @@ async function generateAiReview({
     throw new Error(errorMessage);
   }
 
-  const text =
-    typeof data?.output_text === 'string'
-      ? data.output_text
-      : extractOutputText(data);
+  const text = extractGeminiText(data);
   if (!text) {
     throw new Error('AI diagnostics review returned no text');
   }
 
   return JSON.parse(text);
+}
+
+function extractGeminiText(data: any): string | null {
+  const candidates = Array.isArray(data?.candidates) ? data.candidates : [];
+  for (const candidate of candidates) {
+    const parts = Array.isArray(candidate?.content?.parts)
+      ? candidate.content.parts
+      : [];
+    for (const part of parts) {
+      if (typeof part?.text === 'string' && part.text.trim()) {
+        return part.text;
+      }
+    }
+  }
+  return null;
 }
 
 async function safeResponseJson(response: Response): Promise<any> {
