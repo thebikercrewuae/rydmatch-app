@@ -27,9 +27,9 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const geminiKey = Deno.env.get('GEMINI_API_KEY');
+    const groqKey = Deno.env.get('GROQ_API_KEY');
     const scheduleSecret = Deno.env.get('DIAGNOSTICS_SCHEDULE_SECRET');
-    const model = Deno.env.get('GEMINI_DIAGNOSTICS_MODEL') ?? 'gemini-2.0-flash';
+    const model = Deno.env.get('GROQ_DIAGNOSTICS_MODEL') ?? 'llama-3.3-70b-versatile';
     const authHeader = req.headers.get('Authorization') ?? '';
     const scheduleHeader = req.headers.get('x-scheduled-secret') ?? '';
 
@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
     const rows = (data ?? []) as DiagnosticRow[];
     const summary = buildDiagnosticSummary(rows, { days, feature, severity });
     const reviewResult = await buildReview({
-      apiKey: geminiKey,
+      apiKey: groqKey,
       model,
       summary,
     });
@@ -367,29 +367,29 @@ async function buildReview({
   summary: ReturnType<typeof buildDiagnosticSummary>;
 }): Promise<{
   review: Record<string, unknown>;
-  provider: 'gemini' | 'fallback';
+  provider: 'groq' | 'fallback';
   warning: string | null;
 }> {
   if (!apiKey) {
     return {
       review: buildFallbackReview(summary),
       provider: 'fallback',
-      warning: 'GEMINI_API_KEY is not configured; using local diagnostic summary.',
+      warning: 'GROQ_API_KEY is not configured; using local diagnostic summary.',
     };
   }
 
   try {
     return {
       review: await generateAiReview({ apiKey, model, summary }),
-      provider: 'gemini',
+      provider: 'groq',
       warning: null,
     };
   } catch (error) {
-    console.error('admin-diagnostics-review Gemini fallback:', error);
+    console.error('admin-diagnostics-review Groq fallback:', error);
     return {
       review: buildFallbackReview(summary),
       provider: 'fallback',
-      warning: `Gemini review unavailable: ${publicErrorMessage(error)}`,
+      warning: `Groq review unavailable: ${publicErrorMessage(error)}`,
     };
   }
 }
@@ -440,7 +440,14 @@ async function generateAiReview({
     'You are a senior mobile reliability reviewer for RydMatch. Review diagnostics in read-only mode. ' +
     'Do not claim to have changed data, code, SQL, policies, or deployments. Avoid exposing personal data. ' +
     'Be concise and practical. For each issue, give a likely root cause and a concrete, specific recommended fix ' +
-    '(for example: the exact Supabase secret to set, the migration to run, the column to add, or the config to change).';
+    '(for example: the exact Supabase secret to set, the migration to run, the column to add, or the config to change).\n\n' +
+    'Return ONLY a JSON object with exactly these fields:\n' +
+    '- overview: string\n' +
+    '- releaseBlockers: array of strings (max 5)\n' +
+    '- likelyRootCauses: array of strings (max 6)\n' +
+    '- recommendedNextActions: array of strings (max 6)\n' +
+    '- privacyNotes: array of strings (max 4)\n' +
+    'Do not include any text outside the JSON object.';
 
   const userPrompt =
     'Analyze this grouped diagnostic summary and return JSON only.\n\n' +
@@ -448,38 +455,23 @@ async function generateAiReview({
 
   let response: Response;
   try {
-    response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        signal: controller.signal,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: 'object',
-              properties: {
-                overview: { type: 'string' },
-                releaseBlockers: { type: 'array', items: { type: 'string' } },
-                likelyRootCauses: { type: 'array', items: { type: 'string' } },
-                recommendedNextActions: { type: 'array', items: { type: 'string' } },
-                privacyNotes: { type: 'array', items: { type: 'string' } },
-              },
-              required: [
-                'overview',
-                'releaseBlockers',
-                'likelyRootCauses',
-                'recommendedNextActions',
-                'privacyNotes',
-              ],
-            },
-          },
-        }),
+    response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
-    );
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.2,
+      }),
+    });
   } finally {
     clearTimeout(timeout);
   }
@@ -489,9 +481,9 @@ async function generateAiReview({
     const errorMessage =
       typeof data?.error?.message === 'string'
         ? data.error.message
-        : `Gemini request failed with HTTP ${response.status}`;
+        : `Groq request failed with HTTP ${response.status}`;
 
-    console.error('Gemini diagnostics review error:', {
+    console.error('Groq diagnostics review error:', {
       status: response.status,
       error: data?.error ?? data,
     });
@@ -499,7 +491,7 @@ async function generateAiReview({
     throw new Error(errorMessage);
   }
 
-  const text = extractGeminiText(data);
+  const text = extractGroqText(data);
   if (!text) {
     throw new Error('AI diagnostics review returned no text');
   }
@@ -507,16 +499,12 @@ async function generateAiReview({
   return JSON.parse(text);
 }
 
-function extractGeminiText(data: any): string | null {
-  const candidates = Array.isArray(data?.candidates) ? data.candidates : [];
-  for (const candidate of candidates) {
-    const parts = Array.isArray(candidate?.content?.parts)
-      ? candidate.content.parts
-      : [];
-    for (const part of parts) {
-      if (typeof part?.text === 'string' && part.text.trim()) {
-        return part.text;
-      }
+function extractGroqText(data: any): string | null {
+  const choices = Array.isArray(data?.choices) ? data.choices : [];
+  for (const choice of choices) {
+    const content = choice?.message?.content;
+    if (typeof content === 'string' && content.trim()) {
+      return content;
     }
   }
   return null;
