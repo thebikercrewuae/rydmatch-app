@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const STRAVA_OAUTH_BASE_URL = 'https://www.strava.com';
-const STRAVA_API_BASE_URL = 'https://www.api-v3.strava.com';
+const STRAVA_API_BASE_URL = 'https://www.strava.com/api/v3';
 
 type Action = 'exchange' | 'status' | 'refresh' | 'disconnect' | 'admin_status';
 
