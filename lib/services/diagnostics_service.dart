@@ -15,6 +15,7 @@ class DiagnosticsService {
     StackTrace? stackTrace,
     Map<String, dynamic>? context,
     String severity = 'error',
+    bool isDebug = kDebugMode,
   }) async {
     try {
       final supabase = Supabase.instance.client;
@@ -29,7 +30,7 @@ class DiagnosticsService {
         'stack_trace': stackTrace?.toString(),
         'context': context ?? {},
         'platform': defaultTargetPlatform.name,
-        'is_debug': kDebugMode,
+        'is_debug': isDebug,
       });
     } catch (loggingError) {
       debugPrint('DiagnosticsService.logError failed: $loggingError');

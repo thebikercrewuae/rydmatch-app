@@ -263,6 +263,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           'location_attempts': locationAttempts,
           if (isLocationTimeout) 'transient_location_timeout': true,
         },
+        isDebug: true,
       );
     } finally {
       if (canUseRecentFallback && (_myLat == null || _myLng == null)) {
@@ -439,6 +440,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         action: 'load_profiles_without_location',
         error: StateError('Viewer location is unavailable'),
         severity: 'warning',
+        isDebug: true,
       );
       if (!mounted) return;
       setState(() {
