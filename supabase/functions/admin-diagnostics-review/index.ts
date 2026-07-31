@@ -178,7 +178,34 @@ async function runSafeMaintenance(admin: any, trigger: ReviewTrigger) {
     warnings.push(`Ambassador maintenance skipped: ${String(error)}`);
   }
 
+  // Prune old diagnostics (>90 days) and stale live-ride locations (>6h)
+  // so these tables don't grow unbounded.
+  await runCleanupRpc(admin, actions, warnings, 'cleanup_old_app_errors', { retention_days: 90 });
+  await runCleanupRpc(admin, actions, warnings, 'cleanup_stale_live_ride_locations', { retention_minutes: 360 });
+
   return maintenance;
+}
+
+async function runCleanupRpc(
+  admin: any,
+  actions: Array<Record<string, unknown>>,
+  warnings: string[],
+  name: string,
+  params: Record<string, unknown>,
+) {
+  try {
+    const { data, error } = await admin.rpc(name, params);
+    if (error) {
+      warnings.push(`Could not run ${name}: ${error.message}`);
+    } else {
+      actions.push({
+        name,
+        affectedRows: typeof data === 'number' ? data : null,
+      });
+    }
+  } catch (error) {
+    warnings.push(`${name} skipped: ${String(error)}`);
+  }
 }
 
 async function storeReview(
@@ -447,6 +474,7 @@ async function generateAiReview({
     '- likelyRootCauses: array of strings (max 6)\n' +
     '- recommendedNextActions: array of strings (max 6)\n' +
     '- privacyNotes: array of strings (max 4)\n' +
+    '- proposedFixes: array (may be empty). Only propose a fix for MISSING DATABASE SCHEMA you are confident about — a missing table, missing column, or missing index. Do NOT propose fixes that change app code, modify user data, delete anything, or set secrets. Each proposal is an object with: fixId (short id string), issue (string), explanation (plain language), fixType (one of: create_table, add_column, create_index), sql (exact idempotent SQL to run), rollbackSql (exact SQL to undo it), confidence (low, medium, or high). Leave the array empty if there are no confident missing-schema fixes.\n' +
     'Do not include any text outside the JSON object.';
 
   const userPrompt =
