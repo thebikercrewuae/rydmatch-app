@@ -2127,31 +2127,15 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       final currentUser = supabase.auth.currentUser;
       if (currentUser == null) return;
 
-      final existingConv = await supabase
-          .from('conversations')
-          .select('id')
-          .or(
-            'and(user1_id.eq.${currentUser.id},user2_id.eq.$riderId),and(user1_id.eq.$riderId,user2_id.eq.${currentUser.id})',
-          )
-          .maybeSingle();
+      final ids = [currentUser.id, riderId]..sort();
+      final conversationId = ids.join('_');
 
-      String conversationId;
-      if (existingConv != null) {
-        conversationId = existingConv['id'] as String;
-      } else {
-        final newConv = await supabase
-            .from('conversations')
-            .insert({'user1_id': currentUser.id, 'user2_id': riderId})
-            .select('id')
-            .single();
-        conversationId = newConv['id'] as String;
-      }
-
-      await supabase.from('messages').insert({
+      await supabase.from('chat_messages').insert({
         'conversation_id': conversationId,
         'sender_id': currentUser.id,
-        'content': message,
-        'message_type': 'text',
+        'recipient_id': riderId,
+        'message_body': message,
+        'delivery_status': 'sent',
       });
 
       if (mounted) {
@@ -2165,8 +2149,8 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
       if (mounted) {
         AppToast.show(
           context,
-          message: 'Route sent! 🏍️',
-          type: ToastType.success,
+          message: 'Could not send route. Please try again.',
+          type: ToastType.error,
         );
       }
     }

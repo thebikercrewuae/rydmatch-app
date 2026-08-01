@@ -1232,7 +1232,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     SupabaseService.instance.client.auth.currentUser?.id;
                 if (userId != null) {
                   await SupabaseService.instance.client
-                      .from('profiles')
+                      .from('user_profiles')
                       .update({'is_active': false})
                       .eq('id', userId);
                 }
