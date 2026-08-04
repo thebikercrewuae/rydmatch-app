@@ -53,7 +53,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _OnboardingPage(
       title: 'Ride with Confidence',
       subtitle:
-          'Emergency SOS, live location sharing, and trusted contact alerts keep you safe on every journey. Your safety is our priority.',
+          'Emergency SOS, live location sharing, and trusted contact alerts keep you safe on every journey. Your safety is our priority. Verified riders build trust. Upload your motorcycle license after setup to get a verified badge.',
       gradient: [Color(0xFF4A3000), Color(0xFFB7791F)],
       accentColor: Color(0xFFFFCA28),
       icon: Icons.shield_rounded,
