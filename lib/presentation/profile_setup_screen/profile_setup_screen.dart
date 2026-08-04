@@ -827,6 +827,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           _buildDateOfBirthField(theme),
           SizedBox(height: 2.5.h),
           _buildRideCommunitySection(theme),
+          if (_rideMode != 'bicycle') _buildGetVerifiedCard(theme),
           SizedBox(height: 2.5.h),
           _buildTextLabel(theme, 'Bio'),
           SizedBox(height: 1.h),
@@ -940,6 +941,63 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildGetVerifiedCard(ThemeData theme) {
+    return Padding(
+      padding: EdgeInsets.only(top: 2.h),
+      child: GestureDetector(
+        onTap: () => Navigator.pushNamed(context, '/verification-screen'),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: theme.colorScheme.primary.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.verified_user_rounded,
+                color: theme.colorScheme.primary,
+                size: 28,
+              ),
+              SizedBox(width: 3.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Get Verified',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    SizedBox(height: 0.3.h),
+                    Text(
+                      'Upload your motorcycle license to build trust with other riders. Verified riders get more matches.',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 10.5.sp,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: theme.colorScheme.primary,
+                size: 24,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
