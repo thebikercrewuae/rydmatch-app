@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'diagnostics_service.dart';
+import 'pioneer_service.dart';
 import 'revenuecat_service.dart';
 
 class PremiumService extends ChangeNotifier {
@@ -15,6 +16,7 @@ class PremiumService extends ChangeNotifier {
   bool _isPremiumAccount = false;
   bool _isAdmin = false;
   bool _isAmbassador = false;
+  bool _isPioneer = false;
   DateTime? _ambassadorExpiresAt;
   String? _ambassadorCode;
   bool _priorityListingsEnabled = false;
@@ -28,8 +30,11 @@ class PremiumService extends ChangeNotifier {
   static const String _localPremiumUserIdKey = 'premium_entitlement_user_id';
 
   /// Existing app code mostly checks isPremium.
-  /// Admin users should receive full access too, so this returns true for either.
-  bool get isPremium => _isPremiumAccount || _isAdmin || _isAmbassador;
+  /// Admins, ambassadors, and Pioneer members all receive full access.
+  /// Pioneers (first 100 members) get Premium free for life while their
+  /// early_access_enabled flag stays true.
+  bool get isPremium =>
+      _isPremiumAccount || _isAdmin || _isAmbassador || _isPioneer;
 
   /// The actual paid/trial premium flag from the database.
   bool get isPremiumAccount => _isPremiumAccount;
@@ -40,6 +45,10 @@ class PremiumService extends ChangeNotifier {
   bool get isAmbassador => _isAmbassador;
   DateTime? get ambassadorExpiresAt => _ambassadorExpiresAt;
   String? get ambassadorCode => _ambassadorCode;
+
+  /// True when the signed-in user is a Pioneer member with early access
+  /// enabled. Pioneers receive Premium free for life.
+  bool get isPioneer => _isPioneer;
 
   /// Clearer name for future screens.
   bool get hasFullAccess => isPremium;
@@ -64,6 +73,7 @@ class PremiumService extends ChangeNotifier {
       _isPremiumAccount = false;
       _isAdmin = false;
       _isAmbassador = false;
+      _isPioneer = false;
       _ambassadorExpiresAt = null;
       _ambassadorCode = null;
       _priorityListingsEnabled = false;
@@ -153,6 +163,23 @@ class PremiumService extends ChangeNotifier {
         _priorityListingsEnabled = true;
       }
 
+      // Pioneer members receive Premium free for life while early access
+      // is enabled. This is independent of paid/RevenueCat entitlement.
+      try {
+        final pioneerStatus = await PioneerService.instance.getStatus(
+          currentUser.id,
+        );
+        _isPioneer =
+            pioneerStatus != null && pioneerStatus.earlyAccessEnabled;
+        if (_isPioneer) {
+          _isPremiumAccount = true;
+          _priorityListingsEnabled = true;
+        }
+      } catch (e) {
+        debugPrint('PremiumService pioneer lookup failed: $e');
+        _isPioneer = false;
+      }
+
       _isLoaded = true;
       notifyListeners();
     } catch (e) {
@@ -172,6 +199,7 @@ class PremiumService extends ChangeNotifier {
       _isPremiumAccount = localPremium;
       _isAdmin = false;
       _isAmbassador = false;
+      _isPioneer = false;
       _ambassadorExpiresAt = null;
       _ambassadorCode = null;
       _priorityListingsEnabled = false;
@@ -279,6 +307,7 @@ class PremiumService extends ChangeNotifier {
     _isPremiumAccount = false;
     _isAdmin = false;
     _isAmbassador = false;
+    _isPioneer = false;
     _ambassadorExpiresAt = null;
     _ambassadorCode = null;
     _priorityListingsEnabled = false;

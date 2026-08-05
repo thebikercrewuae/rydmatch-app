@@ -383,7 +383,11 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
         children: [
           _buildBackground(),
           SafeArea(
-            child: _showSuccess ? _buildSuccessState() : _buildContent(),
+            child: _showSuccess
+                ? _buildSuccessState()
+                : (PremiumService().isPioneer
+                    ? _buildPioneerState()
+                    : _buildContent()),
           ),
         ],
       ),
@@ -450,6 +454,71 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPioneerState() {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 8.w),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 22.w,
+              height: 22.w,
+              decoration: BoxDecoration(
+                color: _gold.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+                border: Border.all(color: _gold, width: 2),
+              ),
+              child: Icon(
+                Icons.workspace_premium_rounded,
+                color: _gold,
+                size: 32,
+              ),
+            ),
+            SizedBox(height: 3.h),
+            Text(
+              'Pioneer Member',
+              style: GoogleFonts.dmSans(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(height: 1.h),
+            Text(
+              'As a founding Pioneer, you have RydMatch Premium free for life. Thank you for being here from the start.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.dmSans(
+                fontSize: 13.sp,
+                color: Colors.white.withValues(alpha: 0.7),
+                height: 1.5,
+              ),
+            ),
+            SizedBox(height: 4.h),
+            GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 1.5.h),
+                decoration: BoxDecoration(
+                  color: _gold,
+                  borderRadius: BorderRadius.circular(30.0),
+                ),
+                child: Text(
+                  'Got it',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w800,
+                    color: _deepBlue,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

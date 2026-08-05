@@ -15,6 +15,7 @@ class ProfileHeaderWidget extends StatelessWidget {
   final bool isPioneer;
   final int? pioneerNumber;
   final VoidCallback? onPhotoTap;
+  final bool isEditable;
 
   const ProfileHeaderWidget({
     super.key,
@@ -25,6 +26,7 @@ class ProfileHeaderWidget extends StatelessWidget {
     this.isPioneer = false,
     this.pioneerNumber,
     this.onPhotoTap,
+    this.isEditable = false,
   });
 
   bool get _isNetworkUrl =>
@@ -61,7 +63,8 @@ class ProfileHeaderWidget extends StatelessWidget {
               ),
               if (isVerified)
                 Positioned(
-                  right: 0,
+                  right: isEditable ? null : 0,
+                  left: isEditable ? 0 : null,
                   bottom: 0,
                   child: Container(
                     padding: const EdgeInsets.all(3),
@@ -78,6 +81,12 @@ class ProfileHeaderWidget extends StatelessWidget {
                     ),
                     child: const VerifiedBadgeWidget(size: 28),
                   ),
+                ),
+              if (isEditable)
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: _buildEditBadge(theme),
                 ),
             ],
           ),
@@ -122,6 +131,28 @@ class ProfileHeaderWidget extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildEditBadge(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Icon(
+        Icons.edit_rounded,
+        color: theme.colorScheme.onPrimary,
+        size: 16,
+      ),
     );
   }
 

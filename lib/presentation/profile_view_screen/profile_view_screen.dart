@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/diagnostics_service.dart';
 import '../../services/profile_service.dart';
@@ -43,6 +44,7 @@ class ProfileViewScreen extends StatefulWidget {
 
 class _ProfileViewScreenState extends State<ProfileViewScreen> {
   bool _isLoading = true;
+  bool _isUploadingPhoto = false;
   bool _initialized = false;
   double _ridingSpeed = 60.0;
   bool _hasRidingSpeed = false;
@@ -557,6 +559,159 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     });
   }
 
+  Future<void> _editProfilePhoto() async {
+    final picker = ImagePicker();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        final sheetTheme = Theme.of(ctx);
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 2.h, horizontal: 4.w),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 10.w,
+                  height: 0.5.h,
+                  decoration: BoxDecoration(
+                    color: sheetTheme.colorScheme.outline,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                SizedBox(height: 2.h),
+                Text(
+                  'Change Profile Photo',
+                  style: sheetTheme.textTheme.titleMedium,
+                ),
+                SizedBox(height: 2.h),
+                if (_canOpenPhoto(_riderPhotoPath))
+                  ListTile(
+                    leading: Icon(
+                      Icons.visibility_outlined,
+                      color: sheetTheme.colorScheme.primary,
+                      size: 24,
+                    ),
+                    title: const Text('View Current Photo'),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showPhotoExpanded(
+                        context,
+                        _riderPhotoPath!,
+                        gallery: _profileGalleryPhotos,
+                      );
+                    },
+                  ),
+                ListTile(
+                  leading: Icon(
+                    AppIcons.camera,
+                    color: sheetTheme.colorScheme.primary,
+                    size: 24,
+                  ),
+                  title: const Text('Take Photo'),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await _pickAndApplyProfilePhoto(
+                      picker,
+                      ImageSource.camera,
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: Icon(
+                    AppIcons.help,
+                    color: sheetTheme.colorScheme.primary,
+                    size: 24,
+                  ),
+                  title: const Text('Choose from Gallery'),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await _pickAndApplyProfilePhoto(
+                      picker,
+                      ImageSource.gallery,
+                    );
+                  },
+                ),
+                SizedBox(height: 1.h),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAndApplyProfilePhoto(
+    ImagePicker picker,
+    ImageSource source,
+  ) async {
+    if (_isUploadingPhoto) return;
+    try {
+      final photo = await picker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1024,
+      );
+      if (photo == null) return;
+      await _applyProfilePhoto(photo);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              source == ImageSource.camera
+                  ? 'Camera unavailable'
+                  : 'Photo selection unavailable',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _applyProfilePhoto(XFile photo) async {
+    if (!mounted) return;
+    setState(() => _isUploadingPhoto = true);
+    try {
+      final url = await ProfileService.uploadPhoto(photo, 'profile');
+      if (url == null || url.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                ProfileService.lastUploadError != null
+                    ? 'Photo rejected: ${ProfileService.lastUploadError}'
+                    : 'Could not upload photo. Please try again.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+      setState(() => _riderPhotoPath = url);
+      // Persist + sync via the existing save flow (updates avatar_url,
+      // local cache, and reloads the profile).
+      await _savePreference();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile photo updated')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not update photo: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
+  }
+
   Future<void> _openEditProfile() async {
     await Navigator.of(
       context,
@@ -942,13 +1097,16 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                         isVerified: _rideMode != 'bicycle' && _isVerified,
                         isPioneer: _isPioneer,
                         pioneerNumber: _pioneerNumber,
-                        onPhotoTap: _canOpenPhoto(_riderPhotoPath)
-                            ? () => _showPhotoExpanded(
-                                context,
-                                _riderPhotoPath!,
-                                gallery: _profileGalleryPhotos,
-                              )
-                            : null,
+                        isEditable: !isOtherUser,
+                        onPhotoTap: isOtherUser
+                            ? (_canOpenPhoto(_riderPhotoPath)
+                                ? () => _showPhotoExpanded(
+                                    context,
+                                    _riderPhotoPath!,
+                                    gallery: _profileGalleryPhotos,
+                                  )
+                                : null)
+                            : _editProfilePhoto,
                       ),
                     ),
                     SizedBox(height: 3.h),

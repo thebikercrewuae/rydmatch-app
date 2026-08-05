@@ -62,7 +62,11 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
   }
 
   bool _canDeleteRide(RideGroup group) {
-    return group.leaderName == 'You';
+    if (group.leaderName == 'You') return true;
+    // A rider who joined a ride can remove it from their own page once
+    // the ride date has passed. The creator's copy and other riders are
+    // unaffected.
+    return _isPastRide(group);
   }
 
   void _toggleCleanupMode() {
@@ -438,15 +442,19 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
 
     if (selectedGroups.isEmpty) return;
 
+    final joinerOnlyRemove = selectedGroups.every((g) => g.leaderName != 'You');
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(
-          'Delete rides?',
+          joinerOnlyRemove ? 'Remove rides?' : 'Delete rides?',
           style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
         ),
         content: Text(
-          'This will permanently delete ${selectedGroups.length} ride${selectedGroups.length == 1 ? '' : 's'}, including invites, live ride sessions, locations, and chat messages.',
+          joinerOnlyRemove
+              ? 'This will remove ${selectedGroups.length} completed ride${selectedGroups.length == 1 ? '' : 's'} from your page. The ride${selectedGroups.length == 1 ? '' : 's'} stay visible to the creator and other riders.'
+              : 'This will permanently delete ${selectedGroups.length} ride${selectedGroups.length == 1 ? '' : 's'}, including invites, live ride sessions, locations, and chat messages.',
           style: GoogleFonts.dmSans(),
         ),
         actions: [
@@ -460,7 +468,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
               backgroundColor: Theme.of(context).colorScheme.error,
               foregroundColor: Colors.white,
             ),
-            child: Text('Delete', style: GoogleFonts.dmSans()),
+            child: Text(joinerOnlyRemove ? 'Remove' : 'Delete', style: GoogleFonts.dmSans()),
           ),
         ],
       ),
@@ -470,7 +478,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
 
     try {
       for (final group in selectedGroups) {
-        await _deleteRideData(group.id);
+        await _deleteRideData(group);
       }
 
       if (mounted) {
@@ -484,7 +492,9 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
         if (!mounted) return;
         AppToast.show(
           context,
-          message: 'Ride${selectedGroups.length == 1 ? '' : 's'} deleted',
+          message: joinerOnlyRemove
+              ? 'Ride${selectedGroups.length == 1 ? '' : 's'} removed from your page'
+              : 'Ride${selectedGroups.length == 1 ? '' : 's'} deleted',
           type: ToastType.success,
         );
       }
@@ -501,18 +511,30 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       if (mounted) {
         AppToast.show(
           context,
-          message: 'Could not delete selected rides',
+          message: joinerOnlyRemove ? 'Could not remove selected rides' : 'Could not delete selected rides',
           type: ToastType.error,
         );
       }
     }
   }
 
-  Future<void> _deleteRideData(String groupId) async {
-    await Supabase.instance.client.rpc(
-      'delete_old_ride_group',
-      params: {'group_id_param': groupId},
-    );
+  Future<void> _deleteRideData(RideGroup group) async {
+    final supabase = Supabase.instance.client;
+    final currentUser = supabase.auth.currentUser;
+    final isCreator = group.leaderName == 'You' ||
+        (currentUser != null && group.leaderId == currentUser.id);
+    if (isCreator) {
+      await supabase.rpc(
+        'delete_old_ride_group',
+        params: {'group_id_param': group.id},
+      );
+    } else {
+      // Joiner removing a completed ride from their own page only.
+      await supabase.rpc(
+        'leave_completed_ride_group',
+        params: {'p_group_id': group.id},
+      );
+    }
   }
 
   void _showCreateModal() {
