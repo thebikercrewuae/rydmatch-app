@@ -5,6 +5,7 @@ import '../../services/profile_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/pioneer_service.dart';
 import '../../services/premium_service.dart';
+import '../../services/rating_service.dart';
 import '../../widgets/notification_banner_overlay.dart';
 import '../../theme/app_theme.dart';
 import '../discovery_screen/discovery_screen.dart';
@@ -31,6 +32,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _notificationService.initialize();
     PremiumService().refresh(reason: 'main_screen_init');
     _ensurePioneerMembership();
+    _maybePromptForReview();
   }
 
   Future<void> _ensurePioneerMembership() async {
@@ -43,6 +45,15 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('MainScreen: pioneer membership claim failed: ');
     }
+  }
+
+  Future<void> _maybePromptForReview() async {
+    // Wait for the main screen to settle before prompting, so we don't
+    // interrupt the first impression. Gates (7-day age, 90-day cap,
+    // once per session) live in RatingService.
+    await Future.delayed(const Duration(seconds: 6));
+    if (!mounted) return;
+    await RatingService.instance.maybePromptForReview(context);
   }
 
   void _onNotificationsChanged() {
