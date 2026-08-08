@@ -5,6 +5,7 @@ import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../services/analytics_service.dart';
+import '../../services/session_service.dart';
 import '../../services/referral_service.dart';
 import '../../widgets/app_icons.dart';
 import '../../widgets/app_logo_widget.dart';
@@ -156,6 +157,15 @@ class _RegistrationScreenState extends State<RegistrationScreen>
       debugPrint('👤 Final currentUser: ${currentUser?.id}');
 
       if (currentUser != null) {
+        try {
+          // Persist the local session flags so the rider stays signed in
+          // across app launches. Without this, a freshly-registered
+          // pioneer would be bounced back to the login screen next launch.
+          await SessionService.saveSession(staySignedIn: true);
+        } catch (e) {
+          debugPrint('Registration: saveSession failed: $e');
+        }
+
         try {
           await supabase.from('user_profiles').upsert({
             'id': currentUser.id,
