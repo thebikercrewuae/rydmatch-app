@@ -4,6 +4,7 @@ import 'package:sizer/sizer.dart';
 import '../../report_user_screen/report_user_screen.dart';
 import '../../block_user_confirmation_screen/block_user_confirmation_screen.dart';
 import '../../../widgets/app_logo_widget.dart';
+import '../../../widgets/fallback_avatar_widget.dart';
 import '../../../widgets/pioneer_member_badge.dart';
 
 class ChatHeaderWidget extends StatelessWidget {
@@ -136,10 +137,10 @@ class ChatHeaderWidget extends StatelessWidget {
             onTap: onProfileTap,
             child: Stack(
               children: [
-                CircleAvatar(
+                FallbackAvatar(
+                  name: riderName,
+                  imageUrl: riderImage,
                   radius: 5.5.w,
-                  backgroundImage: NetworkImage(riderImage),
-                  backgroundColor: Colors.white.withValues(alpha: 0.2),
                 ),
                 if (isOnline)
                   Positioned(

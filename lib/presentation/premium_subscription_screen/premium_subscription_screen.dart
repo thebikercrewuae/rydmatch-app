@@ -751,7 +751,7 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
     final priceText = _premiumPrice;
     final hasStorePrice = priceText != null && priceText.isNotEmpty;
     final displayPrice = _betaPremiumUnlockEnabled
-        ? 'Free during beta'
+        ? 'Free during early access'
         : hasStorePrice
         ? priceText
         : _loadingStoreProduct
@@ -759,10 +759,10 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
         : 'See store price';
     final detailText = _betaPremiumUnlockEnabled
         ? hasStorePrice
-              ? 'Beta access is open. Store price loaded: $priceText/month'
+              ? 'Early access is open. Store price loaded: $priceText/month'
               : _loadingStoreProduct
-              ? 'Beta access is open. Loading store price'
-              : 'Tap Subscribe to unlock all Premium features for testing'
+              ? 'Early access is open. Loading store price'
+              : 'Tap to unlock all Premium features free during early access'
         : 'Billed monthly via your app store - Cancel anytime';
 
     return Container(
@@ -824,7 +824,7 @@ class _PremiumSubscriptionScreenState extends State<PremiumSubscriptionScreen>
             ),
             child: Text(
               _betaPremiumUnlockEnabled
-                  ? 'Beta tester access'
+                  ? 'Early access'
                   : _revenueCatAvailable
                   ? 'Secure checkout via app store'
                   : 'Store connection unavailable',

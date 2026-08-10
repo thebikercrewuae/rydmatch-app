@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
-import '../../../widgets/custom_icon_widget.dart';
+import '../../../widgets/fallback_avatar_widget.dart';
 import '../../../widgets/pioneer_member_badge.dart';
 import '../../../widgets/verified_badge_widget.dart';
 
@@ -196,12 +196,15 @@ class ProfileHeaderWidget extends StatelessWidget {
 
   Widget _buildPlaceholder(ThemeData theme) {
     return Container(
-      color: theme.colorScheme.primary.withValues(alpha: 0.1),
+      color: FallbackAvatar.colorFor(riderName),
       child: Center(
-        child: CustomIconWidget(
-          iconName: 'person',
-          color: theme.colorScheme.primary,
-          size: 48,
+        child: Text(
+          FallbackAvatar.initialsFor(riderName),
+          style: GoogleFonts.dmSans(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 48,
+          ),
         ),
       ),
     );

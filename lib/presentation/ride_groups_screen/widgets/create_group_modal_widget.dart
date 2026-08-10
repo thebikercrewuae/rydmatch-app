@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../widgets/fallback_avatar_widget.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sizer/sizer.dart';
@@ -769,7 +770,7 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
     }
 
     return Column(
-      children: _matchedRiders.take(6).map((rider) {
+      children: _matchedRiders.map((rider) {
         final userId = rider['userId'] as String;
         final isSelected = _selectedInvitees.contains(userId);
         final imageUrl = rider['image'] as String? ?? '';
@@ -803,15 +804,10 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
             ),
             child: Row(
               children: [
-                CircleAvatar(
+                FallbackAvatar(
+                  name: rider['name'] as String? ?? 'Rider',
+                  imageUrl: imageUrl,
                   radius: 18,
-                  backgroundColor: Colors.grey[200],
-                  backgroundImage: imageUrl.isNotEmpty
-                      ? NetworkImage(imageUrl)
-                      : null,
-                  child: imageUrl.isEmpty
-                      ? Icon(Icons.person, size: 18, color: Colors.grey[500])
-                      : null,
                 ),
                 SizedBox(width: 3.w),
                 Expanded(

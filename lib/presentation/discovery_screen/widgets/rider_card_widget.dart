@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../widgets/fallback_avatar_widget.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
@@ -126,6 +127,32 @@ class _RiderCardWidgetState extends State<RiderCardWidget>
     );
   }
 
+  Widget _buildInitialsCard(String name) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            FallbackAvatar.colorFor(name),
+            FallbackAvatar.colorFor(name).withValues(alpha: 0.78),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Text(
+          FallbackAvatar.initialsFor(name),
+          style: GoogleFonts.dmSans(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 64,
+            letterSpacing: 2,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final rider = widget.rider;
@@ -149,13 +176,15 @@ class _RiderCardWidgetState extends State<RiderCardWidget>
               child: SizedBox(
                 width: double.infinity,
                 height: double.infinity,
-                child: CustomImageWidget(
-                  imageUrl: rider["photo"] as String,
-                  width: double.infinity,
-                  height: double.infinity,
-                  fit: BoxFit.cover,
-                  semanticLabel: rider["semanticLabel"] as String,
-                ),
+                child: (rider["photo"] as String).isNotEmpty
+                    ? CustomImageWidget(
+                        imageUrl: rider["photo"] as String,
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                        semanticLabel: rider["semanticLabel"] as String,
+                      )
+                    : _buildInitialsCard(rider["name"] as String? ?? 'Rider'),
               ),
             ),
           ),

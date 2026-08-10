@@ -19,6 +19,7 @@ import '../../services/profile_service.dart';
 import '../../widgets/toast_widget.dart';
 import '../ride_groups_screen/widgets/create_group_modal_widget.dart';
 import './widgets/route_location_field_widget.dart';
+import './widgets/location_search_sheet.dart';
 import './widgets/route_summary_card_widget.dart';
 import './widgets/route_type_selector_widget.dart';
 import './widgets/route_weather_widget.dart';
@@ -46,7 +47,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   bool _isSaving = false;
   bool _isMetric = true;
   bool _isGeocodingStart = false;
-  bool _isGeocodingDest = false;
+  final bool _isGeocodingDest = false;
   bool _isFetchingRoute = false;
 
   // Map state
@@ -639,51 +640,39 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
 
   Future<void> _geocodeStartAddress() async {
     final text = _startController.text.trim();
-    if (text.isEmpty) return;
-    setState(() => _isGeocodingStart = true);
-    final latLng = await _geocodeAddress(text, biasToStart: false);
-    if (mounted) {
-      setState(() => _isGeocodingStart = false);
-      if (latLng != null) {
-        setState(() {
-          _startPoint = latLng;
-          _startSet = true;
-        });
-        _rebuildMapOverlays();
-        _mapController?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 13));
-        _updateRoute();
-      } else {
-        AppToast.show(
-          context,
-          message: 'Location not found. Try a different search.',
-          type: ToastType.error,
-        );
-      }
-    }
+    final result = await LocationSearchSheet.show(
+      context,
+      initialQuery: text,
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _startController.text = result.address;
+      _startPoint = LatLng(result.lat, result.lng);
+      _startSet = true;
+    });
+    _rebuildMapOverlays();
+    _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_startPoint, 13));
+    _updateRoute();
   }
 
   Future<void> _geocodeDestAddress() async {
     final text = _destinationController.text.trim();
-    if (text.isEmpty) return;
-    setState(() => _isGeocodingDest = true);
-    final latLng = await _geocodeAddress(text);
-    if (mounted) {
-      setState(() => _isGeocodingDest = false);
-      if (latLng != null) {
-        setState(() {
-          _endPoint = latLng;
-          _weatherLocation = _weatherLocationForPoint(latLng);
-        });
-        _updateRoute();
-        _mapController?.animateCamera(CameraUpdate.newLatLngZoom(latLng, 13));
-      } else {
-        AppToast.show(
-          context,
-          message: 'Destination not found. Try a different search.',
-          type: ToastType.error,
-        );
-      }
-    }
+    final biasLat = _startSet ? _startPoint.latitude : null;
+    final biasLng = _startSet ? _startPoint.longitude : null;
+    final result = await LocationSearchSheet.show(
+      context,
+      initialQuery: text,
+      biasLat: biasLat,
+      biasLng: biasLng,
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _destinationController.text = result.address;
+      _endPoint = LatLng(result.lat, result.lng);
+      _weatherLocation = _weatherLocationForPoint(_endPoint);
+    });
+    _updateRoute();
+    _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_endPoint, 13));
   }
 
   void _updateRoute() {
