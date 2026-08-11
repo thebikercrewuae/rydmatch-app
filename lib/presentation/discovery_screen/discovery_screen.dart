@@ -529,9 +529,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           ? skillLevels.first
           : 'Intermediate';
 
-      final imageUrl =
-          avatarUrl ??
-          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400';
+      // No avatar -> leave empty so the swipe card shows the rider's
+      // initials instead of a generic stock photo.
+      final imageUrl = avatarUrl ?? '';
 
       final otherLat = (p['latitude'] as num?)?.toDouble();
       final otherLng = (p['longitude'] as num?)?.toDouble();
@@ -555,7 +555,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         'name': name,
         'photo': imageUrl,
         'image': imageUrl,
-        'photos': <String>[imageUrl],
+        'photos': imageUrl.isNotEmpty ? <String>[imageUrl] : <String>[],
         'motorcyclePhotoUrls': List<String>.from(
           p['motorcycle_photo_urls'] as List? ?? const [],
         ),
