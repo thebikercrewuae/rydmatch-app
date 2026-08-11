@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide MapType; // ignore: undefined_hidden_name
 import 'package:url_launcher/url_launcher.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../services/live_ride_service.dart';
 import '../../services/live_ride_voice_service.dart';
@@ -883,12 +884,52 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
     final connected = await _voiceService.connect(widget.sessionId);
     if (!mounted) return;
 
-    AppToast.show(
-      context,
-      message: connected
-          ? 'Voice connected'
-          : _voiceService.lastError ?? 'Could not connect voice',
-      type: connected ? ToastType.success : ToastType.error,
+    if (connected) {
+      AppToast.show(context, message: 'Voice connected', type: ToastType.success);
+      return;
+    }
+
+    final error = _voiceService.lastError;
+    if (error != null && error.toLowerCase().contains('microphone')) {
+      await _showMicrophonePermissionDialog();
+    } else {
+      AppToast.show(
+        context,
+        message: error ?? 'Could not connect voice',
+        type: ToastType.error,
+      );
+    }
+  }
+
+  Future<void> _showMicrophonePermissionDialog() {
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Microphone access needed',
+          style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'RydMatch needs microphone access for live ride voice chat. '
+          'It looks like permission was denied. Open Settings to enable '
+          'microphone for RydMatch, then come back and try again.',
+          style: GoogleFonts.dmSans(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Not now', style: GoogleFonts.dmSans()),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              openAppSettings();
+            },
+            child: Text('Open Settings', style: GoogleFonts.dmSans()),
+          ),
+        ],
+      ),
     );
   }
 
