@@ -4,7 +4,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'background_voice_service.dart';
 import 'diagnostics_service.dart';
-import 'premium_service.dart';
 
 class LiveRideVoiceService extends ChangeNotifier {
   static LiveRideVoiceService? _instance;
@@ -39,21 +38,8 @@ class LiveRideVoiceService extends ChangeNotifier {
 
     Room? pendingRoom;
     try {
-      await PremiumService().refresh();
-      if (!PremiumService().isPremium) {
-        _lastError = 'Premium subscription required for voice chat';
-        await DiagnosticsService.instance.logError(
-          feature: 'live_ride_voice',
-          action: 'connect_premium_required',
-          error: _lastError!,
-          context: {'session_id': sessionId},
-          severity: 'warning',
-        );
-        _isConnecting = false;
-        _sessionId = null;
-        notifyListeners();
-        return false;
-      }
+      // During early access, all users get voice chat free.
+      // Re-add the premium check at cutover when charging starts.
 
       final micPermission = await Permission.microphone.request();
       if (!micPermission.isGranted) {
