@@ -42,8 +42,8 @@ class PlacesAutocompleteService {
   static const String _detailsUrl =
       'https://maps.googleapis.com/maps/api/place/details/json';
 
-  /// Bias results to the UAE during the soft launch. Remove `components`
-  /// here when the app expands beyond the UAE.
+  /// Returns place predictions worldwide. Optional location bias narrows
+  /// results to the area near the ride start point when available.
   Future<List<PlacePrediction>> getSuggestions(
     String input, {
     double? biasLat,
@@ -56,7 +56,6 @@ class PlacesAutocompleteService {
       final params = <String, dynamic>{
         'input': query,
         'key': _apiKey,
-        'components': 'country:ae',
       };
       if (biasLat != null && biasLng != null) {
         params['location'] = '$biasLat,$biasLng';
