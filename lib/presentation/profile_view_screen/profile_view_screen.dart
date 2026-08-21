@@ -1195,7 +1195,9 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                         icon: Icons.photo_library,
                         child: _buildBikePhotos(theme),
                       ),
-                    if (!isOtherUser) ...[
+                    if (!isOtherUser &&
+                        (PremiumService().isPioneer ||
+                         PremiumService().isPaidSubscriber)) ...[
                       SizedBox(height: 1.h),
                       ProfileInfoCardWidget(
                         title: 'Referral Stats',

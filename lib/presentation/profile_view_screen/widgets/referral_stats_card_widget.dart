@@ -58,6 +58,13 @@ class _ReferralStatsCardWidgetState extends State<ReferralStatsCardWidget> {
       );
     }
 
+    // Hide the card entirely if the user has no referral code.
+    // This happens when the user is not eligible (not a pioneer or
+    // paid subscriber — e.g. they are on a referral trial).
+    if (_stats == null) {
+      return const SizedBox.shrink();
+    }
+
     final totalReferrals = _stats?.totalReferrals ?? 0;
     final earnedDays = _stats?.trialDaysEarned ?? 0;
 

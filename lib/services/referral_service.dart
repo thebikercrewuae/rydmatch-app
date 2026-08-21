@@ -46,11 +46,16 @@ class ReferralService {
     return code.trim().toUpperCase();
   }
 
+  /// Attempts to get or create a referral code for the current user.
+  /// Returns null if the user is not eligible (not a pioneer or paid subscriber).
+  /// The database function enforces eligibility — only pioneers and paid
+  /// subscribers (without a trial expiry) receive a code.
   Future<ReferralStats?> getOrCreateReferralCode() async {
     final user = _client.auth.currentUser;
     if (user == null) return null;
 
     try {
+      // Check if the user already has a code (works for all users)
       final existingRows = await _client
           .from('referral_codes')
           .select()
@@ -64,10 +69,14 @@ class ReferralService {
         return ReferralStats.fromJson(existingList.first);
       }
 
-      await _client.rpc(
+      // Try to create a new code — the RPC returns null if not eligible
+      final rpcResult = await _client.rpc(
         'get_or_create_referral_code',
         params: {'user_uuid': user.id},
       );
+
+      // If RPC returned null, user is not eligible
+      if (rpcResult == null) return null;
 
       final createdRows = await _client
           .from('referral_codes')
@@ -87,6 +96,11 @@ class ReferralService {
     }
   }
 
+  /// Applies a referral code during signup.
+  /// The database function grants 7-day premium trial to the new user
+  /// and extends the referrer's trial (if they have one).
+  /// We refresh the premium state from the DB instead of calling
+  /// activatePremium() to ensure premium_trial_expires_at is set correctly.
   Future<bool> applyReferralCode(String code) async {
     final user = _client.auth.currentUser;
     final normalizedCode = _normalizeReferralCode(code);
@@ -103,7 +117,10 @@ class ReferralService {
       );
 
       if (result == true) {
-        await PremiumService().activatePremium();
+        // Refresh from DB — the RPC already set is_premium and
+        // premium_trial_expires_at. Using refresh() instead of
+        // activatePremium() preserves the trial expiry marker.
+        await PremiumService().refresh(reason: 'referral_applied');
         return true;
       }
 

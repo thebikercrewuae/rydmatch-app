@@ -20,6 +20,7 @@ class PremiumService extends ChangeNotifier {
   DateTime? _ambassadorExpiresAt;
   String? _ambassadorCode;
   bool _priorityListingsEnabled = false;
+  DateTime? _premiumTrialExpiresAt;
   bool _isLoaded = false;
 
   static const String _localPremiumKey = 'premium_entitlement_active';
@@ -50,6 +51,18 @@ class PremiumService extends ChangeNotifier {
   /// enabled. Pioneers receive Premium free for life.
   bool get isPioneer => _isPioneer;
 
+  /// True when the user has premium from a referral trial (time-limited).
+  /// These users do NOT get their own referral code.
+  bool get isOnTrial => _isPremiumAccount && _premiumTrialExpiresAt != null;
+
+  /// True when the user is a paid subscriber (premium active, not on trial).
+  /// These users ARE eligible for their own referral code.
+  bool get isPaidSubscriber => _isPremiumAccount && _premiumTrialExpiresAt == null;
+
+  /// True when the user is eligible to receive a referral code:
+  /// must be a pioneer or a paid subscriber (not on a referral trial).
+  bool get isReferralEligible => _isPioneer || isPaidSubscriber;
+
   /// Clearer name for future screens.
   bool get hasFullAccess => isPremium;
 
@@ -76,6 +89,7 @@ class PremiumService extends ChangeNotifier {
       _isPioneer = false;
       _ambassadorExpiresAt = null;
       _ambassadorCode = null;
+      _premiumTrialExpiresAt = null;
       _priorityListingsEnabled = false;
       _isLoaded = true;
       notifyListeners();
@@ -105,7 +119,7 @@ class PremiumService extends ChangeNotifier {
       final profile = await supabase
           .from('user_profiles')
           .select(
-            'is_premium, is_admin, is_ambassador, ambassador_expires_at, ambassador_code',
+            'is_premium, is_admin, is_ambassador, ambassador_expires_at, ambassador_code, premium_trial_expires_at',
           )
           .eq('id', currentUser.id)
           .maybeSingle();
@@ -126,6 +140,7 @@ class PremiumService extends ChangeNotifier {
       _isAmbassador = remoteAmbassador;
       _ambassadorExpiresAt = remoteAmbassador ? ambassadorExpiresAt : null;
       _ambassadorCode = remoteAmbassador ? ambassadorCode as String? : null;
+      _premiumTrialExpiresAt = _parseDateTime(profile?['premium_trial_expires_at']);
 
       if (remotePremium && !localPremium) {
         await prefs.setBool(_localPremiumKey, true);
@@ -202,6 +217,7 @@ class PremiumService extends ChangeNotifier {
       _isPioneer = false;
       _ambassadorExpiresAt = null;
       _ambassadorCode = null;
+      _premiumTrialExpiresAt = null;
       _priorityListingsEnabled = false;
       _isLoaded = true;
       notifyListeners();
@@ -312,6 +328,7 @@ class PremiumService extends ChangeNotifier {
     _ambassadorCode = null;
     _priorityListingsEnabled = false;
     _isLoaded = false;
+    _premiumTrialExpiresAt = null;
     notifyListeners();
   }
 
@@ -340,6 +357,7 @@ class PremiumService extends ChangeNotifier {
         .from('user_profiles')
         .update({
           'is_premium': true,
+          'premium_trial_expires_at': null,
           'updated_at': DateTime.now().toIso8601String(),
         })
         .eq('id', userId);

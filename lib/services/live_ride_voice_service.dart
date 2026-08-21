@@ -3,6 +3,7 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'background_voice_service.dart';
+import 'premium_service.dart';
 import 'diagnostics_service.dart';
 
 class LiveRideVoiceService extends ChangeNotifier {
@@ -38,8 +39,27 @@ class LiveRideVoiceService extends ChangeNotifier {
 
     Room? pendingRoom;
     try {
-      // During early access, all users get voice chat free.
-      // Re-add the premium check at cutover when charging starts.
+      // Voice chat is free while pioneer slots are still available (< 100).
+      // Once the pioneer cap is reached, voice requires premium — this
+      // auto-enables the gate at cutover without a manual flag flip.
+      final capReached = await _isPioneerCapReached();
+      if (capReached) {
+        await PremiumService().refresh();
+        if (!PremiumService().isPremium) {
+          _lastError = 'Premium subscription required for voice chat';
+          await DiagnosticsService.instance.logError(
+            feature: 'live_ride_voice',
+            action: 'connect_premium_required',
+            error: _lastError!,
+            context: {'session_id': sessionId},
+            severity: 'warning',
+          );
+          _isConnecting = false;
+          _sessionId = null;
+          notifyListeners();
+          return false;
+        }
+      }
 
       final micPermission = await Permission.microphone.request();
       if (!micPermission.isGranted) {
@@ -152,6 +172,26 @@ class LiveRideVoiceService extends ChangeNotifier {
     }
   }
 
+  /// Returns true when all 100 pioneer slots are filled (max pioneer
+  /// number >= 100), meaning the founding period is over and voice
+  /// chat should require premium again.
+  Future<bool> _isPioneerCapReached() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('pioneer_members')
+          .select('pioneer_number')
+          .order('pioneer_number', ascending: false)
+          .limit(1);
+      if (response.isEmpty) return false;
+      final maxNumber = (response.first['pioneer_number'] as num).toInt();
+      return maxNumber >= 100;
+    } catch (e) {
+      // Fail open: if we can't check, allow voice (don't block during
+      // early access due to a transient query error).
+      debugPrint('LiveRideVoiceService: pioneer cap check failed: $e');
+      return false;
+    }
+  }
   void _syncRoomState(Room room) {
     if (_room != room) return;
 

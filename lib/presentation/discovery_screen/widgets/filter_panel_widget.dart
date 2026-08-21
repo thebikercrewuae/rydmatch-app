@@ -4,7 +4,7 @@ import 'package:sizer/sizer.dart';
 
 import '../../../widgets/app_icons.dart';
 
-const double _defaultSearchRadius = 500;
+const double _defaultSearchRadius = 20000;
 
 class FilterState {
   final double distance;

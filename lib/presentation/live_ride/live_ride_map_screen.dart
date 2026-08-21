@@ -50,6 +50,7 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
   String _plannedRouteName = '';
   bool _hasFittedInitialView = false;
   LatLng? _myPosition;
+  bool _isNavigationMode = false;
   bool _isSharingLocation = true;
   bool _isChatOpen = false;
   bool _isPremium = false;
@@ -371,6 +372,40 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
     setState(() {
       _myPosition = LatLng(position.latitude, position.longitude);
     });
+
+    // In navigation mode, follow the rider's position with heading-aware
+    // camera (bearing rotates to match travel direction, tilted for depth).
+    if (_isNavigationMode && _mapController != null) {
+      _mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: LatLng(position.latitude, position.longitude),
+            zoom: 16,
+            bearing: position.heading,
+            tilt: 45,
+          ),
+        ),
+      );
+    }
+  }
+
+  void _toggleNavigationMode() {
+    setState(() {
+      _isNavigationMode = !_isNavigationMode;
+    });
+    if (_isNavigationMode && _myPosition != null && _mapController != null) {
+      final pos = LiveRideService.latestPosition.value;
+      _mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: _myPosition!,
+            zoom: 16,
+            bearing: pos?.heading ?? 0,
+            tilt: 45,
+          ),
+        ),
+      );
+    }
   }
 
   void _onRiderLocationsChanged() {
@@ -1523,6 +1558,27 @@ class _LiveRideMapScreenState extends State<LiveRideMapScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  FloatingActionButton(
+                    heroTag: 'live_ride_nav',
+                    mini: true,
+                    backgroundColor: _isNavigationMode
+                        ? const Color(0xFF2563EB)
+                        : Colors.white.withAlpha(230),
+                    foregroundColor: _isNavigationMode
+                        ? Colors.white
+                        : const Color(0xFF111827),
+                    tooltip: _isNavigationMode
+                        ? 'Exit navigation mode'
+                        : 'Follow my position (navigation mode)',
+                    onPressed: _toggleNavigationMode,
+                    child: Icon(
+                      _isNavigationMode
+                          ? Icons.navigation_rounded
+                          : Icons.navigation_outlined,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   FloatingActionButton(
                     heroTag: 'live_ride_layers',
                     mini: true,
