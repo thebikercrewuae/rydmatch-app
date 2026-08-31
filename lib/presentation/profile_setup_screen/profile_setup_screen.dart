@@ -681,6 +681,26 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 ),
                 SizedBox(height: 2.h),
                 _buildContinueButton(theme),
+                if (_currentPage == _totalPages - 1 && !_isEditMode) ...[
+                  SizedBox(height: 1.h),
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _emergencyContactName = '';
+                        _emergencyContactPhone = '';
+                      });
+                      _saveAndFinish();
+                    },
+                    child: Text(
+                      'Skip — set up later',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

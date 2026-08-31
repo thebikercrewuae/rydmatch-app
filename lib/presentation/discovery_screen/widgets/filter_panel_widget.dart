@@ -13,6 +13,7 @@ class FilterState {
   final String bikeType;
   final List<String> ridingStyles;
   final bool onlineOnly;
+  final String gender;
 
   const FilterState({
     this.distance = _defaultSearchRadius,
@@ -21,6 +22,7 @@ class FilterState {
     this.bikeType = 'All',
     this.ridingStyles = const ['All'],
     this.onlineOnly = false,
+    this.gender = 'All',
   });
 
   FilterState copyWith({
@@ -30,6 +32,7 @@ class FilterState {
     String? bikeType,
     List<String>? ridingStyles,
     bool? onlineOnly,
+    String? gender,
   }) {
     return FilterState(
       distance: distance ?? this.distance,
@@ -38,6 +41,7 @@ class FilterState {
       bikeType: bikeType ?? this.bikeType,
       ridingStyles: ridingStyles ?? this.ridingStyles,
       onlineOnly: onlineOnly ?? this.onlineOnly,
+      gender: gender ?? this.gender,
     );
   }
 
@@ -48,7 +52,8 @@ class FilterState {
       bikeType == 'All' &&
       ridingStyles.length == 1 &&
       ridingStyles.first == 'All' &&
-      !onlineOnly;
+      !onlineOnly &&
+      gender == 'All';
 
   int get activeCount {
     int count = 0;
@@ -58,6 +63,7 @@ class FilterState {
     if (bikeType != 'All') count++;
     if (!(ridingStyles.length == 1 && ridingStyles.first == 'All')) count++;
     if (onlineOnly) count++;
+    if (gender != 'All') count++;
     return count;
   }
 }
@@ -85,7 +91,10 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
   late String _selectedBikeType;
   late List<String> _selectedRidingStyles;
   late bool _onlineOnly;
+  late String _selectedGender;
   bool _isMetric = true;
+
+  final List<String> _genderOptions = ['All', 'male', 'female', 'other'];
 
   final List<String> _skillLevels = [
     'All',
@@ -138,6 +147,7 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
     _selectedBikeType = widget.initialState.bikeType;
     _selectedRidingStyles = List.from(widget.initialState.ridingStyles);
     _onlineOnly = widget.initialState.onlineOnly;
+    _selectedGender = widget.initialState.gender;
     _loadUnitPreference();
   }
 
@@ -227,6 +237,19 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
     }
   }
 
+  String _genderLabel(String value) {
+    switch (value) {
+      case 'male':
+        return 'Male';
+      case 'female':
+        return 'Female';
+      case 'other':
+        return 'Other';
+      default:
+        return 'All';
+    }
+  }
+
   void _resetAll() {
     setState(() {
       _distance = _defaultSearchRadius;
@@ -235,6 +258,7 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
       _selectedBikeType = 'All';
       _selectedRidingStyles = ['All'];
       _onlineOnly = false;
+      _selectedGender = 'All';
     });
   }
 
@@ -247,6 +271,7 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
         bikeType: _selectedBikeType,
         ridingStyles: List.from(_selectedRidingStyles),
         onlineOnly: _onlineOnly,
+        gender: _selectedGender,
       ),
     );
     widget.onClose();
@@ -425,6 +450,18 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
               selected: _selectedRidingStyles,
               activeColor: theme.colorScheme.tertiary,
               onTap: (v) => _toggleMultiSelect(_selectedRidingStyles, v),
+            ),
+            SizedBox(height: 1.h),
+
+            // Gender
+            _buildSectionLabel(theme, 'Gender'),
+            _buildChipRow(
+              theme: theme,
+              options: _genderOptions,
+              selected: [_selectedGender],
+              activeColor: theme.colorScheme.primary,
+              labelBuilder: _genderLabel,
+              onTap: (v) => setState(() => _selectedGender = v),
             ),
             SizedBox(height: 1.h),
 

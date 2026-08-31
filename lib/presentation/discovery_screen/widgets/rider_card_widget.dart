@@ -135,7 +135,7 @@ class _RiderCardWidgetState extends State<RiderCardWidget>
           end: Alignment.bottomCenter,
           colors: [
             FallbackAvatar.colorFor(name),
-            FallbackAvatar.colorFor(name).withValues(alpha: 0.78),
+            Color.lerp(FallbackAvatar.colorFor(name), Colors.black, 0.15) ?? FallbackAvatar.colorFor(name),
           ],
         ),
       ),

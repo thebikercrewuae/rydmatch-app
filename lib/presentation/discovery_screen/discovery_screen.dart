@@ -47,6 +47,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   int _currentCardIndex = 0;
   bool _isEmpty = true;
   bool _isLoading = true;
+  bool _locationDisabled = false;
   bool _isMetric = true;
 
   double? _myLat;
@@ -206,7 +207,11 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     var canUseRecentFallback = false;
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return;
+      if (!serviceEnabled) {
+        _locationDisabled = true;
+        return;
+      }
+      _locationDisabled = false;
 
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -215,6 +220,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
+        _locationDisabled = true;
         return;
       }
 
@@ -579,6 +585,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         'distanceMiles': distanceMilesValue,
         'compatibility': _calcCompatibility(p),
         'bio': p['bio'] as String? ?? '',
+        'gender': p['gender'] as String? ?? '',
         'bikeTypes': bikeTypes,
         'skillLevels': skillLevels,
         'preferredRoads': preferredRoads,
@@ -691,6 +698,11 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           filters.ridingStyles.first == 'All')) {
         final style = rider['ridingStyle'] as String? ?? '';
         if (!filters.ridingStyles.contains(style)) return false;
+      }
+
+      if (filters.gender != 'All') {
+        final gender = rider['gender'] as String? ?? '';
+        if (gender != filters.gender) return false;
       }
 
       return true;
@@ -976,6 +988,110 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       context,
       message: "It's a match! $category ride planned",
       type: ToastType.success,
+    );
+  }
+
+  Future<void> _retryLocation() async {
+    setState(() {
+      _isLoading = true;
+      _locationDisabled = false;
+    });
+    await _fetchAndStoreLocation();
+    await _loadRiders();
+  }
+
+  Widget _buildLocationDisabledState(ThemeData theme) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 8.w),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 32.w,
+                  height: 32.w,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFE53935).withValues(alpha: 0.07),
+                  ),
+                ),
+                Container(
+                  width: 22.w,
+                  height: 22.w,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFE53935).withValues(alpha: 0.12),
+                  ),
+                ),
+                const Icon(
+                  Icons.location_off_rounded,
+                  color: Color(0xFFE53935),
+                  size: 52,
+                ),
+              ],
+            ),
+            SizedBox(height: 3.h),
+            Text(
+              'Location needed',
+              style: GoogleFonts.dmSans(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w800,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            SizedBox(height: 1.h),
+            Text(
+              'Turn on location to find riding partners near you. RydMatch uses your location to match you with compatible riders.',
+              style: GoogleFonts.dmSans(
+                fontSize: 11.sp,
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.6,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 3.h),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _retryLocation,
+                  icon: const Icon(Icons.location_searching_rounded, size: 18),
+                  label: Text(
+                    'Enable Location',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 1.5.h),
+            TextButton(
+              onPressed: () async {
+                await Geolocator.openLocationSettings();
+              },
+              child: Text(
+              'Open device location settings',
+                style: GoogleFonts.dmSans(
+                  fontSize: 11.sp,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1532,7 +1648,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                 child: _isLoading
                     ? _buildSkeletonStack()
                     : _isEmpty
-                    ? EmptyStateWidget(onExpandRadius: _expandRadius)
+                    ? _locationDisabled
+                      ? _buildLocationDisabledState(theme)
+                      : EmptyStateWidget(onExpandRadius: _expandRadius)
                     : Stack(
                         children: [
                           CardSwiper(

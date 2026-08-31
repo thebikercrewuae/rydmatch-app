@@ -40,7 +40,7 @@ class _ForgotPasswordModalWidgetState extends State<ForgotPasswordModalWidget> {
       await Supabase.instance.client.auth.resetPasswordForEmail(
         email,
         redirectTo:
-            'https://www.rydmatch.com/#/reset-password',
+            'https://rydmatch.vercel.app/reset-password',
       );
       if (mounted) setState(() => _sent = true);
     } on AuthException catch (e) {

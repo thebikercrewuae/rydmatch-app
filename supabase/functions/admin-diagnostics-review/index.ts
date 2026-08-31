@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const groqKey = Deno.env.get('GROQ_API_KEY');
     const scheduleSecret = Deno.env.get('DIAGNOSTICS_SCHEDULE_SECRET');
-    const model = Deno.env.get('GROQ_DIAGNOSTICS_MODEL') ?? 'llama-3.3-70b-versatile';
+    const model = Deno.env.get('GROQ_DIAGNOSTICS_MODEL') ?? 'openai/gpt-oss-120b';
     const authHeader = req.headers.get('Authorization') ?? '';
     const scheduleHeader = req.headers.get('x-scheduled-secret') ?? '';
 

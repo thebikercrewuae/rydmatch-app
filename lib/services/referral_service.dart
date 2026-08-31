@@ -136,13 +136,14 @@ class ReferralService {
     if (normalizedCode.isEmpty) return false;
 
     try {
-      final result = await _client
-          .from('referral_codes')
-          .select('id')
-          .eq('code', normalizedCode)
-          .maybeSingle();
-
-      return result != null;
+      // Use RPC (SECURITY DEFINER) so unauthenticated users during
+      // registration can validate a code - the referral_codes table
+      // RLS only allows authenticated users to read directly.
+      final result = await _client.rpc(
+        'validate_referral_code',
+        params: {'code': normalizedCode},
+      );
+      return result == true;
     } catch (e) {
       debugPrint('ReferralService.validateReferralCode error: $e');
       return false;
