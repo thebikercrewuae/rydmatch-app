@@ -34,6 +34,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final int _totalPages = 9;
   bool _isEditMode = false;
   bool _isLoading = true;
+  bool _isSaving = false;
   bool _hasLoggedProfileSetupStart = false;
   final Set<int> _loggedStepViews = {};
 
@@ -413,6 +414,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _saveAndFinish() async {
+    if (_isSaving) return;
+
+    setState(() => _isSaving = true);
+
+    try {
     final supabase = Supabase.instance.client;
     final currentUser = supabase.auth.currentUser;
 
@@ -510,6 +516,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           context,
           rootNavigator: true,
         ).pushNamedAndRemoveUntil('/main-screen', (route) => false);
+      }
+    }
+    } catch (e) {
+      debugPrint('ProfileSetup._saveAndFinish error: $e');
+      if (mounted) {
+        AppToast.show(
+          context,
+          message: 'Could not save profile. Please check your connection and try again.',
+          type: ToastType.error,
+        );
+        setState(() => _isSaving = false);
       }
     }
   }
@@ -681,7 +698,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 ),
                 SizedBox(height: 2.h),
                 _buildContinueButton(theme),
-                if (_currentPage == _totalPages - 1 && !_isEditMode) ...[
+                if (_currentPage == _totalPages - 1 && !_isEditMode && !_isSaving) ...[
                   SizedBox(height: 1.h),
                   TextButton(
                     onPressed: () {
@@ -782,7 +799,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       width: double.infinity,
       height: 6.h,
       child: ElevatedButton(
-        onPressed: _canContinue ? _nextPage : null,
+        onPressed: (_canContinue && !_isSaving) ? _nextPage : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: _canContinue
               ? theme.colorScheme.primary
@@ -793,7 +810,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         ),
         child: Text(
           _currentPage == _totalPages - 1
-              ? (_isEditMode ? 'Save Changes' : 'Get Started')
+              ? (_isSaving
+                  ? 'Saving...'
+                  : (_isEditMode ? 'Save Changes' : 'Get Started'))
               : 'Continue',
           style: theme.textTheme.labelLarge?.copyWith(
             color: Colors.white,

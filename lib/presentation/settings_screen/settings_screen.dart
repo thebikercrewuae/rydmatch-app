@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:sizer/sizer.dart';
 import './widgets/unit_system_widget.dart';
 import './widgets/settings_section_widget.dart';
@@ -96,6 +97,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
           margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
         ),
       );
+    }
+  }
+
+  String _buildInviteMessage(String code) {
+    return 'Hey! I''m using RydMatch to find riding partners. '
+        'Join me and we''ll be automatically matched for rides. '
+        'Use my code $code to sign up and get 7 days free Premium! '
+        'Download: https://rydmatch.com';
+  }
+
+  Future<void> _inviteViaWhatsApp(String code) async {
+    final message = _buildInviteMessage(code);
+    final url = Uri.parse(
+      'https://wa.me/?text=${Uri.encodeComponent(message)}',
+    );
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not open WhatsApp',
+              style: GoogleFonts.dmSans(fontSize: 13.sp),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _inviteViaEmail(String code) async {
+    final message = _buildInviteMessage(code);
+    final url = Uri.parse(
+      'mailto:?subject=Join me on RydMatch&body=${Uri.encodeComponent(message)}',
+    );
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not open email',
+              style: GoogleFonts.dmSans(fontSize: 13.sp),
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -900,6 +946,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ],
                                 ),
                               ),
+                            ),
+                            SizedBox(height: 2.h),
+                            // Invite buttons
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () =>
+                                        _inviteViaWhatsApp(_referralStats!.code),
+                                    icon: const Icon(Icons.chat_rounded, size: 18),
+                                    label: Text(
+                                      'WhatsApp',
+                                      style: GoogleFonts.dmSans(
+                                        fontSize: 11.sp,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF25D366),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 2.w),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () =>
+                                        _inviteViaEmail(_referralStats!.code),
+                                    icon: const Icon(Icons.email_rounded, size: 18),
+                                    label: Text(
+                                      'Email',
+                                      style: GoogleFonts.dmSans(
+                                        fontSize: 11.sp,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF1B365D),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                             SizedBox(height: 2.h),
                             // Stats row
