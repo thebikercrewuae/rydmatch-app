@@ -17,6 +17,7 @@ import './services/supabase_service.dart';
 import './services/theme_service.dart';
 import './widgets/custom_error_widget.dart';
 import 'core/app_export.dart';
+import 'presentation/ride_groups_screen/ride_groups_screen.dart';
 import 'web_utils.dart' if (dart.library.io) 'web_utils_stub.dart';
 
 final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
@@ -60,6 +61,9 @@ void main() async {
   final bool sessionActive = await SessionService.isSessionActive();
 
   final uri = Uri.base;
+  final isJoinRideLink = uri.path.startsWith('/join/');
+  final joinGroupId = isJoinRideLink ? uri.path.split('/').last : null;
+
   final isPasswordResetLink =
       uri.path == '/reset-password' ||
       uri.fragment.contains('/reset-password') ||
@@ -68,7 +72,9 @@ void main() async {
 
   String initialRoute;
 
-  if (isPasswordResetLink) {
+  if (isJoinRideLink && joinGroupId != null && joinGroupId.isNotEmpty) {
+    initialRoute = '/main-screen';
+  } else if (isPasswordResetLink) {
     initialRoute = '/reset-password';
   } else if (sessionActive) {
     final supabaseUser = Supabase.instance.client.auth.currentUser;
@@ -109,7 +115,10 @@ void main() async {
   await StravaService.instance.init();
 
   void launchApp() {
-    runApp(MyApp(initialRoute: initialRoute));
+    if (joinGroupId != null && joinGroupId.isNotEmpty) {
+    RideGroupsScreen.pendingJoinGroupId = joinGroupId;
+  }
+  runApp(MyApp(initialRoute: initialRoute, pendingJoinGroupId: joinGroupId));
   }
 
   if (kIsWeb) {
@@ -161,8 +170,9 @@ class _StartupFailureApp extends StatelessWidget {
 
 class MyApp extends StatefulWidget {
   final String initialRoute;
+  final String? pendingJoinGroupId;
 
-  const MyApp({super.key, required this.initialRoute});
+  const MyApp({super.key, required this.initialRoute, this.pendingJoinGroupId});
 
   @override
   State<MyApp> createState() => _MyAppState();

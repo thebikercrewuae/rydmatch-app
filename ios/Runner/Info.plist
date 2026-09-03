@@ -71,6 +71,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>rydmatch</string>
+			<string>https</string>
 			</array>
 		</dict>
 	</array>

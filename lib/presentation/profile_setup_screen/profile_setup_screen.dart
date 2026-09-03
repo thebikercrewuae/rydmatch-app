@@ -434,6 +434,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             type: ToastType.error,
           );
         }
+        setState(() => _isSaving = false);
         return;
       }
     }
@@ -452,6 +453,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             : 'Bicycle users must be at least 16.',
         type: ToastType.error,
       );
+      setState(() => _isSaving = false);
       return;
     }
 

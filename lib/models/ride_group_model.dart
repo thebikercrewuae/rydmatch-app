@@ -19,6 +19,7 @@ class RideGroup {
   final String routeImageUrl;
   final List<LatLng> routePolyline;
   final List<String> routeWaypoints;
+  final bool isOpenRide;
 
   RideGroup({
     required this.id,
@@ -38,6 +39,7 @@ class RideGroup {
     required this.routeImageUrl,
     this.routePolyline = const [],
     this.routeWaypoints = const [],
+    this.isOpenRide = false,
   });
 
   String get formattedDate => DateFormat('EEE, MMM d - h:mm a').format(date);

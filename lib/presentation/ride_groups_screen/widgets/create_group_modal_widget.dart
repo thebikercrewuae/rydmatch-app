@@ -41,6 +41,7 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
   final _routeController = TextEditingController();
 
   int _groupSize = 4;
+  bool _isOpenRide = false;
   String _rideCommunity = 'motorcycle';
   String _rideType = 'Scenic';
   String _difficulty = 'Moderate';
@@ -237,7 +238,8 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
         _selectedTime.hour,
         _selectedTime.minute,
       ),
-      maxRiders: _groupSize,
+      maxRiders: _isOpenRide ? 100 : _groupSize,
+      isOpenRide: _isOpenRide,
       memberCount: 1,
       leaderName: 'You',
       rideCommunity: _rideCommunity,
@@ -474,6 +476,43 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
                 ],
               ),
               SizedBox(height: 1.5.h),
+              // Open Ride toggle
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 3.w, vertical: 1.5.h),
+                decoration: BoxDecoration(
+                  color: _isOpenRide
+                      ? const Color(0xFF1B365D).withValues(alpha: 0.08)
+                      : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(10.0),
+                  border: _isOpenRide
+                      ? Border.all(color: const Color(0xFF1B365D).withValues(alpha: 0.3))
+                      : null,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _isOpenRide ? Icons.link_rounded : Icons.lock_outline,
+                      size: 18,
+                      color: _isOpenRide
+                          ? const Color(0xFF1B365D)
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                    SizedBox(width: 3.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Open Ride', style: GoogleFonts.dmSans(fontSize: 12.sp, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
+                          Text(_isOpenRide ? 'Anyone with the link can join (up to 100 riders)' : 'Invite only - select riders from your matches', style: GoogleFonts.dmSans(fontSize: 10.sp, color: theme.colorScheme.onSurfaceVariant)),
+                        ],
+                      ),
+                    ),
+                    Switch(value: _isOpenRide, onChanged: (v) => setState(() => _isOpenRide = v), activeThumbColor: const Color(0xFF1B365D)),
+                  ],
+                ),
+              ),
+              SizedBox(height: 1.5.h),
+              if (!_isOpenRide) ...[
               _buildLabel('Group Size (max $_maxGroupSize riders)'),
               Wrap(
                 spacing: 2.w,
@@ -509,6 +548,7 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
                   );
                 }),
               ),
+              ],
               SizedBox(height: 1.5.h),
               _buildLabel('$_communityLabel Ride Type'),
               Wrap(
@@ -593,6 +633,7 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
                   );
                 }).toList(),
               ),
+              if (!_isOpenRide) ...[
               SizedBox(height: 2.h),
               Row(
                 children: [
@@ -629,6 +670,7 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
               ),
               SizedBox(height: 1.h),
               _buildInviteRidersSection(theme),
+              ],
               SizedBox(height: 3.h),
               SizedBox(
                 width: double.infinity,
@@ -641,7 +683,9 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
                     ),
                   ),
                   child: Text(
-                    _selectedInvitees.isNotEmpty
+                    _isOpenRide
+                        ? 'Create & Share Link'
+                        : _selectedInvitees.isNotEmpty
                         ? 'Create & Invite ${_selectedInvitees.length} Rider${_selectedInvitees.length > 1 ? 's' : ''}'
                         : 'Create Ride',
                     style: GoogleFonts.dmSans(

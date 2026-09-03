@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sizer/sizer.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../models/ride_group_model.dart';
@@ -19,6 +20,7 @@ import './widgets/group_card_widget.dart';
 import './widgets/premium_gate_widget.dart';
 
 class RideGroupsScreen extends StatefulWidget {
+  static String? pendingJoinGroupId;
   const RideGroupsScreen({super.key});
 
   @override
@@ -43,6 +45,15 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
     _tabController = TabController(length: 2, vsync: this);
     PremiumService().addListener(_handlePremiumChanged);
     _loadGroups();
+    _checkPendingJoin();
+  }
+
+  void _checkPendingJoin() {
+    if (RideGroupsScreen.pendingJoinGroupId != null && RideGroupsScreen.pendingJoinGroupId!.isNotEmpty) {
+      final groupId = RideGroupsScreen.pendingJoinGroupId!;
+      RideGroupsScreen.pendingJoinGroupId = null;
+      Future.delayed(const Duration(seconds: 2), () => _joinOpenRide(groupId));
+    }
   }
 
   @override
@@ -318,6 +329,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
           'https://images.pexels.com/photos/1119796/pexels-photo-1119796.jpeg',
       routePolyline: _parseRoutePolyline(row['route_polyline']),
       routeWaypoints: _parseRouteWaypoints(row['route_waypoints']),
+      isOpenRide: row['is_open_ride'] as bool? ?? false,
     );
   }
 
@@ -574,6 +586,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
               'route_image_url': group.routeImageUrl,
               'route_polyline': _routePolylineToJson(group.routePolyline),
               'route_waypoints': group.routeWaypoints,
+              'is_open_ride': group.isOpenRide,
             });
 
             final groupId = inserted['id'] as String?;
@@ -674,6 +687,44 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
         },
       ),
     );
+  }
+
+  void _shareOpenRideLink(RideGroup group) {
+    final link = 'https://rydmatch.com/join/' + group.id;
+    SharePlus.instance.share(
+      ShareParams(
+        text: 'Join my ride: ' + group.name + ' on RydMatch! Click to join: ' + link,
+        subject: 'Join my RydMatch ride: ' + group.name,
+      ),
+    );
+  }
+
+  Future<void> _joinOpenRide(String groupId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final result = await supabase.rpc('join_open_ride', params: {'p_group_id': groupId});
+      final data = result as Map<String, dynamic>;
+      if (data['success'] == true) {
+        await _loadGroups();
+        if (mounted) {
+          _tabController.animateTo(0);
+          AppToast.show(context, message: 'Joined !', type: ToastType.success);
+        }
+      } else {
+        final error = data['error'] as String? ?? 'Could not join ride';
+        if (mounted && error != 'already_joined') {
+          AppToast.show(context, message: error, type: ToastType.error);
+        } else if (mounted && error == 'already_joined') {
+          await _loadGroups();
+          if (mounted) _tabController.animateTo(0);
+        }
+      }
+    } catch (e) {
+      debugPrint('JoinOpenRide error: ');
+      if (mounted) {
+        AppToast.show(context, message: 'Could not join ride. Please try again.', type: ToastType.error);
+      }
+    }
   }
 
   Future<void> _acceptInvitation(RideGroup group) async {
@@ -1417,6 +1468,23 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
                           ),
                         ),
                         SizedBox(height: 1.5.h),
+                        if (group.isOpenRide && (group.leaderName == 'You' || (Supabase.instance.client.auth.currentUser?.id == group.leaderId))) ...[
+                          SizedBox(height: 1.5.h),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () => _shareOpenRideLink(group),
+                              icon: const Icon(Icons.share_rounded, size: 18),
+                              label: Text('Share Join Link', style: GoogleFonts.dmSans(fontSize: 13.sp, fontWeight: FontWeight.w700)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1B365D),
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(vertical: 1.8.h),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+                              ),
+                            ),
+                          ),
+                        ],
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton.icon(
