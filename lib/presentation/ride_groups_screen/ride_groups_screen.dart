@@ -690,11 +690,11 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
   }
 
   void _shareOpenRideLink(RideGroup group) {
-    final link = 'https://rydmatch.com/join/' + group.id;
+    final link = 'https://rydmatch.com/join/${group.id}';
     SharePlus.instance.share(
       ShareParams(
-        text: 'Join my ride: ' + group.name + ' on RydMatch! Click to join: ' + link,
-        subject: 'Join my RydMatch ride: ' + group.name,
+        text: 'Join my ride: ${group.name} on RydMatch! Click to join: $link',
+        subject: 'Join my RydMatch ride: ${group.name}',
       ),
     );
   }
