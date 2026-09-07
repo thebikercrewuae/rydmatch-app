@@ -448,7 +448,6 @@ workflows:
         auth: integration
         submit_to_testflight: false
         submit_to_app_store: true
-        expire_build_submitted_for_review: true
 
   ios-staging-ipa:
     name: iOS Staging IPA
