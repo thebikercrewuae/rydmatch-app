@@ -226,7 +226,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 SizedBox(height: 1.h),
 
                 // ── Referral Program ───────────────────────────────────
-                _buildReferralSection(theme),
+                if (PremiumService().isPioneer || PremiumService().isPaidSubscriber)
+                  _buildReferralSection(theme),
                 SizedBox(height: 1.h),
 
                 // ── Premium Features ───────────────────────────────────

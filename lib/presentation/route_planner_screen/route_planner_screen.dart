@@ -1761,6 +1761,8 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
                   .map((point) => '${point.latitude},${point.longitude}')
                   .toList()
             : null,
+        prefillStartLatitude: _startPoint.latitude,
+        prefillStartLongitude: _startPoint.longitude,
         prefillRoutePolylinePoints: _routePolylinePoints.isNotEmpty
             ? List<LatLng>.from(_routePolylinePoints)
             : null,

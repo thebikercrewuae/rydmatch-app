@@ -330,6 +330,8 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
       routePolyline: _parseRoutePolyline(row['route_polyline']),
       routeWaypoints: _parseRouteWaypoints(row['route_waypoints']),
       isOpenRide: row['is_open_ride'] as bool? ?? false,
+      startLatitude: (row['start_latitude'] as num?)?.toDouble(),
+      startLongitude: (row['start_longitude'] as num?)?.toDouble(),
     );
   }
 
@@ -586,6 +588,8 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
               'route_image_url': group.routeImageUrl,
               'route_polyline': _routePolylineToJson(group.routePolyline),
               'route_waypoints': group.routeWaypoints,
+              'start_latitude': group.startLatitude,
+              'start_longitude': group.startLongitude,
               'is_open_ride': group.isOpenRide,
             });
 
@@ -893,7 +897,13 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
           ],
         ),
         centerTitle: true,
-        actions: null,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.explore_rounded, color: Colors.white),
+            onPressed: () => Navigator.pushNamed(context, '/discover-rides-screen'),
+            tooltip: 'Discover Open Rides',
+          ),
+        ],
         bottom: hasRideGroupAccess
             ? TabBar(
                 controller: _tabController,

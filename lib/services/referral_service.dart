@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import './premium_service.dart';
+import './diagnostics_service.dart';
 import './supabase_service.dart';
 
 class ReferralStats {
@@ -136,16 +137,23 @@ class ReferralService {
     if (normalizedCode.isEmpty) return false;
 
     try {
-      // Use RPC (SECURITY DEFINER) so unauthenticated users during
-      // registration can validate a code - the referral_codes table
-      // RLS only allows authenticated users to read directly.
       final result = await _client.rpc(
         'validate_referral_code',
         params: {'code': normalizedCode},
       );
+      if (result is bool) return result;
+      if (result is String) return result.toLowerCase() == 'true';
+      if (result is Map) return result.values.first == true;
       return result == true;
     } catch (e) {
       debugPrint('ReferralService.validateReferralCode error: $e');
+      await DiagnosticsService.instance.logError(
+        feature: 'referral',
+        action: 'validate_referral_code_rpc',
+        error: e,
+        severity: 'warning',
+        context: {'code': normalizedCode},
+      );
       return false;
     }
   }

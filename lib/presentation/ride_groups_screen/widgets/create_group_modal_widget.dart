@@ -17,6 +17,8 @@ class CreateGroupModalWidget extends StatefulWidget {
   final String? prefillRouteType;
   final List<String>? prefillWaypoints;
   final List<LatLng>? prefillRoutePolylinePoints;
+  final double? prefillStartLatitude;
+  final double? prefillStartLongitude;
 
   const CreateGroupModalWidget({
     super.key,
@@ -27,6 +29,8 @@ class CreateGroupModalWidget extends StatefulWidget {
     this.prefillRouteType,
     this.prefillWaypoints,
     this.prefillRoutePolylinePoints,
+    this.prefillStartLatitude,
+    this.prefillStartLongitude,
   });
 
   @override
@@ -240,6 +244,8 @@ class _CreateGroupModalWidgetState extends State<CreateGroupModalWidget> {
       ),
       maxRiders: _isOpenRide ? 100 : _groupSize,
       isOpenRide: _isOpenRide,
+      startLatitude: widget.prefillStartLatitude,
+      startLongitude: widget.prefillStartLongitude,
       memberCount: 1,
       leaderName: 'You',
       rideCommunity: _rideCommunity,

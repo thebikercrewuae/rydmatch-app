@@ -94,7 +94,7 @@ workflows:
             printf "%s" "$1" | base64 | tr -d '\n'
           }
 
-          DART_DEFINES="$(encode_define "SUPABASE_URL=$SUPABASE_URL"),$(encode_define "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"),$(encode_define "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY"),$(encode_define "STRAVA_CLIENT_ID=$STRAVA_CLIENT_ID"),$(encode_define "STRAVA_REDIRECT_URI=$STRAVA_REDIRECT_URI"),$(encode_define "REVENUECAT_ANDROID_API_KEY=$REVENUECAT_ANDROID_API_KEY"),$(encode_define "REVENUECAT_PREMIUM_ENTITLEMENT=${REVENUECAT_PREMIUM_ENTITLEMENT:-premium}"),$(encode_define "BETA_PREMIUM_UNLOCK_ENABLED=${BETA_PREMIUM_UNLOCK_ENABLED:-true}")"
+          DART_DEFINES="$(encode_define "SUPABASE_URL=$SUPABASE_URL"),$(encode_define "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"),$(encode_define "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY"),$(encode_define "STRAVA_CLIENT_ID=$STRAVA_CLIENT_ID"),$(encode_define "STRAVA_REDIRECT_URI=$STRAVA_REDIRECT_URI"),$(encode_define "REVENUECAT_ANDROID_API_KEY=$REVENUECAT_ANDROID_API_KEY"),$(encode_define "REVENUECAT_PREMIUM_ENTITLEMENT=${REVENUECAT_PREMIUM_ENTITLEMENT:-premium}"),$(encode_define "BETA_PREMIUM_UNLOCK_ENABLED=${BETA_PREMIUM_UNLOCK_ENABLED:-false}")"
 
           APP_VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
           APP_VERSION_NAME="${APP_VERSION%%+*}"
@@ -255,7 +255,7 @@ workflows:
             printf "%s" "$1" | base64 | tr -d '\n'
           }
 
-          DART_DEFINES="$(encode_define "SUPABASE_URL=$SUPABASE_URL"),$(encode_define "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"),$(encode_define "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY"),$(encode_define "STRAVA_CLIENT_ID=$STRAVA_CLIENT_ID"),$(encode_define "STRAVA_REDIRECT_URI=$STRAVA_REDIRECT_URI"),$(encode_define "REVENUECAT_ANDROID_API_KEY=$REVENUECAT_ANDROID_API_KEY"),$(encode_define "REVENUECAT_PREMIUM_ENTITLEMENT=${REVENUECAT_PREMIUM_ENTITLEMENT:-premium}"),$(encode_define "BETA_PREMIUM_UNLOCK_ENABLED=${BETA_PREMIUM_UNLOCK_ENABLED:-true}")"
+          DART_DEFINES="$(encode_define "SUPABASE_URL=$SUPABASE_URL"),$(encode_define "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"),$(encode_define "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY"),$(encode_define "STRAVA_CLIENT_ID=$STRAVA_CLIENT_ID"),$(encode_define "STRAVA_REDIRECT_URI=$STRAVA_REDIRECT_URI"),$(encode_define "REVENUECAT_ANDROID_API_KEY=$REVENUECAT_ANDROID_API_KEY"),$(encode_define "REVENUECAT_PREMIUM_ENTITLEMENT=${REVENUECAT_PREMIUM_ENTITLEMENT:-premium}"),$(encode_define "BETA_PREMIUM_UNLOCK_ENABLED=${BETA_PREMIUM_UNLOCK_ENABLED:-false}")"
 
           APP_VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
           APP_VERSION_NAME="${APP_VERSION%%+*}"
@@ -435,7 +435,7 @@ workflows:
             --dart-define=STRAVA_REDIRECT_URI="$STRAVA_REDIRECT_URI" \
             --dart-define=REVENUECAT_IOS_API_KEY="$REVENUECAT_IOS_API_KEY" \
             --dart-define=REVENUECAT_PREMIUM_ENTITLEMENT="${REVENUECAT_PREMIUM_ENTITLEMENT:-premium}" \
-            --dart-define=BETA_PREMIUM_UNLOCK_ENABLED="${BETA_PREMIUM_UNLOCK_ENABLED:-true}" \
+            --dart-define=BETA_PREMIUM_UNLOCK_ENABLED="${BETA_PREMIUM_UNLOCK_ENABLED:-false}" \
             --export-options-plist="$EXPORT_OPTIONS_PLIST"
 
     artifacts:
@@ -446,7 +446,8 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: true
+        submit_to_testflight: false
+        submit_to_app_store: true
         expire_build_submitted_for_review: true
 
   ios-staging-ipa:
@@ -555,7 +556,7 @@ workflows:
             --dart-define=STRAVA_REDIRECT_URI="$STRAVA_REDIRECT_URI" \
             --dart-define=REVENUECAT_IOS_API_KEY="$REVENUECAT_IOS_API_KEY" \
             --dart-define=REVENUECAT_PREMIUM_ENTITLEMENT="${REVENUECAT_PREMIUM_ENTITLEMENT:-premium}" \
-            --dart-define=BETA_PREMIUM_UNLOCK_ENABLED="${BETA_PREMIUM_UNLOCK_ENABLED:-true}" \
+            --dart-define=BETA_PREMIUM_UNLOCK_ENABLED="${BETA_PREMIUM_UNLOCK_ENABLED:-false}" \
             --export-options-plist="$EXPORT_OPTIONS_PLIST"
 
     artifacts:
