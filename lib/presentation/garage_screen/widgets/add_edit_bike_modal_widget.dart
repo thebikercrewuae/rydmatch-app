@@ -269,7 +269,9 @@ class _AddEditBikeModalWidgetState extends State<AddEditBikeModalWidget> {
       maxChildSize: 0.95,
       expand: false,
       builder: (_, scrollController) {
-        return Container(
+        return GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: Container(
           decoration: BoxDecoration(
             color: theme.scaffoldBackgroundColor,
             borderRadius: const BorderRadius.vertical(
@@ -518,6 +520,7 @@ class _AddEditBikeModalWidgetState extends State<AddEditBikeModalWidget> {
               ),
             ],
           ),
+        ),
         );
       },
     );

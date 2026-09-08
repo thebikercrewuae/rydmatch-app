@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../widgets/custom_bottom_bar.dart';
 import '../../services/profile_service.dart';
@@ -48,10 +49,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _maybePromptForReview() async {
+    // Increment app open count for rating engagement gate
+    final prefs = await SharedPreferences.getInstance();
+    final openCount = (prefs.getInt('app_open_count') ?? 0) + 1;
+    await prefs.setInt('app_open_count', openCount);
     // Wait for the main screen to settle before prompting, so we don't
     // interrupt the first impression. Gates (7-day age, 90-day cap,
     // once per session) live in RatingService.
-    await Future.delayed(const Duration(seconds: 6));
+    await Future.delayed(const Duration(seconds: 10));
     if (!mounted) return;
     await RatingService.instance.maybePromptForReview(context);
   }

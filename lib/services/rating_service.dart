@@ -22,7 +22,9 @@ class RatingService {
   static final RatingService instance = RatingService._();
 
   static const String _lastPromptKey = 'app_review_last_prompt_at_ms';
-  static const Duration _minAccountAge = Duration(days: 7);
+  static const Duration _minAccountAge = Duration(days: 14);
+  static const int _minAppOpens = 5;
+  static const String _appOpenCountKey = 'app_open_count';
   static const Duration _minBetweenPrompts = Duration(days: 90);
 
   /// Support address for the "could be better" path. Update to the real
@@ -52,6 +54,12 @@ class RatingService {
 
     // 90-day cap between prompts.
     final prefs = await SharedPreferences.getInstance();
+
+    // App-open count gate: require meaningful engagement.
+    final openCount = prefs.getInt(_appOpenCountKey) ?? 0;
+    if (openCount < _minAppOpens) {
+      return;
+    }
     final lastMs = prefs.getInt(_lastPromptKey);
     if (lastMs != null) {
       final last = DateTime.fromMillisecondsSinceEpoch(lastMs);
