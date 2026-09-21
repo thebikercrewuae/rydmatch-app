@@ -6,10 +6,12 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import './services/haptic_service.dart';
 import './services/offline_queue_service.dart';
 import './services/premium_service.dart';
+import './services/push_notification_service.dart';
 import './services/profile_service.dart';
 import './services/session_service.dart';
 import './services/strava_service.dart';
@@ -109,10 +111,14 @@ void main() async {
     initialRoute = onboardingSeen ? '/' : '/onboarding-screen';
   }
 
+  // Register FCM background handler
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
   await ThemeService().loadThemeMode();
   await HapticService.instance.init();
   await PremiumService().init();
   await StravaService.instance.init();
+  await PushNotificationService().initialize();
 
   void launchApp() {
     if (joinGroupId != null && joinGroupId.isNotEmpty) {

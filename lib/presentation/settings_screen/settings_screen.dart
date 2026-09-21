@@ -7,6 +7,7 @@ import 'package:sizer/sizer.dart';
 import './widgets/unit_system_widget.dart';
 import './widgets/settings_section_widget.dart';
 import '../../services/premium_service.dart';
+import '../../services/push_notification_service.dart';
 import '../../services/theme_service.dart';
 import '../../services/session_service.dart';
 import '../../services/haptic_service.dart';
@@ -470,6 +471,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: 'Ride Analytics',
             subtitle: 'View your riding statistics',
             onTap: () => Navigator.pushNamed(context, '/ride-analytics-screen'),
+          ),
+          SettingsRowWidget(
+            icon: AppIcons.calendar,
+            iconColor: const Color(0xFF4FC3F7),
+            title: 'Staff Scanner',
+            subtitle: 'Scan rider QR codes at events',
+            onTap: () => Navigator.pushNamed(context, '/staff-scanner-screen'),
           ),
           SettingsRowWidget(
             icon: AppIcons.rocket,
@@ -1334,6 +1342,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       .update({'is_active': false})
                       .eq('id', userId);
                 }
+                await SupabaseService.instance.client.auth.signOut();
+              await PushNotificationService().deleteToken();
+              await PremiumService().clearLocalState();
+                await PremiumService().clearLocalState();
                 await SessionService.clearSession();
                 if (context.mounted) {
                   Navigator.of(
@@ -1478,6 +1490,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               .delete()
                               .eq('id', userId);
                           await SupabaseService.instance.client.auth.signOut();
+              await PushNotificationService().deleteToken();
+              await PremiumService().clearLocalState();
                         }
                         await SessionService.clearSession();
                         if (context.mounted) {
@@ -1552,6 +1566,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.of(ctx).pop();
+              await SupabaseService.instance.client.auth.signOut();
+              await PushNotificationService().deleteToken();
+              await PremiumService().clearLocalState();
+              await PremiumService().clearLocalState();
               await SessionService.clearSession();
               if (context.mounted) {
                 Navigator.of(

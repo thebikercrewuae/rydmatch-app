@@ -24,9 +24,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   final List<_OnboardingPage> _pages = [
     _OnboardingPage(
-      title: 'Discover Riders Near You',
+      title: 'Discover Riders & Drivers Near You',
       subtitle:
-          'Browse rider profiles filtered by bike type, skill level, and riding style. Find your perfect road companion within miles.',
+          'Browse profiles filtered by vehicle type, skill level, and riding style. Find your perfect road companion within miles.',
       gradient: [Color(0xFF1B365D), Color(0xFF2A5298)],
       accentColor: Color(0xFF4A90D9),
       icon: Icons.explore_rounded,
@@ -35,7 +35,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _OnboardingPage(
       title: 'Match on the Road',
       subtitle:
-          'Swipe right on riders who share your pace and passion. When it\'s mutual, the road opens up — start chatting and plan your first ride.',
+          'Swipe right on people who share your pace and passion. When it\'s mutual, the road opens up — start chatting and plan your first ride together.',
       gradient: [Color(0xFF8B1A1A), Color(0xFFE85A4F)],
       accentColor: Color(0xFFFF8A80),
       icon: Icons.favorite_rounded,
@@ -44,7 +44,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _OnboardingPage(
       title: 'Join Ride Groups',
       subtitle:
-          'Create or join group rides with verified riders. Set routes, share waypoints, and ride together with real-time coordination.',
+          'Create or join group rides with verified members. Set routes, share waypoints, and ride together with real-time coordination.',
       gradient: [Color(0xFF1A4A2E), Color(0xFF2D7A4F)],
       accentColor: Color(0xFF66BB6A),
       icon: Icons.group_rounded,
@@ -53,7 +53,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _OnboardingPage(
       title: 'Ride with Confidence',
       subtitle:
-          'Emergency SOS, live location sharing, and trusted contact alerts keep you safe on every journey. Your safety is our priority. Verified riders build trust. Upload your motorcycle license after setup to get a verified badge.',
+          'Emergency SOS, live location sharing, and trusted contact alerts keep you safe on every journey. Your safety is our priority. Verified members build trust. Upload your license after setup to get a verified badge.',
       gradient: [Color(0xFF4A3000), Color(0xFFB7791F)],
       accentColor: Color(0xFFFFCA28),
       icon: Icons.shield_rounded,

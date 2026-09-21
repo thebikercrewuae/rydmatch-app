@@ -109,7 +109,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   ];
 
   int get _minimumAge =>
-      _rideMode == 'motorcycle' || _mixedCommunityMatching ? 18 : 16;
+      _rideMode == 'bicycle' && !_mixedCommunityMatching ? 16 : 18;
 
   bool get _meetsMinimumAge {
     final birthDate = _dateOfBirth;
@@ -831,7 +831,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Tell riders about you',
+            _rideMode == 'car' ? 'Tell drivers about you' : 'Tell riders about you',
             style: GoogleFonts.dmSans(
               fontSize: 18.sp,
               fontWeight: FontWeight.w700,
@@ -840,7 +840,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           ),
           SizedBox(height: 1.h),
           Text(
-            'Add your name and a short bio for your rider profile.',
+            _rideMode == 'car' ? 'Add your name and a short bio for your driver profile.' : 'Add your name and a short bio for your rider profile.',
             style: GoogleFonts.dmSans(
               fontSize: 13.sp,
               color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
@@ -964,7 +964,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             children: [
               Expanded(
                 child: Text(
-                  'Open to mixed motorcycle and bicycle matches',
+                  'Open to matching with other communities',
                   style: GoogleFonts.dmSans(
                     fontSize: 11.5.sp,
                     fontWeight: FontWeight.w600,
@@ -1021,7 +1021,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     ),
                     SizedBox(height: 0.3.h),
                     Text(
-                      'Upload your motorcycle license to build trust with other riders. Verified riders get more matches.',
+                      _rideMode == 'car' ? 'Upload your driving license to build trust with other drivers. Verified members get more matches.' : 'Upload your motorcycle license to build trust with other riders. Verified riders get more matches.',
                       style: GoogleFonts.dmSans(
                         fontSize: 10.5.sp,
                         color: theme.colorScheme.onSurfaceVariant,

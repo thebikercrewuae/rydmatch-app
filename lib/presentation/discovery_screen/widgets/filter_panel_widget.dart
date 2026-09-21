@@ -103,7 +103,7 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
     'Advanced',
     'Expert',
   ];
-  final List<String> _rideCommunities = ['All', 'motorcycle', 'bicycle'];
+  final List<String> _rideCommunities = ['All', 'motorcycle', 'car', 'bicycle'];
   final List<String> _motorcycleTypes = [
     'All',
     'sport',
@@ -125,6 +125,17 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
     'touring_bicycle',
     'bmx',
     'folding_bicycle',
+  ];
+  final List<String> _carTypes = [
+    'All',
+    'sports_car',
+    'sedan',
+    'suv',
+    'classic_car',
+    'muscle_car',
+    'jdm',
+    'luxury_car',
+    'offroad_car',
   ];
   final List<String> _ridingStyles = [
     'All',
@@ -186,6 +197,7 @@ class _FilterPanelWidgetState extends State<FilterPanelWidget> {
   List<String> get _vehicleTypeOptions {
     if (_selectedRideCommunity == 'motorcycle') return _motorcycleTypes;
     if (_selectedRideCommunity == 'bicycle') return _bicycleTypes;
+    if (_selectedRideCommunity == 'car') return _carTypes;
 
     return [
       'All',

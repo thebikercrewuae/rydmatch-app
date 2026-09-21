@@ -18,6 +18,7 @@ import '../live_ride/live_ride_navigation.dart';
 import './widgets/create_group_modal_widget.dart';
 import './widgets/group_card_widget.dart';
 import './widgets/premium_gate_widget.dart';
+import '../../services/event_service.dart';
 
 class RideGroupsScreen extends StatefulWidget {
   static String? pendingJoinGroupId;
@@ -877,7 +878,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
                 color: Colors.white,
               ),
             ),
-            SizedBox(width: 2.w),
+            SizedBox(width: 1.w),
             if (isPremium)
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 2.w, vertical: 0.3.h),
@@ -921,6 +922,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
                 ),
                 tabs: [
                   Tab(text: 'My Groups (${_myGroups.length})'),
+                  Tab(text: 'Events'),
                   Tab(
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -998,6 +1000,7 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
             controller: _tabController,
             children: [
               _buildGroupsList(_myGroups, isMyGroups: true),
+              _buildEventsList(),
               _buildInvitationsList(),
             ],
           ),
@@ -1212,6 +1215,107 @@ class _RideGroupsScreenState extends State<RideGroupsScreen>
     );
   }
 
+
+  Widget _buildEventsList() {
+    return FutureBuilder<List<dynamic>>(
+      future: EventService.instance.getOpenEvents(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: Color(0xFFE85A4F)));
+        }
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.event_outlined, size: 48, color: Colors.white38),
+                const SizedBox(height: 16),
+                const Text('No events yet', style: TextStyle(color: Colors.white54, fontSize: 16)),
+                const SizedBox(height: 8),
+                const Text('Check back soon for upcoming motorcycle events.',
+                    style: TextStyle(color: Colors.white38, fontSize: 13)),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/events-screen');
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE85A4F)),
+                  child: const Text('Browse All Events'),
+                ),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: () => Navigator.pushNamed(context, '/staff-scanner-screen'),
+                  icon: const Icon(Icons.qr_code_scanner, color: Colors.white70),
+                  label: const Text('Staff Scanner', style: TextStyle(color: Colors.white70)),
+                ),
+              ],
+            ),
+          );
+        }
+        final events = snapshot.data!.cast<EventInfo>();
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: events.length,
+          itemBuilder: (context, index) {
+            final event = events[index];
+            return Card(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              margin: const EdgeInsets.only(bottom: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: InkWell(
+                onTap: () {
+                  Navigator.pushNamed(context, '/event-detail-screen', arguments: {'eventId': event.id, 'eventName': event.name});
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(event.name, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          ),
+                          if (event.status == 'open')
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+                              child: const Text('Open', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w600)),
+                            ),
+                        ],
+                      ),
+                      if (event.description != null) ...[
+                        const SizedBox(height: 6),
+                        Text(event.description!, style: const TextStyle(color: Colors.white54, fontSize: 13), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      ],
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 16,
+                        children: [
+                          if (event.locationName != null) _eventChip(Icons.location_on, event.locationName!),
+                          _eventChip(Icons.calendar_today, '${event.startDate.day}/${event.startDate.month}/${event.startDate.year}'),
+                          if (event.maxRiders != null) _eventChip(Icons.motorcycle, '${event.maxRiders} riders'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _eventChip(IconData icon, String text) {
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 14, color: Colors.white54),
+      const SizedBox(width: 4),
+      Text(text, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+    ]);
+  }
   Widget _buildInvitationsList() {
     if (_invitations.isEmpty) {
       return Center(

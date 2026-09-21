@@ -566,7 +566,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           p['motorcycle_photo_urls'] as List? ?? const [],
         ),
         'semanticLabel':
-            '$name ${rideModeLabel.toLowerCase()} rider profile photo',
+            '$name ${rideModeLabel.toLowerCase()} profile photo',
         'rideMode': rideMode,
         'rideModeLabel': rideModeLabel,
         'age': p['age'] as int? ?? '',
@@ -658,7 +658,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   }
 
   String _rideModeLabel(String rideMode) {
-    return rideMode == 'bicycle' ? 'Bicycle' : 'Motorcycle';
+    return rideMode == 'bicycle' ? 'Bicycle' : rideMode == 'car' ? 'Car' : 'Motorcycle';
   }
 
   List<Map<String, dynamic>> _applyFiltersToList(

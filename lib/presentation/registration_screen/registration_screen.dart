@@ -158,7 +158,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
 
       if (currentUser != null) {
         try {
-          // Persist the local session flags so the rider stays signed in
+          // Persist the local session flags so the user stays signed in
           // across app launches. Without this, a freshly-registered
           // pioneer would be bounced back to the login screen next launch.
           await SessionService.saveSession(staySignedIn: true);
@@ -233,7 +233,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
               'https://images.pexels.com/photos/1715193/pexels-photo-1715193.jpeg',
               fit: BoxFit.cover,
               semanticLabel:
-                  'Motorcycle rider on open road at sunset with dramatic sky',
+                  'Rider on open road at sunset with dramatic sky',
               errorBuilder: (_, __, ___) =>
                   const ColoredBox(color: Color(0xFF0D1B2A)),
             ),

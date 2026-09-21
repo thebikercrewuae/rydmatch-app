@@ -131,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
               'https://images.pexels.com/photos/1715193/pexels-photo-1715193.jpeg',
               fit: BoxFit.cover,
               semanticLabel:
-                  'Motorcycle rider on open road at sunset with dramatic sky',
+                  'Rider on open road at sunset with dramatic sky',
               errorBuilder: (_, __, ___) =>
                   const ColoredBox(color: Color(0xFF0D1B2A)),
             ),
