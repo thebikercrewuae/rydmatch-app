@@ -89,5 +89,7 @@
 	</array>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<false/>
+	<key>NSCalendarsUsageDescription</key>
+	<string>RydMatch adds event details to your calendar so you don't miss your rides.</string>
 </dict>
 </plist>
