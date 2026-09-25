@@ -178,7 +178,7 @@ class _EventCard extends StatelessWidget {
                 children: [
                   if (event.locationName != null)
                     _InfoChip(icon: Icons.location_on, text: event.locationName!),
-                  _InfoChip(icon: Icons.calendar_today, text: dateStr),
+                    _InfoChip(icon: Icons.calendar_today, text: [dateStr, ' at ', _formatEventTime(event.startDate)].join()),
                   if (event.maxRiders != null)
                     _InfoChip(icon: Icons.motorcycle, text: [event.maxRiders, ' riders'].join()),
                   if (event.donationRequired)
@@ -191,6 +191,13 @@ class _EventCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _formatEventTime(DateTime dt) {
+  final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+  final minute = dt.minute.toString().padLeft(2, '0');
+  final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+  return [[hour.toString(), minute].join(':'), ' ', ampm].join();
 }
 
 class _InfoChip extends StatelessWidget {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/event_service.dart';
 import '../../theme/app_theme.dart';
+import 'event_voice_widget.dart';
 
 class EventChatScreen extends StatefulWidget {
   const EventChatScreen({super.key});
@@ -154,6 +155,11 @@ class _EventChatScreenState extends State<EventChatScreen> {
                       ),
           ),
           _buildInputBar(),
+          // Voice widget at the bottom
+          EventVoiceWidget(
+            channelId: _channelId ?? '',
+            channelName: _channelName ?? 'Channel',
+          ),
         ],
       ),
     );

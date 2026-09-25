@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:add_2_calendar/add_2_calendar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/event_service.dart';
 import '../../theme/app_theme.dart';
@@ -152,9 +153,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       if (_event!.locationName != null)
                         _buildInfoRow(Icons.location_on, _event!.locationName!),
                       _buildInfoRow(Icons.calendar_today,
-                        '${_event!.startDate.day}/${_event!.startDate.month}/${_event!.startDate.year}'),
+                          _formatEventDate(_event!.startDate)),
                       if (_event!.maxRiders != null)
-                        _buildInfoRow(Icons.motorcycle, '${_event!.maxRiders} riders max'),
+                        _buildInfoRow(Icons.motorcycle, [_event!.maxRiders, ' riders max'].join()),
                     ],
                   ),
 
@@ -181,6 +182,33 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   ],
 
                   const SizedBox(height: 16),
+
+                  // Add to calendar button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        final event2 = Event(
+                          title: _event!.name,
+                          description: _event!.description ?? '',
+                          location: _event!.locationName ?? '',
+                          startDate: _event!.startDate,
+                          endDate: _event!.endDate,
+                          iosParams: IOSParams(reminder: Duration(hours: 1)),
+                        );
+                        Add2Calendar.addEvent2Cal(event2);
+                      },
+                      icon: const Icon(Icons.event_available, size: 18),
+                      label: const Text('Add to Calendar'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.green,
+                        side: const BorderSide(color: Colors.green),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
 
                   // Channels button
                   SizedBox(
@@ -230,6 +258,18 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         ),
       ),
     );
+  }
+
+  String _formatEventDate(DateTime dt) {
+    final dateStr = [dt.day, '/', dt.month, '/', dt.year].join();
+    return [dateStr, ' at ', _formatEventTime(dt)].join();
+  }
+
+  String _formatEventTime(DateTime dt) {
+    final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+    return [[hour.toString(), minute].join(':'), ' ', ampm].join();
   }
 
   Widget _buildInfoRow(IconData icon, String text) {

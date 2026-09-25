@@ -15,6 +15,7 @@ class EventInfo {
     required this.donationTarget,
     required this.status,
     required this.bannerUrl,
+    this.approvedCount,
   });
 
   final String id;
@@ -29,6 +30,7 @@ class EventInfo {
   final String? donationTarget;
   final String status;
   final String? bannerUrl;
+  final int? approvedCount;
 
   factory EventInfo.fromMap(Map<String, dynamic> map) {
     return EventInfo(
@@ -44,6 +46,7 @@ class EventInfo {
       donationTarget: map['donation_target'] as String?,
       status: map['status'] as String? ?? 'draft',
       bannerUrl: map['banner_url'] as String?,
+      approvedCount: map['approved_count'] != null ? (map['approved_count'] as num).toInt() : null,
     );
   }
 }
@@ -245,6 +248,55 @@ class EventService {
     } catch (e) {
       debugPrint('sendChannelMessage error');
       return false;
+    }
+  }
+
+  // Staff signup functions
+  Future<Map<String, dynamic>?> verifyStaffCode(String code) async {
+    try {
+      final response = await _client.rpc('verify_staff_code', params: {'p_code': code});
+      if (response is List && response.isNotEmpty) {
+        return response.first as Map<String, dynamic>;
+      }
+      if (response is Map) {
+        return response as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('verifyStaffCode error');
+      return null;
+    }
+  }
+
+  Future<bool> registerEventStaff({
+    required String code,
+    required String email,
+    required String password,
+    required String fullName,
+    String? phone,
+  }) async {
+    try {
+      await _client.rpc('register_event_staff', params: {
+        'p_code': code,
+        'p_email': email,
+        'p_password': password,
+        'p_full_name': fullName,
+        'p_phone': phone,
+      });
+      return true;
+    } catch (e) {
+      debugPrint('registerEventStaff error');
+      return false;
+    }
+  }
+
+  Future<int> endEvent(String eventId) async {
+    try {
+      final response = await _client.rpc('end_event', params: {'p_event_id': eventId});
+      return (response as num?)?.toInt() ?? 0;
+    } catch (e) {
+      debugPrint('endEvent error');
+      return 0;
     }
   }
 

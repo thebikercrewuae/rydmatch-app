@@ -95,13 +95,14 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       }
     }
 
+    // Run location, profile, swiped IDs, and unit preference all in parallel
     await Future.wait([
       _loadUnitPreference(),
       _loadSwipedIds(),
       _loadMyProfile(),
+      _fetchAndStoreLocation(),
     ]);
 
-    await _fetchAndStoreLocation();
     await _loadRiders();
   }
 
@@ -231,7 +232,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         position = await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.medium,
-            timeLimit: Duration(seconds: 15),
+            timeLimit: Duration(seconds: 8),
           ),
         );
       } on TimeoutException {
@@ -239,7 +240,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         position = await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.low,
-            timeLimit: Duration(seconds: 15),
+            timeLimit: Duration(seconds: 8),
           ),
         );
       }
@@ -393,11 +394,10 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         final row = byId[profileId];
         if (row == null) continue;
 
-        final avatarUrl = await ProfileService.resolveUserProfilePhotoUrl(
-          userId: profile['id']?.toString() ?? '',
-          avatarUrl: row['avatar_url'] as String?,
-        );
-        if (avatarUrl != null) {
+        // Use avatar_url directly from the query - skip per-profile storage lookup
+        // (the N+1 storage calls were causing 30-60s load times)
+        final avatarUrl = row['avatar_url'] as String?;
+        if (avatarUrl != null && avatarUrl.isNotEmpty) {
           profile['avatar_url'] = avatarUrl;
         }
 
@@ -472,7 +472,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
             radius: _activeFilters.distance,
             isMetric: _isMetric,
           ),
-          'p_limit': 150,
+          'p_limit': 50,
           'p_offset': 0,
         },
       );
@@ -502,8 +502,10 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       return;
     }
 
-    await _hydrateDiscoveryProfileFields(allProfiles);
-    await PioneerService.instance.enrichProfiles(allProfiles);
+    await Future.wait([
+      _hydrateDiscoveryProfileFields(allProfiles),
+      PioneerService.instance.enrichProfiles(allProfiles),
+    ]);
 
     final afterExcludeSelf = allProfiles
         .where((p) => p['id'] != currentUser.id)
