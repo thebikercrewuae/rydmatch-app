@@ -4,7 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../widgets/custom_bottom_bar.dart';
 import '../../services/profile_service.dart';
 import '../../services/notification_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/pioneer_service.dart';
+import '../../services/proximity_service.dart';
 import '../../services/premium_service.dart';
 import '../../services/rating_service.dart';
 import '../../widgets/notification_banner_overlay.dart';
@@ -34,6 +36,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     PremiumService().refresh(reason: 'main_screen_init');
     _ensurePioneerMembership();
     _maybePromptForReview();
+    _checkNearbyMatches();
   }
 
   Future<void> _ensurePioneerMembership() async {
@@ -45,6 +48,46 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       await PioneerService.instance.claimCurrentUserMembership();
     } catch (e) {
       debugPrint('MainScreen: pioneer membership claim failed: ');
+    }
+  }
+
+  Future<void> _checkNearbyMatches() async {
+    try {
+      final enabled = await ProximityService.instance.isProximityEnabled();
+      if (!enabled) return;
+
+      // Get user's location from profile
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final profile = await supabase
+          .from('user_profiles')
+          .select('latitude, longitude')
+          .eq('id', userId)
+          .maybeSingle();
+
+      final lat = (profile?['latitude'] as num?)?.toDouble();
+      final lng = (profile?['longitude'] as num?)?.toDouble();
+      if (lat == null || lng == null) return;
+
+      // Check for nearby matches
+      final nearby = await ProximityService.instance.checkNearbyMatches(lat, lng);
+      if (nearby.isEmpty || !mounted) return;
+
+      // Show notification banner
+      final count = nearby.length;
+      final nearest = nearby.first;
+      final nearestKm = nearest.distanceKm.toStringAsFixed(1);
+
+      _notificationService.showProximityAlert(
+        count == 1
+            ? [nearest.name, ' is ', nearestKm, ' km away'].join()
+            : [count.toString(), ' matched riders nearby! Nearest: ', nearestKm, ' km'].join(),
+        'Open Discover to see their profiles',
+      );
+    } catch (e) {
+      debugPrint('Proximity check failed');
     }
   }
 

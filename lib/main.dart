@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -60,84 +59,63 @@ void main() async {
     return const SizedBox.shrink();
   };
 
-  final bool sessionActive = await SessionService.isSessionActive();
+  String initialRoute = '/';
+  String? joinGroupId;
 
-  final uri = Uri.base;
-  final isJoinRideLink = uri.path.startsWith('/join/');
-  final joinGroupId = isJoinRideLink ? uri.path.split('/').last : null;
+  try {
+    final bool sessionActive = await SessionService.isSessionActive();
+    final uri = Uri.base;
+    final isJoinRideLink = uri.path.startsWith('/join/');
+    joinGroupId = isJoinRideLink ? uri.path.split('/').last : null;
+    final isPasswordResetLink = uri.path == '/reset-password' || uri.fragment.contains('/reset-password') || uri.queryParameters['type'] == 'recovery' || uri.fragment.contains('type=recovery');
 
-  final isPasswordResetLink =
-      uri.path == '/reset-password' ||
-      uri.fragment.contains('/reset-password') ||
-      uri.queryParameters['type'] == 'recovery' ||
-      uri.fragment.contains('type=recovery');
-
-  String initialRoute;
-
-  if (isJoinRideLink && joinGroupId != null && joinGroupId.isNotEmpty) {
-    initialRoute = '/main-screen';
-  } else if (isPasswordResetLink) {
-    initialRoute = '/reset-password';
-  } else if (sessionActive) {
-    final supabaseUser = Supabase.instance.client.auth.currentUser;
-
-    if (supabaseUser != null) {
-      await ProfileService.restoreProfileFromSupabase();
+    if (isJoinRideLink && joinGroupId != null && joinGroupId.isNotEmpty) {
       initialRoute = '/main-screen';
-    } else {
-      bool recovered = false;
-
-      for (int i = 0; i < 6; i++) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (Supabase.instance.client.auth.currentUser != null) {
-          recovered = true;
-          break;
-        }
-      }
-
-      if (recovered) {
-        await ProfileService.restoreProfileFromSupabase();
+    } else if (isPasswordResetLink) {
+      initialRoute = '/reset-password';
+    } else if (sessionActive) {
+      final supabaseUser = Supabase.instance.client.auth.currentUser;
+      if (supabaseUser != null) {
+        try { await ProfileService.restoreProfileFromSupabase().timeout(const Duration(seconds: 5)); } catch (_) {}
         initialRoute = '/main-screen';
       } else {
-        await SessionService.clearSession();
-        final prefs = await SharedPreferences.getInstance();
-        final onboardingSeen = prefs.getBool('onboarding_seen') ?? false;
-        initialRoute = onboardingSeen ? '/' : '/onboarding-screen';
+        bool recovered = false;
+        for (int i = 0; i < 4; i++) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          if (Supabase.instance.client.auth.currentUser != null) { recovered = true; break; }
+        }
+        if (recovered) {
+          try { await ProfileService.restoreProfileFromSupabase().timeout(const Duration(seconds: 5)); } catch (_) {}
+          initialRoute = '/main-screen';
+        } else {
+          await SessionService.clearSession();
+          final prefs = await SharedPreferences.getInstance();
+          initialRoute = (prefs.getBool('onboarding_seen') ?? false) ? '/' : '/onboarding-screen';
+        }
       }
+    } else {
+      final prefs = await SharedPreferences.getInstance();
+      initialRoute = (prefs.getBool('onboarding_seen') ?? false) ? '/' : '/onboarding-screen';
     }
-  } else {
-    final prefs = await SharedPreferences.getInstance();
-    final onboardingSeen = prefs.getBool('onboarding_seen') ?? false;
-    initialRoute = onboardingSeen ? '/' : '/onboarding-screen';
+  } catch (e) {
+    debugPrint(['Session setup failed: ', e.toString()].join());
+    initialRoute = '/';
   }
 
-  // Register FCM background handler
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  try { FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler); } catch (_) {}
+  try { await ThemeService().loadThemeMode().timeout(const Duration(seconds: 3)); } catch (_) {}
+  try { await HapticService.instance.init().timeout(const Duration(seconds: 2)); } catch (_) {}
+  try { await PremiumService().init().timeout(const Duration(seconds: 5)); } catch (_) {}
+  try { await StravaService.instance.init().timeout(const Duration(seconds: 3)); } catch (_) {}
+  try { await PushNotificationService().initialize().timeout(const Duration(seconds: 5)); } catch (_) {}
 
-  await ThemeService().loadThemeMode();
-  await HapticService.instance.init();
-  await PremiumService().init();
-  await StravaService.instance.init();
-  await PushNotificationService().initialize();
+  final String finalRoute = initialRoute;
+  final String? finalJoinGroupId = joinGroupId;
 
-  void launchApp() {
-    if (joinGroupId != null && joinGroupId.isNotEmpty) {
-    RideGroupsScreen.pendingJoinGroupId = joinGroupId;
+  if (finalJoinGroupId != null && finalJoinGroupId.isNotEmpty) {
+    RideGroupsScreen.pendingJoinGroupId = finalJoinGroupId;
   }
-  runApp(MyApp(initialRoute: initialRoute, pendingJoinGroupId: joinGroupId));
-  }
-
-  if (kIsWeb) {
-    launchApp();
-  } else {
-    try {
-      await SystemChrome.setPreferredOrientations([]);
-    } catch (e) {
-      debugPrint('Orientation preference failed: $e');
-    }
-
-    launchApp();
-  }
+  runApp(MyApp(initialRoute: finalRoute, pendingJoinGroupId: finalJoinGroupId));
 }
 
 class _StartupFailureApp extends StatelessWidget {

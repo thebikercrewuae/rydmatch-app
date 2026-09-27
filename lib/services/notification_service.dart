@@ -401,6 +401,20 @@ class NotificationService extends ChangeNotifier {
 
   /// Mark all unread new_message notifications for the current user as read.
   /// Called when the user opens a chat screen.
+  void showProximityAlert(String title, String message) {
+    try {
+      _bannerController.add(AppNotification(
+        id: 'proximity_alert',
+        userId: '',
+        type: NotificationType.newMatch,
+        title: title,
+        message: message,
+        isRead: false,
+        createdAt: DateTime.now(),
+      ));
+    } catch (_) {}
+  }
+
   Future<void> markNewMessageNotificationsAsRead() async {
     try {
       final user = _client.auth.currentUser;

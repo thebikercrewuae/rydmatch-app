@@ -7,6 +7,8 @@ import 'package:sizer/sizer.dart';
 import './widgets/unit_system_widget.dart';
 import './widgets/settings_section_widget.dart';
 import '../../services/premium_service.dart';
+import '../../services/proximity_service.dart';
+import '../../theme/app_theme.dart';
 import '../../services/push_notification_service.dart';
 import '../../services/theme_service.dart';
 import '../../services/session_service.dart';
@@ -464,6 +466,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: 'Ride Groups',
             subtitle: 'Create & manage group rides',
             onTap: () => Navigator.pushNamed(context, '/ride-groups-screen'),
+          ),
+          SettingsRowWidget(
+            icon: Icons.location_on,
+            iconColor: const Color(0xFF4FC3F7),
+            title: 'Nearby Rider Alerts',
+            subtitle: 'Get notified when matched riders are close by',
+            trailing: StatefulBuilder(
+              builder: (context, setLocalState) {
+                return FutureBuilder<bool>(
+                  future: ProximityService.instance.isProximityEnabled(),
+                  builder: (context, snapshot) {
+                    final enabled = snapshot.data ?? false;
+                    return Switch(
+                      value: enabled,
+                      activeThumbColor: AppTheme.secondaryDark,
+                      onChanged: (v) async {
+                        await ProximityService.instance.setProximityEnabled(v);
+                        setLocalState(() {});
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+            onTap: null,
           ),
           SettingsRowWidget(
             icon: AppIcons.analytics,
