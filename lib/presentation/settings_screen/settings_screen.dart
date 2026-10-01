@@ -8,6 +8,7 @@ import './widgets/unit_system_widget.dart';
 import './widgets/settings_section_widget.dart';
 import '../../services/premium_service.dart';
 import '../../services/proximity_service.dart';
+import '../../services/background_proximity_service.dart';
 import '../../theme/app_theme.dart';
 import '../../services/push_notification_service.dart';
 import '../../services/theme_service.dart';
@@ -483,6 +484,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       activeThumbColor: AppTheme.secondaryDark,
                       onChanged: (v) async {
                         await ProximityService.instance.setProximityEnabled(v);
+                        if (v) {
+                          await BackgroundProximityService().initialize();
+                          await BackgroundProximityService().start();
+                        } else {
+                          await BackgroundProximityService().stop();
+                        }
                         setLocalState(() {});
                       },
                     );

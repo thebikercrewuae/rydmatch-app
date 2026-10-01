@@ -230,6 +230,24 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 12),
+
+                  // Join a ride group button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/group-scanner-screen');
+                      },
+                      icon: const Icon(Icons.qr_code_scanner, size: 18),
+                      label: const Text('Join a Ride Group'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.green,
+                        side: const BorderSide(color: Colors.green),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
 
                   const SizedBox(height: 24),
 

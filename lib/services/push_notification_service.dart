@@ -125,6 +125,30 @@ class PushNotificationService {
     }
   }
 
+  void handleProximityMessage(Map<String, dynamic> data) {
+    final message = data['message'] as String? ?? 'Nearby rider detected';
+    _localNotifications.show(
+      'proximity'.hashCode,
+      'Nearby Rider',
+      message,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          'proximity_alerts',
+          'Nearby Rider Alerts',
+          channelDescription: 'Alerts when matched riders are nearby',
+          icon: '@mipmap/ic_launcher',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+    );
+  }
+
   Future<void> deleteToken() async {
     try {
       final client = Supabase.instance.client;

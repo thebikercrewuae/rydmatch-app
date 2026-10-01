@@ -251,6 +251,43 @@ class EventService {
     }
   }
 
+  // Event ride groups
+  Future<List<Map<String, dynamic>>> getEventGroups(String eventId) async {
+    try {
+      final response = await _client
+          .from('event_groups')
+          .select('id, name, description, leader_name, qr_token, max_riders')
+          .eq('event_id', eventId)
+          .order('name');
+      return (response as List).map((e) => e as Map<String, dynamic>).toList();
+    } catch (e) {
+      debugPrint('getEventGroups error');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> joinGroupByQr(String qrToken) async {
+    try {
+      final response = await _client.rpc('join_event_group', params: {'p_qr_token': qrToken});
+      if (response is Map) return response as Map<String, dynamic>;
+      if (response is List && response.isNotEmpty) return response.first as Map<String, dynamic>;
+      return null;
+    } catch (e) {
+      debugPrint('joinGroupByQr error');
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getGroupMembers(String groupId) async {
+    try {
+      final response = await _client.rpc('get_group_members', params: {'p_group_id': groupId});
+      return (response as List).map((e) => e as Map<String, dynamic>).toList();
+    } catch (e) {
+      debugPrint('getGroupMembers error');
+      return [];
+    }
+  }
+
   // Staff signup functions
   Future<Map<String, dynamic>?> verifyStaffCode(String code) async {
     try {

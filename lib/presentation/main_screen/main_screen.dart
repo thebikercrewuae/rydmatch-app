@@ -7,6 +7,7 @@ import '../../services/notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/pioneer_service.dart';
 import '../../services/proximity_service.dart';
+import '../../services/background_proximity_service.dart';
 import '../../services/premium_service.dart';
 import '../../services/rating_service.dart';
 import '../../widgets/notification_banner_overlay.dart';
@@ -37,6 +38,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _ensurePioneerMembership();
     _maybePromptForReview();
     _checkNearbyMatches();
+    _startBackgroundProximity();
   }
 
   Future<void> _ensurePioneerMembership() async {
@@ -48,6 +50,18 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       await PioneerService.instance.claimCurrentUserMembership();
     } catch (e) {
       debugPrint('MainScreen: pioneer membership claim failed: ');
+    }
+  }
+
+  Future<void> _startBackgroundProximity() async {
+    try {
+      final enabled = await ProximityService.instance.isProximityEnabled();
+      if (enabled) {
+        await BackgroundProximityService().initialize();
+        await BackgroundProximityService().start();
+      }
+    } catch (e) {
+      debugPrint('Background proximity start failed');
     }
   }
 
