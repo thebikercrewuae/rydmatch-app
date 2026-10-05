@@ -483,6 +483,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       value: enabled,
                       activeThumbColor: AppTheme.secondaryDark,
                       onChanged: (v) async {
+                        if (v) {
+                          final shouldEnable = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              backgroundColor: AppTheme.cardDark,
+                              title: const Text('Nearby Rider Alerts', style: TextStyle(color: Colors.white)),
+                              content: const Text('RydMatch will access your location in the background to alert you when matched riders are nearby. You can turn this off at any time in Settings.', style: TextStyle(color: Colors.white70)),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel', style: TextStyle(color: Colors.white54))),
+                                TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Allow', style: TextStyle(color: AppTheme.secondaryDark))),
+                              ],
+                            ),
+                          );
+                          if (shouldEnable != true) return;
+                        }
                         await ProximityService.instance.setProximityEnabled(v);
                         if (v) {
                           await BackgroundProximityService().initialize();
@@ -532,7 +547,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       SizedBox(height: 1.h),
     ];
   }
-
   String _ambassadorSubtitle() {
     final code = _ambassadorCode?.trim();
     final suffix = code == null || code.isEmpty ? '' : ' - $code';
