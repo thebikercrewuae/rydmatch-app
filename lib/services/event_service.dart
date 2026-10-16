@@ -251,7 +251,17 @@ class EventService {
     }
   }
 
-  // Event ride groups
+    String generateStaffShareText(String code, String eventName) {
+    return [
+      'You are invited to staff the event: ', eventName, '\n\n',
+      '1. Download RydMatch from the App Store or Google Play\n',
+      '2. Open the app and tap Event Staff Sign up with code\n',
+      '3. Enter this code: ', code, '\n\n',
+      'App Store: https://apps.apple.com/us/app/rydmatch/id6784371001\n',
+      'Google Play: https://play.google.com/store/apps/details?id=com.rydmatch.app',
+    ].join('');
+  }
+// Event ride groups
   Future<List<Map<String, dynamic>>> getEventGroups(String eventId) async {
     try {
       final response = await _client
@@ -327,13 +337,15 @@ class EventService {
     }
   }
 
-  Future<int> endEvent(String eventId) async {
+  Future<Map<String, dynamic>?> endEvent(String eventId) async {
     try {
       final response = await _client.rpc('end_event', params: {'p_event_id': eventId});
-      return (response as num?)?.toInt() ?? 0;
+      if (response is Map) return response as Map<String, dynamic>;
+      if (response is int) return {'deleted_count': response};
+      return null;
     } catch (e) {
       debugPrint('endEvent error');
-      return 0;
+      return null;
     }
   }
 

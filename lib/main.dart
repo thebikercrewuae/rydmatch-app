@@ -67,9 +67,16 @@ void main() async {
     final uri = Uri.base;
     final isJoinRideLink = uri.path.startsWith('/join/');
     joinGroupId = isJoinRideLink ? uri.path.split('/').last : null;
+    final isJoinGroupLink = uri.path.startsWith('/join-group/');
+    final joinGroupToken = isJoinGroupLink ? uri.path.split('/').last : null;
     final isPasswordResetLink = uri.path == '/reset-password' || uri.fragment.contains('/reset-password') || uri.queryParameters['type'] == 'recovery' || uri.fragment.contains('type=recovery');
 
     if (isJoinRideLink && joinGroupId != null && joinGroupId.isNotEmpty) {
+      initialRoute = '/main-screen';
+    } else if (isJoinGroupLink && joinGroupToken != null && joinGroupToken.isNotEmpty) {
+      // Store the token for the group scanner to use after login
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('pending_join_group_token', joinGroupToken);
       initialRoute = '/main-screen';
     } else if (isPasswordResetLink) {
       initialRoute = '/reset-password';

@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -13,6 +13,7 @@ enum NotificationType {
   rideStarted,
   emergencySos,
   adminDiagnosticsReview,
+  eventEnded,
   urgentAlert;
 
   static NotificationType fromString(String value) {
@@ -31,6 +32,8 @@ enum NotificationType {
         return NotificationType.emergencySos;
       case 'admin_diagnostics_review':
         return NotificationType.adminDiagnosticsReview;
+      case 'event_ended':
+        return NotificationType.eventEnded;
       case 'urgent_alert':
         return NotificationType.urgentAlert;
       default:
@@ -54,6 +57,8 @@ enum NotificationType {
         return 'emergency_sos';
       case NotificationType.adminDiagnosticsReview:
         return 'admin_diagnostics_review';
+      case NotificationType.eventEnded:
+        return 'event_ended';
       case NotificationType.urgentAlert:
         return 'urgent_alert';
     }
@@ -145,6 +150,20 @@ class AppNotification {
       }
     }
 
+
+    // Handle event ended notifications - route to post-event screen
+    if (type == NotificationType.eventEnded) {
+      // Extract event name from the notification body
+      final bodyText = json['body'] as String? ?? '';
+      String eventName = bodyText;
+      // Try to extract the event name from the body text "The event X has ended..."
+      final match = RegExp(r'The event (.+?) has ended').firstMatch(bodyText);
+      if (match != null) {
+        eventName = match.group(1) ?? bodyText;
+      }
+      actionRoute = '/post-event-screen';
+      actionArguments = {'eventName': eventName};
+    }
     // Handle live ride started notifications
     if (type == NotificationType.rideStarted) {
       if (actionArguments != null) {

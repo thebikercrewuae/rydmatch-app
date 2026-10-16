@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -97,6 +97,17 @@ class _NotificationBannerOverlayState extends State<NotificationBannerOverlay> {
                   }
                 }
 
+
+                // Handle event ended notifications
+                if (entry.notification.type == NotificationType.eventEnded) {
+                  final args = entry.notification.actionArguments;
+                  final eventName = args?['eventName'] as String? ?? 'Event';
+                  Navigator.of(context, rootNavigator: true).pushNamed(
+                    '/post-event-screen',
+                    arguments: eventName,
+                  );
+                  return;
+                }
                 if (route != null && route.isNotEmpty) {
                   if (route == '/chat-screen' && args != null) {
                     Navigator.of(context, rootNavigator: true).push(
@@ -188,6 +199,8 @@ class _NotificationBannerState extends State<_NotificationBanner>
         return Icons.emergency_rounded;
       case NotificationType.adminDiagnosticsReview:
         return Icons.manage_search_rounded;
+      case NotificationType.eventEnded:
+        return Icons.event_available_rounded;
       case NotificationType.urgentAlert:
         return Icons.warning_amber_rounded;
     }
@@ -209,6 +222,8 @@ class _NotificationBannerState extends State<_NotificationBanner>
         return const Color(0xFFB3261E);
       case NotificationType.adminDiagnosticsReview:
         return const Color(0xFF1B365D);
+      case NotificationType.eventEnded:
+        return const Color(0xFF22c55e);
       case NotificationType.urgentAlert:
         return const Color(0xFFB7791F);
     }

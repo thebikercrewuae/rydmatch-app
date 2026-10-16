@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -50,6 +50,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return Icons.emergency_rounded;
       case NotificationType.adminDiagnosticsReview:
         return Icons.manage_search_rounded;
+      case NotificationType.eventEnded:
+        return Icons.event_available_rounded;
       case NotificationType.urgentAlert:
         return Icons.warning_amber_rounded;
     }
@@ -71,6 +73,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return const Color(0xFFB3261E);
       case NotificationType.adminDiagnosticsReview:
         return const Color(0xFF1B365D);
+      case NotificationType.eventEnded:
+        return const Color(0xFF22c55e);
       case NotificationType.urgentAlert:
         return const Color(0xFFB7791F);
     }
@@ -92,6 +96,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return 'Emergency SOS';
       case NotificationType.adminDiagnosticsReview:
         return 'Diagnostics';
+      case NotificationType.eventEnded:
+        return 'Event Ended';
       case NotificationType.urgentAlert:
         return 'Urgent';
     }
@@ -137,6 +143,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       }
     }
 
+
+    if (notification.type == NotificationType.eventEnded) {
+      final args = notification.actionArguments;
+      final eventName = args?['eventName'] as String? ?? 'Event';
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pushNamed(
+        '/post-event-screen',
+        arguments: eventName,
+      );
+      return;
+    }
     final route = notification.actionRoute;
     if (route != null && route.isNotEmpty) {
       if (!mounted) return;

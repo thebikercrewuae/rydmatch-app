@@ -57,6 +57,23 @@
                     android:host="rydmatch.com"
                     android:path="/strava-callback" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="rydmatch"
+                    android:host="join-group" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="rydmatch.com"
+                    android:pathPrefix="/join-group/" />
+            </intent-filter>
         </activity>
 
         <service

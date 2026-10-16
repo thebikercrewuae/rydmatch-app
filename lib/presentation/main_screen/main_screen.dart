@@ -7,6 +7,7 @@ import '../../services/notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/pioneer_service.dart';
 import '../../services/proximity_service.dart';
+import '../../services/event_service.dart';
 import '../../services/background_proximity_service.dart';
 import '../../services/premium_service.dart';
 import '../../services/rating_service.dart';
@@ -39,6 +40,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _maybePromptForReview();
     _checkNearbyMatches();
     _startBackgroundProximity();
+    _checkPendingJoinGroup();
   }
 
   Future<void> _ensurePioneerMembership() async {
@@ -51,6 +53,25 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('MainScreen: pioneer membership claim failed: ');
     }
+  }
+
+  Future<void> _checkPendingJoinGroup() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('pending_join_group_token');
+      if (token == null || token.isEmpty) return;
+      await prefs.remove('pending_join_group_token');
+      final group = await EventService.instance.joinGroupByQr(token);
+      if (group != null && mounted) {
+        final groupName = group['name'] as String? ?? 'Group';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(['Joined ', groupName, ' successfully!'].join()),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   Future<void> _startBackgroundProximity() async {
