@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +15,7 @@ import '../../services/theme_service.dart';
 import '../../services/session_service.dart';
 import '../../services/haptic_service.dart';
 import '../../services/referral_service.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../widgets/app_icons.dart';
 import '../../widgets/app_logo_widget.dart';
 import '../../services/supabase_service.dart';
@@ -300,7 +301,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
 
-                // ── Notifications ──────────────────────────────────────
+                
+// ── Invite Riders ────────────────────────────────────
+SettingsSectionWidget(
+  title: 'Invite Riders',
+  children: [
+    SettingsRowWidget(
+      icon: Icons.person_add_rounded,
+      iconColor: const Color(0xFF1A6BFF),
+      title: 'Invite Friends to RydMatch',
+      subtitle: 'Invite riders to join the RydMatch community',
+      onTap: () => _shareInviteLink(context),
+    ),
+  ],
+),
+// ── Notifications ──────────────────────────────────────
                 SettingsSectionWidget(
                   title: 'Notifications',
                   children: [
@@ -1589,6 +1604,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _shareInviteLink(BuildContext context) async {
+    try {
+      final stats = await ReferralService().getOrCreateReferralCode();
+      if (stats == null || stats.code.isEmpty) {
+        await SharePlus.instance.share(
+          ShareParams(
+            text: 'Join me on RydMatch - the motorcycle community app. Discover riders, join group rides, and find events near you!\n\nApp Store: https://apps.apple.com/us/app/rydmatch/id6784371001\nGoogle Play: https://play.google.com/store/apps/details?id=com.rydmatch.app',
+            subject: 'Join me on RydMatch',
+          ),
+        );
+        return;
+      }
+
+      await SharePlus.instance.share(
+        ShareParams(
+          text: 'Join me on RydMatch - the motorcycle community app. Discover riders, join group rides, and find events near you!\n\nUse my referral code: ${stats.code}\n\nApp Store: https://apps.apple.com/us/app/rydmatch/id6784371001\nGoogle Play: https://play.google.com/store/apps/details?id=com.rydmatch.app',
+          subject: 'Join me on RydMatch',
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not generate invite link')),
+      );
+    }
   }
 
   void _showSignOutDialog(BuildContext context) {

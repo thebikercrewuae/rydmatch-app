@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io' if (dart.library.io) 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/diagnostics_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/pioneer_service.dart';
@@ -551,6 +552,23 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   }
 
   Future<void> _loadPioneerStatus(String userId) async {
+    // First check cached pioneer status from SharedPreferences
+    // This was set during restoreProfileFromSupabase on app launch
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedIsPioneer = prefs.getBool('_is_pioneer') ?? false;
+      final cachedPioneerNumber = prefs.getInt('_pioneer_number');
+      if (cachedIsPioneer && cachedPioneerNumber != null) {
+        if (mounted) {
+          setState(() {
+            _isPioneer = true;
+            _pioneerNumber = cachedPioneerNumber;
+          });
+        }
+      }
+    } catch (_) {}
+
+    // Then fetch fresh status from Supabase to ensure accuracy
     final status = await PioneerService.instance.getStatus(userId);
     if (!mounted) return;
     setState(() {

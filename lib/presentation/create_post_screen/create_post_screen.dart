@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sizer/sizer.dart';
@@ -61,6 +61,30 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     _photoUrlController.dispose();
     _distanceController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Map<String, dynamic> && args['photoPath'] != null) {
+      _loadPreselectedPhoto(args['photoPath'] as String);
+    }
+  }
+
+  Future<void> _loadPreselectedPhoto(String path) async {
+    setState(() => _isUploadingPhoto = true);
+    try {
+      final photoUrl = await ProfileService.uploadPhoto(
+        XFile(path),
+        'ride-feed',
+      );
+      if (photoUrl != null && mounted) {
+        setState(() => _photoUrlController.text = photoUrl);
+      }
+    } catch (_) {} finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
   }
 
   Future<void> _loadData() async {
@@ -574,6 +598,20 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           ],
         ),
         actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context, rootNavigator: true)
+                        .pushNamed('/ride-feed-screen');
+                  },
+                  child: Text(
+                    'Feed',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ),
           Padding(
             padding: EdgeInsets.only(right: 3.w),
             child: TextButton(

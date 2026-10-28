@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -189,10 +189,31 @@ class PremiumService extends ChangeNotifier {
         if (_isPioneer) {
           _isPremiumAccount = true;
           _priorityListingsEnabled = true;
+          // Cache for future quick access
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('_is_pioneer', true);
+          if (pioneerStatus != null) {
+            await prefs.setInt('_pioneer_number', pioneerStatus.number);
+          }
+        } else {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('_is_pioneer', false);
+          await prefs.remove('_pioneer_number');
         }
       } catch (e) {
         debugPrint('PremiumService pioneer lookup failed: $e');
-        _isPioneer = false;
+        // Fallback to cached pioneer status
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final cachedPioneer = prefs.getBool('_is_pioneer') ?? false;
+          _isPioneer = cachedPioneer;
+          if (cachedPioneer) {
+            _isPremiumAccount = true;
+            _priorityListingsEnabled = true;
+          }
+        } catch (_) {
+          _isPioneer = false;
+        }
       }
 
       _isLoaded = true;

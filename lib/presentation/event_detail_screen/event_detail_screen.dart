@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -6,6 +6,7 @@ import 'package:add_2_calendar/add_2_calendar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/event_service.dart';
 import '../../theme/app_theme.dart';
+import '../live_ride/live_ride_navigation.dart';
 
 class EventDetailScreen extends StatefulWidget {
   const EventDetailScreen({super.key});
@@ -19,6 +20,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   bool _loading = true;
   EventInfo? _event;
   EventApplicationInfo? _myApp;
+  List<Map<String, dynamic>> _myGroups = [];
+  bool _startingRide = false;
   String? _error;
 
   // Form fields
@@ -46,6 +49,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       _event = event;
       if (event != null) {
         _myApp = await _eventService.getMyApplication(event.id);
+        _myGroups = await _eventService.getMyEventGroups(event.id);
       }
     } catch (e) {
       _error = 'Failed to load event';
@@ -97,6 +101,34 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     super.dispose();
   }
 
+
+  Future<void> _startLiveRide(Map<String, dynamic> group) async {
+    setState(() => _startingRide = true);
+    try {
+      final session = await _eventService.startEventLiveRide(group['id']);
+      if (session != null && mounted) {
+        final sessionId = session['id'] as String;
+        await LiveRideNavigation.open(
+          context,
+          sessionId: sessionId,
+          isCreator: true,
+          useRootNavigator: true,
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to start live ride'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _startingRide = false);
+    }
+  }
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -249,6 +281,133 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     ),
                   ),
 
+
+                  // My Groups (for leaders and members)
+                  if (_myGroups.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    const Text('My Ride Groups', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    ..._myGroups.map((group) => Card(
+                      color: AppTheme.cardDark,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    group['name'] as String? ?? 'Group',
+                                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                if (group['leader_id'] == Supabase.instance.client.auth.currentUser?.id)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Text('Leader', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w600)),
+                                  ),
+                              ],
+                            ),
+                            if (group['description'] != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  group['description'] as String,
+                                  style: const TextStyle(color: Colors.white54, fontSize: 13),
+                                ),
+                              ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                // Show QR Code button
+                                OutlinedButton.icon(
+                                  onPressed: () {
+                                    Navigator.pushNamed(
+                                      context,
+                                      '/group-qr-screen',
+                                      arguments: {
+                                        'groupId': group['id'],
+                                        'groupName': group['name'],
+                                        'qrToken': group['qr_token'],
+                                      },
+                                    );
+                                  },
+                                  icon: const Icon(Icons.qr_code, size: 18),
+                                  label: const Text('Show QR'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppTheme.secondaryDark,
+                                    side: BorderSide(color: AppTheme.secondaryDark.withValues(alpha: 0.5)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                // Voice + Chat shortcut - goes directly to the group's channel
+                                if (group['channel_id'] != null) ...[
+                                  OutlinedButton.icon(
+                                    onPressed: () {
+                                      Navigator.pushNamed(
+                                        context,
+                                        '/event-chat-screen',
+                                        arguments: {
+                                          'channelId': group['channel_id'],
+                                          'channelName': group['name'] != null ? group['name'] + ' Comms' : 'Channel',
+                                        },
+                                      );
+                                    },
+                                    icon: const Icon(Icons.mic, size: 18),
+                                    label: const Text('Voice'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.green,
+                                      side: const BorderSide(color: Colors.green),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  OutlinedButton.icon(
+                                    onPressed: () {
+                                      Navigator.pushNamed(
+                                        context,
+                                        '/event-channels-screen',
+                                        arguments: {'eventId': _event!.id},
+                                      );
+                                    },
+                                    icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                                    label: const Text('Channels'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.white54,
+                                      side: const BorderSide(color: Colors.white54),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(width: 12),
+                                // Start Live Ride button (for leaders and organizers)
+                                OutlinedButton.icon(
+                                  onPressed: _startingRide ? null : () => _startLiveRide(group),
+                                  icon: _startingRide
+                                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orange))
+                                      : const Icon(Icons.navigation, size: 18),
+                                  label: const Text('Start Ride'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.orange,
+                                    side: const BorderSide(color: Colors.orange),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    )),
+                  ],
                   const SizedBox(height: 24),
 
                   // Not logged in

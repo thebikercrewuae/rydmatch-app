@@ -1,9 +1,10 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'diagnostics_service.dart';
+import 'pioneer_service.dart';
 import 'photo_safety_service.dart';
 
 class ProfileService {
@@ -906,6 +907,20 @@ class ProfileService {
         }
       }
 
+      // Restore pioneer status so it's immediately available
+      // without waiting for PremiumService.refresh or profile screen to load
+      try {
+        final pioneerStatus = await PioneerService.instance.getStatus(currentUser.id);
+        if (pioneerStatus != null) {
+          await prefs.setBool('_is_pioneer', true);
+          await prefs.setInt('_pioneer_number', pioneerStatus.number);
+        } else {
+          await prefs.setBool('_is_pioneer', false);
+          await prefs.remove('_pioneer_number');
+        }
+      } catch (_) {
+        // Non-critical — pioneer status will be fetched by PremiumService.refresh
+      }
       // Mark profile as complete locally
       await prefs.setBool(_keyIsProfileComplete, true);
     } catch (e) {

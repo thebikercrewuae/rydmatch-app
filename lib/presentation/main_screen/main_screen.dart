@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../widgets/custom_bottom_bar.dart';
@@ -14,6 +14,7 @@ import '../../services/rating_service.dart';
 import '../../widgets/notification_banner_overlay.dart';
 import '../../theme/app_theme.dart';
 import '../discovery_screen/discovery_screen.dart';
+import 'package:image_picker/image_picker.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -167,6 +168,30 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     setState(() => _currentIndex = 3);
   }
 
+
+  Future<void> _openCameraToPost() async {
+    try {
+      final photo = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+        maxWidth: 2048,
+      );
+      if (photo == null || !mounted) return;
+
+      // Navigate to create post screen with the photo
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pushNamed(
+          '/create-post-screen',
+          arguments: {'photoPath': photo.path},
+        );
+      }
+    } catch (e) {
+      // If camera fails (permission denied or not available), fall back to create post screen
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pushNamed('/create-post-screen');
+      }
+    }
+  }
   void _openNotifications() {
     Navigator.of(
       context,
@@ -206,6 +231,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                 ),
               ),
               actions: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.camera_alt_outlined,
+                    color: Colors.white,
+                  ),
+                  onPressed: _openCameraToPost,
+                  tooltip: 'Take Photo',
+                ),
                 Padding(
                   padding: const EdgeInsets.only(right: 8.0),
                   child: Stack(
@@ -277,7 +310,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                     Navigator.of(
                       context,
                       rootNavigator: true,
-                    ).pushNamed('/ride-feed-screen').then((_) {
+                    ).pushNamed('/events-screen').then((_) {
                       if (mounted) setState(() => _currentIndex = 0);
                     });
                     setState(() => _currentIndex = 2);

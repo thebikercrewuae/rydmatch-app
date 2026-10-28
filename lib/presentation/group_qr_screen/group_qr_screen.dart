@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../services/event_service.dart';
 import '../../theme/app_theme.dart';
@@ -72,7 +73,7 @@ class _GroupQrScreenState extends State<GroupQrScreen> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: QrImageView(
-                    data: _qrToken!,
+                    data: 'https://rydmatch.com/join-group/$_qrToken',
                     version: QrVersions.auto,
                     size: 250,
                     gapless: true,
@@ -85,12 +86,35 @@ class _GroupQrScreenState extends State<GroupQrScreen> {
               style: TextStyle(color: Colors.white54, fontSize: 12),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 16),
+            if (_qrToken != null)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    final url = 'https://rydmatch.com/join-group/$_qrToken';
+                    Clipboard.setData(ClipboardData(text: url));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Join link copied to clipboard'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.share, size: 18),
+                  label: const Text('Share Join Link'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.secondaryDark,
+                    side: BorderSide(color: AppTheme.secondaryDark.withValues(alpha: 0.5)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
             const SizedBox(height: 32),
-            // Member list
             Row(
               children: [
                 Text(
-                  ['Members (', _members.length.toString(), ')'].join(),
+                  'Members ($_members.length)',
                   style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -129,6 +153,6 @@ class _GroupQrScreenState extends State<GroupQrScreen> {
     final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
     final minute = dt.minute.toString().padLeft(2, '0');
     final ampm = dt.hour >= 12 ? 'PM' : 'AM';
-    return [[hour.toString(), minute].join(':'), ' ', ampm].join();
+    return '$hour:$minute $ampm';
   }
 }

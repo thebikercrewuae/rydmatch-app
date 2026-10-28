@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../services/haptic_service.dart';
 
@@ -54,9 +54,9 @@ class CustomBottomBar extends StatelessWidget {
               _buildNavItem(
                 context: context,
                 index: 2,
-                icon: Icons.photo_library_outlined,
-                activeIcon: Icons.photo_library_rounded,
-                label: 'Ride Feed',
+                icon: Icons.event_outlined,
+                activeIcon: Icons.event_rounded,
+                label: 'Events',
               ),
               _buildNavItem(
                 context: context,

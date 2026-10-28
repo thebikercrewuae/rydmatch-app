@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+﻿import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { AccessToken } from 'npm:livekit-server-sdk';
 
 const corsHeaders = {
@@ -51,15 +51,22 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Get the channel and its event
+    // Get the channel and its event (with payment status)
     const { data: channel, error: channelError } = await adminClient
       .from('event_channels')
-      .select('id, event_id, is_restricted')
+      .select(`id, event_id, is_restricted, events (id, status, pricing_tier, payment_status)`)
       .eq('id', channelId)
       .maybeSingle();
 
     if (channelError || !channel) {
       return jsonResponse({ error: 'Channel not found' }, 404);
+    }
+
+    // Verify the event is paid or comped (payment_status = 'paid')
+    // Free tier events don't require payment, so they're also allowed
+    const event = channel.events;
+    if (event && event.payment_status && event.payment_status !== 'paid' && event.pricing_tier && event.pricing_tier !== 'free') {
+      return jsonResponse({ error: 'Event voice requires payment. Please complete the event payment first.' }, 403);
     }
 
     // Check if user is a member of this channel

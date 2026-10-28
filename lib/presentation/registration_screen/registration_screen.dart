@@ -1,8 +1,9 @@
-import 'package:flutter/gestures.dart';
+﻿import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/analytics_service.dart';
 import '../../services/session_service.dart';
@@ -199,7 +200,15 @@ class _RegistrationScreenState extends State<RegistrationScreen>
         _successAnimController.forward();
         await Future.delayed(const Duration(seconds: 2));
         if (mounted) {
-          Navigator.pushReplacementNamed(context, '/profile-setup-screen');
+          // Check if user joined via event QR code - skip profile setup and go straight to main screen
+          final prefs = await SharedPreferences.getInstance();
+          if (!mounted) return;
+          final hasPendingGroupToken = prefs.getString('pending_join_group_token') != null;
+          if (hasPendingGroupToken) {
+            Navigator.pushNamedAndRemoveUntil(context, '/main-screen', (route) => false);
+          } else {
+            Navigator.pushReplacementNamed(context, '/profile-setup-screen');
+          }
         }
       }
     } on AuthException catch (e) {

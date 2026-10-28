@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EventInfo {
@@ -266,7 +266,7 @@ class EventService {
     try {
       final response = await _client
           .from('event_groups')
-          .select('id, name, description, leader_name, qr_token, max_riders')
+          .select('id, name, description, leader_id, leader_name, qr_token, max_riders, channel_id')
           .eq('event_id', eventId)
           .order('name');
       return (response as List).map((e) => e as Map<String, dynamic>).toList();
@@ -298,6 +298,60 @@ class EventService {
     }
   }
 
+
+  // Get groups where the current user is a leader or member
+  Future<List<Map<String, dynamic>>> getMyEventGroups(String eventId) async {
+    try {
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) return [];
+
+      // Get all groups for this event
+      final response = await _client
+          .from('event_groups')
+          .select('id, name, description, leader_id, leader_name, qr_token, max_riders, channel_id')
+          .eq('event_id', eventId)
+          .order('name');
+      final allGroups = (response as List).map((e) => e as Map<String, dynamic>).toList();
+
+      // Get the user's group memberships
+      final memberResponse = await _client
+          .from('event_group_members')
+          .select('group_id')
+          .eq('user_id', userId);
+      final memberGroupIds = (memberResponse as List)
+          .map((e) => (e as Map<String, dynamic>)['group_id'] as String)
+          .toSet();
+
+      // Filter to groups where user is leader or member
+      final myGroups = <Map<String, dynamic>>[];
+      for (final group in allGroups) {
+        final isLeader = group['leader_id'] == userId;
+        final isMember = memberGroupIds.contains(group['id']);
+        if (isLeader || isMember) {
+          myGroups.add(group);
+        }
+      }
+      return myGroups;
+    } catch (e) {
+      debugPrint('getMyEventGroups error: $e');
+      return [];
+    }
+  }
+
+  // Start a live ride for an event group
+  Future<Map<String, dynamic>?> startEventLiveRide(String eventGroupId) async {
+    try {
+      final response = await _client.rpc('start_event_live_ride', params: {
+        'p_event_group_id': eventGroupId,
+      });
+      if (response is Map) return response as Map<String, dynamic>;
+      if (response is List && response.isNotEmpty) return response.first as Map<String, dynamic>;
+      return null;
+    } catch (e) {
+      debugPrint('startEventLiveRide error: $e');
+      return null;
+    }
+  }
   // Staff signup functions
   Future<Map<String, dynamic>?> verifyStaffCode(String code) async {
     try {
