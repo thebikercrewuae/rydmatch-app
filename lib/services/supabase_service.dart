@@ -1,4 +1,4 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+﻿import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseService {
   static SupabaseService? _instance;
@@ -26,7 +26,7 @@ class SupabaseService {
     await Supabase.initialize(
       url: supabaseUrl,
       publishableKey: supabaseAnonKey,
-    );
+    ).timeout(const Duration(seconds: 10));
   }
 
   // Get Supabase client

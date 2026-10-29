@@ -162,7 +162,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
           // Persist the local session flags so the user stays signed in
           // across app launches. Without this, a freshly-registered
           // pioneer would be bounced back to the login screen next launch.
-          await SessionService.saveSession(staySignedIn: true);
+          await SessionService.saveSession(staySignedIn: true).timeout(const Duration(seconds: 3));
         } catch (e) {
           debugPrint('Registration: saveSession failed: $e');
         }

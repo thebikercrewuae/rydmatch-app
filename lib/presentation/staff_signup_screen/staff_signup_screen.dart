@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/event_service.dart';
 import '../../services/session_service.dart';
@@ -96,8 +96,8 @@ class _StaffSignupScreenState extends State<StaffSignupScreen> {
         );
 
         if (response.session != null) {
-          await SessionService.saveSession(staySignedIn: true);
-          await ProfileService.restoreProfileFromSupabase();
+          await SessionService.saveSession(staySignedIn: true).timeout(const Duration(seconds: 3));
+          await ProfileService.restoreProfileFromSupabase().timeout(const Duration(seconds: 5));
           await PremiumService().refresh();
 
           if (mounted) {

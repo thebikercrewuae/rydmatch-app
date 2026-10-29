@@ -57,3 +57,7 @@ android/key.properties
 # Local load-test fixtures and output
 load-tests/accounts.json
 load-tests/results/
+
+gradle-build.log
+build-*.zip
+token_usage.json

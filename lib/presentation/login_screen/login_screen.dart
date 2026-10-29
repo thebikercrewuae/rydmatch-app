@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sizer/sizer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -58,19 +58,19 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       try {
-        await SessionService.saveSession(staySignedIn: _staySignedIn);
+        await SessionService.saveSession(staySignedIn: _staySignedIn).timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint('LoginScreen: saveSession failed: $e');
       }
 
       try {
-        await ProfileService.restoreProfileFromSupabase();
+        await ProfileService.restoreProfileFromSupabase().timeout(const Duration(seconds: 5));
       } catch (e) {
         debugPrint('LoginScreen: restoreProfileFromSupabase failed: $e');
       }
 
       try {
-        await PremiumService().refresh();
+        await PremiumService().refresh(reason: 'login').timeout(const Duration(seconds: 5));
       } catch (e) {
         debugPrint('LoginScreen: premium refresh failed: $e');
       }
